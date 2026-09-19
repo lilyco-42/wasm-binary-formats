@@ -164,7 +164,11 @@ The ">=200 modules" requirement is not answered by hand-writing 200 readers. It 
 `.ksy` specs** (counted from the git tree, star 795, pushed 2026-09-18), from whose descriptions
 the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
-generates PNG/GIF/BMP readers, and parses fixtures this repo wrote itself - 4 tests, 0 failures.
+generates readers for **37 specs across 10 families** (`tools/kaitai/specs.txt`), and parses
+fixtures this repo wrote itself. Two levels are asserted separately on purpose - a load gate for
+all 37 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 5 that have
+fixtures (PNG, GIF, BMP, ICO, gzip in `test/kaitai.test.mjs`, 6 tests). "It generated" is never
+reported as "it parses".
 
 
 * Licences: **compiler GPLv3+** (so it runs in CI and is never shipped), **JS runtime
