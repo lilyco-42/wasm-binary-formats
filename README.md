@@ -263,22 +263,23 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 29 | 13.2% |
+| own Rust reader, named header fields decoded | 31 | 14.2% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **126** | 57.5% |
-| **covered, any level** | **93** | 42.5% |
+| **no parser at all - real gap** | **124** | 56.6% |
+| **covered, any level** | **95** | 43.4% |
 
 Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `ttf`/`otf`/
-`woff`/`woff2` - the last four because no font writer runs here, not because the table format is hard.
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf`/`woff2` -
+`otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
+Python refuses to install into its own environment.
 
-So the honest answer to the objective is **no, not yet**: 93 of 219 binary labels have a parser
-that runs here (29 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 126 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 95 of 219 binary labels have a parser
+that runs here (31 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 124 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -290,6 +291,7 @@ node tools/coverage.mjs          # writes catalog/coverage.json, the 219-label m
 node scripts/make-fixture.mjs    # rewrites test/fixtures/lab-fixture.apk
 bash scripts/make-media-fixtures.sh    # ffmpeg/Pillow media, tiny.pcx, tiny.pdf
 bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and their probes
+python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
 ```
@@ -370,8 +372,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **93 covered** (29 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **126 with no
+Coverage is scored against magika's 219 binary labels: **95 covered** (31 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **124 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -394,7 +396,10 @@ does not re-derive them:
   over that module (`code_matches_functions`, one code body per declared function, is the check that
   the boundaries are real; the JS test compares the export count with what the host engine reports for
   the same bytes). Same lesson as the PDF writer: look at what already exists before recording a
-  format as unproducible.
+  format as unproducible. Fonts went the same way - `fontTools` is installed and MIT-licensed, and it
+  compiles a two-glyph font out of nothing, so `tiny.ttf`/`tiny.woff` are an independent writer's
+  bytes with no third-party outline to licence (+2 labels; `woff2` still needs `brotli`, which this
+  Python refuses to install into itself).
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
