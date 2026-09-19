@@ -342,6 +342,44 @@ fn reads_a_wave_written_by_ffmpeg_as_pcm() {
 }
 
 #[test]
+fn walks_an_avif_that_libsvtav1_muxed() {
+    // The same ISO base media reader that handles mp4 is what covers AVIF: the file starts with
+    // `ftyp` and the brand, so the box walk needs no new code. ffprobe reads the same file as
+    // major_brand=avif with compatible brands avif, mif1, miaf, MA1B, which is what the two
+    // assertions on the brand list are checking against.
+    let avif = fixture("tiny.avif");
+    let length = avif.len();
+    assert_eq!(parse_container(&avif), FORMAT_BMFF);
+    let lines = container_fields();
+    assert_eq!(
+        lines[0], "ftyp\tavif\t0",
+        "brand and minor version: {lines:#?}"
+    );
+    assert_eq!(
+        rows_starting(&lines, "box\t"),
+        vec![
+            "box\tftyp\t32\t0".to_string(),
+            "box\tmeta\t249\t32".to_string(),
+            "box\tmdat\t290\t281".to_string(),
+        ],
+        "AVIF carries no moov, so this is the whole top level: {lines:#?}"
+    );
+    assert_eq!(
+        rows_starting(&lines, "brand\t").len(),
+        4,
+        "avif, mif1, miaf, MA1B: {lines:#?}"
+    );
+    assert!(
+        !lines.iter().any(|row| row.starts_with("duration")),
+        "without a mvhd there is no duration to report: {lines:#?}"
+    );
+    assert!(
+        lines.contains(&"walked\tend".to_string()),
+        "the three boxes must account for all {length} bytes: {lines:#?}"
+    );
+}
+
+#[test]
 fn refuses_media_readers_on_bytes_that_are_not_those_formats() {
     // A png is RIFF-free and holds no fLaC, OggS or MPEG sync at the offsets these readers probe.
     let png = fixture("tiny.png");

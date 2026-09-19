@@ -34,6 +34,9 @@ make() { # make <name> <encoder args...>
 # ISO base media file format.
 make media.mp4 $V -c:v libx264 -pix_fmt yuv420p -g 5
 make media-av.mp4 $V -i "sine=frequency=440:duration=1" -c:v libx264 -c:a aac -shortest
+# AVIF is the same box framing with a different brand, so one fixture covers both readers. There is
+# no HEIF muxer in this ffmpeg build, which is why `heif` is not claimed.
+make tiny.avif -f lavfi -i testsrc2=size=32x24 -frames:v 1 -c:v libsvtav1
 
 # Matroska and its WebM profile: the EBML tree, which no Kaitai spec covers.
 make media.mkv $V -c:v libx264

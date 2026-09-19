@@ -33,7 +33,7 @@ const SELF = {
   ocx: ['fields'], cpl: ['fields'], scr: ['fields'], dex: ['fields'], elf: ['fields'], swf: ['fields'],
   zip: ['container'], jar: ['container'], apk: ['container'], gzip: ['fields'], sqlite: ['fields'],
   xz: ['fields'], bzip: ['fields'], lz4: ['fields'], zst: ['container'],
-  mp4: ['fields'], mkv: ['fields'], webm: ['fields'], avi: ['container'],
+  mp4: ['fields'], mkv: ['fields'], webm: ['fields'], avi: ['container'], avif: ['container'],
   flac: ['fields'], mp3: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['container'],
 };

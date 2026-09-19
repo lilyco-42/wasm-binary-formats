@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 48,
     "selfFields": 23,
-    "selfContainer": 10,
+    "selfContainer": 11,
     "binarySpecAvailable": 0,
-    "gaps": 138,
+    "gaps": 137,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,7 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "video": 5,
+      "video": 4,
       "unknown": 59,
       "image": 14,
       "archive": 16,
@@ -443,8 +443,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "avro",
