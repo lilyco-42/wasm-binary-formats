@@ -260,20 +260,23 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 25 | 11.4% |
-| own Rust reader, container framing only | 22 | 10.0% |
+| own Rust reader, named header fields decoded | 26 | 11.9% |
+| own Rust reader, container framing only | 21 | 9.6% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
 | **no parser at all - real gap** | **131** | 59.8% |
 | **covered, any level** | **88** | 40.2% |
 
-Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
-MKV/WebM/EBML, FLAC, MP3 audio frames, tar, 7z, bzip2/bzip3, xz, zstd, cab, ar/arc/arj, deb, CHM,
-COFF, Arrow/Parquet/Avro, ONNX, DMG, WIM, VHD, HFS, SquashFS, NTFS, EXFAT.
+Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
+Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
+and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, `ttf`/`otf`/`woff`/
+`woff2`, `psd`/`qoi`/`icc`-class image types, and `wma`/`wmv` (whose ASF container we do walk, but the
+matrix counts a label covered only where a reader is keyed to it).
 
-So the honest answer to the objective is **no, not yet**: 73 of 219 binary labels have a parser
-that runs here (13 field-level, 9 container-level from our own Rust engine, 51 generated from Kaitai
-specs and load-gated in CI), 146 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 88 of 219 binary labels have a parser
+that runs here (26 field-level and 21 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 131 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -281,7 +284,10 @@ signature table covers 353 types for naming a file, which is not the same as par
 ```bash
 node scripts/fetch-sources.mjs   # pulls Tika, libarchive, LIEF, Apktool, v86
 node scripts/build-catalog.mjs   # writes catalog/formats.json and the counts above
+node tools/coverage.mjs          # writes catalog/coverage.json, the 219-label matrix
 node scripts/make-fixture.mjs    # rewrites test/fixtures/lab-fixture.apk
+bash scripts/make-media-fixtures.sh    # ffmpeg/Pillow media, tiny.pcx, tiny.pdf
+bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and their probes
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
 ```
@@ -332,39 +338,56 @@ builds the wasm target and runs both test layers on CI.
   and the stream. One `assert.equal(pcx.palette256, undefined)` cost 37 s to fail - long enough to
   stall the CI step and look like a hang. The whole media file now runs in 18 ms, because the
   assertions compare scalars and lengths instead of handing objects to the comparator.
-* CAB was attempted and **not** implemented, on purpose. `makecab.exe` here produces a cabinet whose
+* A generator that quietly writes the wrong document reads as a reader bug. The two-page A4 sample
+  came out as one Letter page because `printf 'a' 'b' 'c'` treats everything after the first argument
+  as a substitution rather than as more text, so the continued string that carried the `@page` rule
+  and the `<body>` was dropped on the floor. The test for it would have failed against a correct
+  reader. `scripts/make-pdf-fixtures.sh` now counts the page boxes in the file it wrote and exits non-zero
+  when they disagree with what the tests assert. The same run also showed why a Windows GUI binary is
+  a poor place to read provenance from: `chrome.exe --version` prints in the console codepage, and the
+  mojibake landed in the probe JSON, so the recorded producer comes from the PDF's own `/Producer`
+  string (`Skia/PDF m153`) instead.
+* CAB was attempted and **partly** implemented, on purpose. `makecab.exe` here produces a cabinet whose
   file table decodes exactly as documented - 16-byte `CFFILE` records at `coffFiles`, names
   `payload.txt` and `second.txt`, sizes 50 and 50, matching `expand -D` - but its folder area is
   `coffFiles - 36 = 8` bytes for `cFolders = 1`, where `CFFOLDER` is specified as 16, and the two
   u16s in those 8 bytes read 1 and 1 rather than the 59 compressed / 100 uncompressed bytes the
-  folder actually holds. Rather than guess a layout from one sample, the reader was left unwritten
-  and `cab` stays a recorded gap. Revisit with a second cabinet (a larger one, and one from another
-  writer) before coding against either interpretation.
+  folder actually holds. The reader walks the file table and stops there; the folder area stays
+  unwritten rather than guessed from one sample, so `cab` is a container-level credit. Revisit with a
+  second cabinet (a larger one, and one from another writer) before coding against either
+  interpretation.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **84 covered** (25 field-level and 18
-container-level from this repo's own readers, 41 generated and mostly load-gated), **135 with no
+Coverage is scored against magika's 219 binary labels: **88 covered** (26 field-level and 21
+container-level from this repo's own readers, 41 generated and mostly load-gated), **131 with no
 parser**. Three things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
-* Ready to build, producers verified on this machine: ASF/WMV/WMA and FLV. ffmpeg 9 writes both here
-  (a 6 906-byte `.asf` and a 1 772-byte `.flv`), and neither has a Kaitai spec in the pinned bundle,
-  so each needs one new framing reader plus a fixture and its own assertions. `test/fixtures/media.asf`
-  and `test/fixtures/media_asf.probe.json` are committed already, measured rather than recalled:
-  top level is two objects of 456 and 6 450 bytes whose lengths sum to the file exactly, each
-  preceded by a 16-byte GUID and a `u64le` size, and `ffprobe` independently reads the same file as
-  container `asf`, 0.200000 s, PCM s16le mono at 8 kHz. One caution from writing this note: the GUID
-  tail I expected for the header object from memory was wrong (`…00AA0061CE80` versus the file's
-  `3026b2758e66cf11a6d900aa0062ce6c`), so the constants should be lifted from the spec text or from
-  these bytes - not from a recollection, which is the failure mode this section keeps documenting.
-* Refused rather than guessed: **CAB** - `makecab` produces a cabinet whose *file* table decodes
-  exactly as documented and matches `expand -D`, but whose folder area is 8 bytes where `CFFOLDER` is
-  specified as 16, so one sample contradicts the layout and no reader was written. **PAM (P7)** ends
-  its header with the token `ENDHDR` instead of a fixed count of integers, so the Netpbm reader
-  rejects it rather than reporting a geometry from the wrong offsets. **IPv4** is still unresolved:
-  the generated reader over-reads the hand-built 24-byte packet by four bytes, and until that is
-  explained the format is not claimed.
+* A format only looked blocked because the producer was looked for in the wrong place. PDF has no
+  Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
+  was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
+  Chromium is a second, independent PDF writer (`Skia/PDF m153` in the file's own `/Producer`), and
+  the four committed fixtures now cross each other: Skia numbers objects in Pillow's opposite order,
+  puts the catalog at 13 rather than 4, writes A4 as `594.95996` points where Pillow's pages are
+  whole, and carries a `/Count` that a tree need not agree with. So the reader resolves the trailer's
+  `/Root` through the cross-reference table, walks `/Kids` to the leaves, and reports the claimed
+  `/Count` beside the leaves it found; the depth and node caps are exercised by a hand-written tree
+  whose `/Kids` points back at itself. Lesson kept general: before coding around a "no producer"
+  claim, search the installed binaries as well as the package indexes.
+* The ASF/FLV/CAB group listed here as "ready to build" is built: all three walk their objects or
+  records against ffmpeg's and `makecab`'s own bytes, and are credited at container level only.
+  Ready to build, still unbuilt: the compound-file Office types (`doc`, `xls`, `ppt`, `chm`) need a
+  CFB writer, and nothing installed here produces one: no Office and no `libreoffice` on PATH, no
+  `olefile` in the Python environment, so the fixture would have to be authored by hand and would
+  only test itself.
+* Refused rather than guessed: **CAB's folder area** - the *file* table decodes exactly as documented
+  and matches `expand -D`, but `makecab` gives it 8 bytes where `CFFOLDER` is specified as 16, so the
+  reader stops at the file table and `cab` is credited as a container, not a field-level parser.
+  **PAM (P7)** ends its header with the token `ENDHDR` instead of a fixed count of integers, so the
+  Netpbm reader rejects it rather than reporting a geometry from the wrong offsets. **IPv4** is still
+  unresolved: the generated reader over-reads the hand-built 24-byte packet by four bytes, and until
+  that is explained the format is not claimed.
 * Blocked on somebody else: `wasm` has no producer on this machine (no toolchain runs locally, and
   the scoop and Git installations contain no `.wasm` to read), and 28 generated readers still have
   no fixture because nothing here writes rpm, xar, ext2, GPT, ISO 9660, registry hives or

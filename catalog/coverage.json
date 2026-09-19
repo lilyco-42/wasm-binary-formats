@@ -7,8 +7,8 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 25,
-    "selfContainer": 22,
+    "selfFields": 26,
+    "selfContainer": 21,
     "binarySpecAvailable": 0,
     "gaps": 131,
     "implementedHere": [
@@ -3008,8 +3008,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "container",
-      "status": "self-container"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "pebin",
