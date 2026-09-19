@@ -327,6 +327,7 @@ test('the audio, stream and package readers answer the same way', () => {
   const cases = [
     ['audio', 'media.flac', 12], ['audio', 'media.mp3', 13],
     ['audio', 'media.ogg', 14], ['audio', 'media.wav', 15],
+    ['audio', 'media.mp2', 24], ['audio', 'media-192k.mp2', 24],
     ['stream', 'stream.gz', 9], ['stream', 'stream.xz', 5], ['stream', 'stream.bz2', 6],
     ['stream', 'stream.lz4', 7], ['stream', 'stream.zst', 8],
     ['document', 'tiny.docx', 1], ['document', 'tiny.xlsx', 2], ['document', 'tiny.pptx', 3],
@@ -355,7 +356,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
     ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
-    ['audio', 'media.wav', 'wave'],
+    ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
     ['stream', 'stream.lz4', 'lz4'], ['stream', 'stream.zst', 'zstd'],
     ['document', 'tiny.docx', 'docx'], ['document', 'tiny.epub', 'epub'], ['document', 'tiny.odp', 'odp'],

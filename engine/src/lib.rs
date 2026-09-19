@@ -376,7 +376,8 @@ pub extern "C" fn parse_audio(ptr: *const u8, len: i32) -> i32 {
     audio::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
 }
 
-/// Which audio header was recognised: 0 none, 12 FLAC, 13 MPEG audio, 14 Ogg, 15 WAVE.
+/// Which audio header was recognised: 0 none, 12 FLAC, 13 MPEG audio (Layer III), 14 Ogg,
+/// 15 WAVE, 24 MPEG audio (Layer II).
 #[no_mangle]
 pub extern "C" fn audio_kind() -> i32 {
     audio::kind()

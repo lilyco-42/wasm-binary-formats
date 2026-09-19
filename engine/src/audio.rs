@@ -13,9 +13,11 @@
 //!         then a 128-bit MD5.
 //!   MP3   an optional ID3v2 header ("ID3", ver, rev, flags, 4x7-bit synchsafe size) then MPEG
 //!         audio frames. A frame header's bits, most significant first: sync(11)=0x7ff,
-//!         version(2) where 3=MPEG1 and 2=MPEG2 and 0=MPEG2.5, layer(2) where 1=Layer III,
-//!         protection(1), bitrate index(4), sample-rate index(2), padding(1), private(1),
-//!         channel mode(2). Layer III frame length = 144*bitrate/samplerate + padding.
+//!         version(2) where 3=MPEG1 and 2=MPEG2 and 0=MPEG2.5, layer(2) where 1=Layer III and
+//!         2=Layer II, protection(1), bitrate index(4), sample-rate index(2), padding(1),
+//!         private(1), channel mode(2). Layer II and Layer III share the frame length
+//!         144*bitrate/samplerate + padding and the 1152 samples per frame; only their bitrate
+//!         tables differ, which is why one walk serves both `.mp3` and `.mp2`.
 //!   Ogg   "OggS", version, header type, granule position i64le, bitstream serial u32le, page
 //!         sequence u32le, checksum u32le, segment count u8, then that many bytes of segment
 //!         lengths; the page is 27 + count + their sum bytes long. The Vorbis identification
@@ -34,6 +36,8 @@ pub const FORMAT_FLAC: i32 = 12;
 pub const FORMAT_MP3: i32 = 13;
 pub const FORMAT_OGG: i32 = 14;
 pub const FORMAT_WAVE: i32 = 15;
+/// MPEG audio Layer II, the format behind an `.mp2`. 16..23 belong to `containers.rs`.
+pub const FORMAT_MP2: i32 = 24;
 
 thread_local! {
     static RESULT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -64,6 +68,7 @@ pub fn name() -> &'static str {
         FORMAT_MP3 => "mpeg-audio",
         FORMAT_OGG => "ogg",
         FORMAT_WAVE => "wave",
+        FORMAT_MP2 => "mp2",
         _ => "unknown",
     }
 }
@@ -164,8 +169,30 @@ const MPEG1_L3: [i64; 16] = [
 const MPEG2_L3: [i64; 16] = [
     0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0,
 ];
+const MPEG1_L2: [i64; 16] = [
+    0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 0,
+];
+const MPEG2_L2: [i64; 16] = [
+    0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0,
+];
 
 fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
+    read_mpeg(bytes, 1, MPEG1_L3, MPEG2_L3)
+}
+
+/// Layer II, which is what an `.mp2` is: the same 1152 samples per frame and the same
+/// `144 * bitrate / rate + padding` stride, with a bitrate table of its own. Both tables were
+/// checked against two ffmpeg encodings (128k and 192k) that each tile their file to the byte.
+fn read_mp2(bytes: &[u8]) -> Option<Vec<String>> {
+    read_mpeg(bytes, 2, MPEG1_L2, MPEG2_L2)
+}
+
+fn read_mpeg(
+    bytes: &[u8],
+    want_layer: i64,
+    table1: [i64; 16],
+    table2: [i64; 16],
+) -> Option<Vec<String>> {
     let mut at = 0usize;
     let mut tag = 0i64;
     if bytes.len() > 10 && &bytes[0..3] == b"ID3" {
@@ -182,9 +209,10 @@ fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
     }
     let version = (header >> 19) & 3;
     let layer = (header >> 17) & 3;
-    if version == 2 || layer != 1 {
-        // Only MPEG 1/2/2.5 Layer III is walked; the other layers differ in frame length and
-        // would be reported with the wrong stride.
+    if version == 2 || layer != want_layer as u32 {
+        // Only MPEG 1/2.5 of the requested layer is walked: MPEG2 (version bits 2) reuses index
+        // values for different rates, and the other layers differ in frame length, so either would
+        // be reported with the wrong stride.
         return None;
     }
     let rates: [i64; 3] = if version == 3 {
@@ -192,13 +220,14 @@ fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
     } else {
         [22050, 24000, 16000]
     };
-    let table: [i64; 16] = if version == 3 { MPEG1_L3 } else { MPEG2_L3 };
+    let table: [i64; 16] = if version == 3 { table1 } else { table2 };
     let sample_rate_index = ((header >> 10) & 3) as usize;
     let first_rate = *rates.get(sample_rate_index)?;
     let mut lines = vec![
         field("id3v2_bytes", tag),
         field("mpeg_version", version),
-        field("layer", 3),
+        // Named, not the two raw bits: the layer field counts down as the bits count up.
+        field("layer", if want_layer == 1 { 3 } else { 2 }),
         field("sample_rate", first_rate),
         field("channel_mode", (header >> 6) & 3),
         field("crc_protected", (header >> 16) & 1),
@@ -216,14 +245,14 @@ fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
             break;
         }
         let frame_version = (word >> 19) & 3;
-        if frame_version == 2 || (word >> 17) & 3 != 1 {
+        if frame_version == 2 || (word >> 17) & 3 != want_layer as u32 {
             break;
         }
         let index = ((word >> 12) & 15) as usize;
         let bitrate = if frame_version == 3 {
-            MPEG1_L3[index]
+            table1[index]
         } else {
-            MPEG2_L3[index]
+            table2[index]
         };
         let frame_rates: [i64; 3] = if frame_version == 3 {
             [44100, 48000, 32000]
@@ -409,10 +438,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
         (FORMAT_OGG, read_ogg),
         (FORMAT_WAVE, read_wave),
         (FORMAT_MP3, read_mp3),
+        (FORMAT_MP2, read_mp2),
     ] {
         if let Some(lines) = reader(bytes) {
             return accept(code, lines);
         }
     }
-    reject("not FLAC, MP3, Ogg or WAVE", -2)
+    reject("not FLAC, MPEG audio, Ogg or WAVE", -2)
 }

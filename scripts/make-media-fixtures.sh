@@ -52,6 +52,10 @@ make media.au $A -ar 8000 -c:a pcm_mulaw
 make media.mp3 $A -c:a libmp3lame -b:a 32k
 make media.flac $A -c:a flac
 make media.ogg $A -c:a libvorbis -q:a 1
+# MPEG Layer II is its own magika label and the same frame walk with a different bitrate table.
+# Two bitrates, because a single file cannot tell a looked-up table from a hardcoded stride.
+make media.mp2 -f lavfi -i "sine=frequency=440:duration=1" -c:a mp2 -b:a 128k
+make media-192k.mp2 -f lavfi -i "sine=frequency=440:duration=1" -c:a mp2 -b:a 192k
 
 # AVI is RIFF again, but with the LIST nesting that webp never exercises.
 make media.avi $V -c:v mpeg4 -q:v 10
