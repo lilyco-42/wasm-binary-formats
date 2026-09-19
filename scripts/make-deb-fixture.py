@@ -50,8 +50,10 @@ def tar_bytes(name: str, data: bytes, mode: int = 0o644) -> bytes:
 
 
 def ar_header(name: str, size: int) -> bytes:
+    # The size and the numeric fields are octal text, as GNU ar writes them; decimal 221
+    # in that field reads back as 0o221 = 145 and desyncs the whole archive.
     fields = (name.ljust(16).encode(), b"0".ljust(12), b"0".ljust(6), b"0".ljust(6),
-              b"644".ljust(8), str(size).ljust(10).encode())
+              b"644".ljust(8), format(size, "o").ljust(10).encode())
     return b"".join(fields) + b"`\n"
 
 
