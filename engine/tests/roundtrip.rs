@@ -117,11 +117,14 @@ fn reads_the_handwritten_apk_fixture() {
         .unwrap() as i32;
     let m = unsafe { extract(manifest, out.as_mut_ptr(), out.len() as i32) };
     assert_eq!(m, 186, "AXML chunk length");
+    let manifest_bytes = out[..m as usize].to_vec();
+    assert_eq!(&manifest_bytes[..2], &[0x03, 0x00], "binary AXML magic");
     assert_eq!(
-        &out[8..10],
+        &manifest_bytes[8..10],
         &[0x01, 0x00],
         "the child chunk is a string pool"
     );
+
     let dex = names.iter().position(|name| name == "classes.dex").unwrap() as i32;
     let d = unsafe { extract(dex, out.as_mut_ptr(), out.len() as i32) };
     assert_eq!(d, 0x70, "DEX header length");
@@ -130,5 +133,4 @@ fn reads_the_handwritten_apk_fixture() {
         &[0x78, 0x56, 0x34, 0x12],
         "little-endian endian tag"
     );
-    assert_eq!(&out[..2], &[0x03, 0x00], "binary AXML magic");
 }
