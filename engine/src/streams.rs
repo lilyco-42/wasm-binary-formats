@@ -72,7 +72,9 @@ fn read_bzip2(bytes: &[u8]) -> Option<i32> {
         return None;
     }
     let level = (bytes[3] as char).to_digit(10)? as i64;
-    let block = Le(&bytes[4..10]).u64(0)?;
+    // The block magic is a 48-bit big-endian field: asking Le for a u64 here wants eight bytes
+    // from a six-byte window, returns None, and the whole format silently failed to match.
+    let block = bytes[4..10].iter().fold(0u64, |acc, byte| (acc << 8) | u64::from(*byte));
     if block != 0x3141_5926_5359 {
         return None;
     }
