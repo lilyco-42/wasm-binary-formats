@@ -28,6 +28,12 @@ modules — counting them to reach "200" would be padding, so this file says 61 
   subsystem, `IMAGE_FILE_DLL`, section table, and the COM descriptor that marks a .NET image.
   Every offset is bounds-checked against the file, so a lied-about `SizeOfOptionalHeader` yields
   an empty section table instead of an out-of-bounds read. **This reads, it does not run.**
+  One field is wrong in the wild rather than maliciously: `C:\Windows\System32\ScriptRunner.exe`
+  (22,984 bytes, checked 2026-09-19) declares `SizeOfOptionalHeader = 0` and
+  `Characteristics = 0` while carrying a perfectly normal optional header and `.text/.rdata/...`
+  table, so the reader falls back to the canonical 224/240 for the magic instead of parsing the
+  optional header as sections. `engine/tests/pe.rs::assumes_the_canonical_size_when_the_field_is_zeroed`
+  pins that behaviour.
 * `demo/index.html` — unpacks an APK client-side and runs `assets/**.html` in an opaque-origin
   sandbox with relative references rewritten to `blob:` URLs; `.exe`/`.dll` get the PE panel.
   Live at <https://lilyco-42.github.io/wasm-binary-formats/>.
@@ -73,7 +79,7 @@ What that shape cannot do, and why:
 | Guest feature | Works? | Reason |
 |---|---|---|
 | classic `<script>` / `<link>` / `<img>` | yes | rewritten to `blob:` URLs before the frame is created |
-| `fetch()`/XHR to a relative path, history routing, path-based routers | no | a `blob:` URL's path is a UUID with no path space ([FileAPI §8.3](https://w3c.github.io/FileAPI/#blob-url)), and blobs are only fetchable from the storage key that created them — the host's, not the opaque guest's |
+| `fetch()`/XHR to a relative path, history routing, path-based routers | no | a `blob:` URL's path is a UUID with no path space ([FileAPI §8.3](https://w3c.github.io/FileAPI/#blob-url)); in Chrome the guest also cannot re-fetch the host's blobs, but that is a storage-key behaviour with a spec-carved-out creator/opaque-origin exception ([MDN](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/blob)), so the CSP line below is what makes it deterministic rather than the origin |
 | `<script type="module">` | no | module scripts require the CORS protocol ([host-environment-resolution](https://html.spec.whatwg.org/multipage/webappapis.html#host-environment-resolution)) |
 | Web Worker, `localStorage`, `document.cookie` | no | opaque origin + no storage ([Worker](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker)) |
 | its own Service Worker | no | SW needs same-origin + secure context ([Using SW](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers)) |
@@ -113,7 +119,8 @@ Verified against the projects themselves on 2026-09-19:
   (its backends are GPL-2.0); unusable for a commercial product on that basis alone.
 
 Cost either way: `v86.wasm` alone is 2,101,621 B, and a BoxedWine web build ships ~2.5 MB of wasm
-plus a ~10 MB overlay and a ~50 MB Wine rootfs — against this repo's 190 KB engine. Modern Win32
+plus a ~10 MB overlay and a ~50 MB Wine rootfs — against this repo's entire engine, which is around
+200 KB (`engine/target/wasm32-unknown-unknown/release/apk_lens.wasm`, reported by CI). Modern Win32
 (64-bit, current .NET) is out of reach regardless.
 
 **Decision: do not ship execution.** Ship inspection (`engine/src/pe.rs`) plus an honest "use the

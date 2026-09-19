@@ -128,10 +128,14 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if magic != 0x10b && magic != 0x20b {
         return fail("unknown optional header magic", -4);
     }
-    let size_of_optional = pe.u16(16).unwrap_or_default() as usize;
     let dirs = if magic == 0x10b { 24 + 96 } else { 24 + 112 };
     // Section table follows the optional header. Its offset is derived from the declared
-    // optional-header size, which is attacker controlled, so every read is bounds-checked.
+    // optional-header size, which is attacker controlled *and* wrong in the wild: shipped
+    // Windows binaries (ScriptRunner.exe, 22984 bytes, seen 2026-09-19) carry zero there, so
+    // trusting it would read the optional header itself as a section table. Fall back to the
+    // canonical size for the magic; a larger-than-file value still yields no sections.
+    let canonical = if magic == 0x10b { 224 } else { 240 };
+    let size_of_optional = pe.u16(16).unwrap_or_default().max(canonical) as usize;
     let count = pe.u16(6).unwrap_or_default().max(0) as usize;
     let mut sections = Vec::new();
     if let Some(start) = lfanew.checked_add(24 + size_of_optional) {

@@ -173,3 +173,20 @@ fn survives_a_lied_about_header_size() {
         "the table is clamped to what the file holds"
     );
 }
+
+#[test]
+fn assumes_the_canonical_size_when_the_field_is_zeroed() {
+    // Not hypothetical: C:\Windows\System32\ScriptRunner.exe declares 0 here. Reading that 0
+    // literally points the section table at the start of the optional header.
+    let mut file = build(false, 0x0102, 0x2008);
+    put_u16(&mut file, NT + 16, 0);
+    assert_eq!(parse(&file), 0, "{}", error_text());
+    let listing = sections();
+    assert_eq!(
+        listing.lines().count(),
+        2,
+        "must fall back to 224: {listing:?}"
+    );
+    assert!(listing.starts_with(".text\t4096\t"), "{listing}");
+    assert_eq!(cli_rva(), 0x2008, "the data directories stay reachable");
+}
