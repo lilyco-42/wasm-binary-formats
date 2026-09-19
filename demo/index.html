@@ -58,7 +58,10 @@ const viewerEl = document.getElementById('viewer');
 const report = (message) => { statusEl.textContent = message };
 
 const ex = await (async () => {
-  const bytes = await (await fetch('apk-lens.wasm')).arrayBuffer();
+  // GitHub Pages serves this file with an ETag and no long max-age, but a plain fetch is free to
+  // answer from the HTTP cache: a visitor who had the previous build open would then run new HTML
+  // against an old module, and every export added since that build would be missing.
+  const bytes = await (await fetch('apk-lens.wasm', { cache: 'no-cache' })).arrayBuffer();
   return (await WebAssembly.instantiate(bytes, {})).instance.exports;
 })();
 
@@ -328,13 +331,15 @@ function structureOf(bytes) {
     const code = ex[shape.parse](ptr, bytes.length);
     if (code <= 0) continue;
     // The reader names its own family: a table of codes duplicated in this page is one renamed
-    // constant away from printing a confident wrong name.
+    // constant away from printing a confident wrong name. An older cached module may not have the
+    // export at all, so the code number is the fallback rather than a thrown call.
     const total = ex[shape.count]();
     const rows = [];
     for (let index = 0; index < Math.min(total, STRUCT_ROWS); index += 1) {
       rows.push(readAt(ex[shape.field], index).text);
     }
-    found = { what: shape.what, code, name: readAt(ex[shape.name]).text, total, rows };
+    const named = typeof ex[shape.name] === 'function' ? readAt(ex[shape.name]).text : '';
+    found = { what: shape.what, code, name: named, total, rows };
     break;
   }
   ex.dealloc(ptr, bytes.length);
@@ -364,9 +369,10 @@ function showStructure(bytes, label) {
   const found = structureOf(bytes);
   if (!found || !found.rows.length) return false;
   viewerEl.textContent = '';
+  const family = found.name || `格式代码 ${found.code}`;
   const head = document.createElement('p');
   head.style.cssText = 'font-size:13px;margin:0 0 10px';
-  head.textContent = `${found.name} · ${found.what}结构 · 代码 ${found.code} · ${bytes.length.toLocaleString('en-US')} 字节`;
+  head.textContent = `${family} · ${found.what}结构 · 代码 ${found.code} · ${bytes.length.toLocaleString('en-US')} 字节`;
   viewerEl.append(head);
   renderLines(found.rows);
   if (found.total > found.rows.length) {
@@ -375,7 +381,7 @@ function showStructure(bytes, label) {
     more.textContent = `另有 ${found.total - found.rows.length} 行未显示（本页上限 ${STRUCT_ROWS} 行）。`;
     viewerEl.append(more);
   }
-  report(`${label} · ${found.name} 已解析 ${found.rows.length}/${found.total} 行`);
+  report(`${label} · ${family} 已解析 ${found.rows.length}/${found.total} 行`);
   return true;
 }
 
@@ -434,9 +440,15 @@ function showAxml(bytes, label) {
 document.getElementById('pick').addEventListener('click', () => document.getElementById('file').click());
 document.getElementById('allowjs').addEventListener('change', () => report('下次点击条目时生效'));
 
-document.getElementById('file').addEventListener('change', async (event) => {
+document.getElementById('file').addEventListener('change', (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
+  // An async handler that throws leaves no trace but a status line stuck on "读取中…", and the whole
+  // point of this page is to open files nobody vouches for.
+  openFile(file).catch((error) => report(`${file.name}：${error?.message ?? error}`));
+});
+
+async function openFile(file) {
   document.getElementById('name').textContent = `${file.name} · ${(file.size / 1048576).toFixed(2)} MB`;
   report('读取中…');
   entries = [];
@@ -482,7 +494,7 @@ document.getElementById('file').addEventListener('change', async (event) => {
     const target = entries.findIndex((e) => e.name === webAssets[0].name);
     listEl.children[target]?.click();
   }
-});
+}
 </script>
 </body>
 </html>
