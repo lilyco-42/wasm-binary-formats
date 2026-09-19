@@ -170,12 +170,14 @@ the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates readers for **50 specs across 13 families** (`tools/kaitai/specs.txt`), and parses
 fixtures against them. Two levels are asserted separately on purpose - a load gate for
-all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 14 formats that
+all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 13 formats that
 have a fixture: PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
 tests, mean reader 13.7 KB), JPEG and ZIP (`test/kaitai_formats.test.mjs`, 2 tests), and WAVE, the
-generic RIFF, Ogg, AVI and MOV/MP4 (`test/kaitai_media.test.mjs`, 5 tests) read from files ffmpeg
+generic RIFF, Ogg and MOV/MP4 (`test/kaitai_media.test.mjs`, 5 tests) read from files ffmpeg
 muxed. The media assertions are a three-way check: the same bytes are also read by this repo's Rust
 engine and by `ffprobe`, so a shared wrong assumption has to be wrong in three places to pass.
+The one media spec that fails on a real file is asserted as a gap instead of dropped - see
+`test/kaitai_media.test.mjs` and the AVI note below.
 "It generated" is never reported as "it parses".
 
 
@@ -314,6 +316,13 @@ builds the wasm target and runs both test layers on CI.
   a LAME file advertises a bitrate index that no later frame uses. Both are reasons the reader
   reports the frame chain it walked, and the test asserts the *majority* index against the probe
   instead of trusting frame zero.
+* A generated reader is not automatically better than a handwritten one: `media/avi.ksy` (CC0, in the
+  pinned 0.11 bundle) steps from one RIFF block to the next by the declared size alone and never
+  skips the padding byte that follows an odd-sized chunk. ffmpeg's AVI has five such chunks - the
+  `ISFT` tag is 13 bytes, the `00dc` video frames 41, 23, 21 and 33 - so the generated reader
+  desyncs inside the nested `LIST`s and throws at end of data, while this repo's own walk, which
+  adds `size & 1`, tiles the file exactly. AVI is therefore credited to the Rust reader only, and
+  the test asserts the generated one still fails so the gap is visible if upstream fixes it.
 
 ## Prior art worth copying instead of rebuilding
 

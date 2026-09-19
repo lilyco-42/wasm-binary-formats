@@ -42,6 +42,13 @@ const model = (name, fixture) => {
 const cc = (text) => ((text.charCodeAt(0)) | (text.charCodeAt(1) << 8)
   | (text.charCodeAt(2) << 16) | (text.charCodeAt(3) << 24)) >>> 0;
 
+// The MOV spec is big-endian, so the same four characters arrive as a different number.
+const ccBe = (text) => ((text.charCodeAt(0) << 24) | (text.charCodeAt(1) << 16)
+  | (text.charCodeAt(2) << 8) | text.charCodeAt(3)) >>> 0;
+
+// A `contents:` member of one byte is handed back as raw bytes by the JS runtime, not as a number.
+const byteOf = (value) => (value instanceof Uint8Array ? value[0] : value);
+
 test('Wav: the generated reader walks the chunks ffmpeg wrote', () => {
   const wav = model('Wav', 'media.wav');
   assert.equal(wav.chunk.len, 3278 - 8, 'RIFF length is the file size minus its own header');
@@ -71,29 +78,25 @@ test('Ogg: pages, sequence numbers and the granule position ffmpeg wrote', () =>
   ogg.pages.forEach((page, index) => {
     assert.equal(page.pageSeqNum, index, `page ${index} carries sequence number ${index}`);
     assert.equal(page.bitstreamSerial, ogg.pages[0].bitstreamSerial, 'one logical bitstream');
-    assert.equal(page.version, 0, 'the spec pins version 0 as a constant');
+    assert.equal(byteOf(page.version), 0, 'the spec pins version 0 as a constant');
+    assert.equal(byteOf(page.reserved1), 0, 'the five bits before the flags are zero');
   });
-  assert.equal(ogg.pages[ogg.pages.length - 1].granulePos, 8820,
+  const last = ogg.pages[ogg.pages.length - 1];
+  assert.equal(Number(last.granulePos), 8820,
     'sample count for vorbis: -t 0.2 at 44100 Hz, matching ffprobe and engine/tests/media.rs');
-  assert.equal(ogg.pages[0].isBeginningOfStream, true, 'the first page is the bootstrap page');
-  assert.equal(ogg.pages[ogg.pages.length - 1].isEndOfStream, true, 'and the last one ends it');
+  assert.equal(ogg.pages[0].numSegments, 1, 'the bootstrap page holds one 30-byte packet');
+  assert.ok(ogg.pages[0].isBeginningOfStream, 'the first page is the beginning of the stream');
+  assert.ok(last.isEndOfStream, 'and the last one ends it');
 });
 
-test('Avi: the RIFF/AVI header and block list ffmpeg wrote', () => {
-  const avi = model('Avi', 'media.avi');
-  assert.equal(Buffer.from(avi.magic1).toString('latin1'), 'RIFF');
-  assert.equal(Buffer.from(avi.magic2).toString('latin1'), 'AVI ');
-  assert.equal(avi.fileSize, 7162 - 8);
-  const blocks = avi.data.entries;
-  assert.ok(blocks.length >= 2, `${blocks.length} top-level blocks`);
-  const fourCc = (value) => String.fromCharCode(value & 0xff, (value >> 8) & 0xff,
-    (value >> 16) & 0xff, (value >> 24) & 0xff);
-  const names = blocks.map((block) => fourCc(block.fourCc >>> 0));
-  assert.ok(names.includes('hdrl'), `the header LIST is one of ${names}`);
-  assert.ok(names.includes('movi'), `the media LIST is one of ${names}`);
-  assert.ok(names.includes('idx1'), `the index is last: ${names}`);
-  assert.equal(names[names.length - 1], 'idx1');
-  assert.equal(names[names.length - 2], 'movi');
+test('Avi: the pinned spec cannot read a real ffmpeg AVI, so the AVI credit rests on our reader', () => {
+  // media/avi.ksy steps from one block to the next by the declared size alone and never skips
+  // RIFF's odd-size padding byte. ffmpeg's file has five such blocks nested inside the LISTs -
+  // the ISFT software chunk is 13 bytes and the 00dc video frames are 41, 23, 21 and 33 - so the
+  // generated reader desyncs and runs off the end. Asserting the failure keeps the gap on the
+  // record and will fail loudly if the spec is ever fixed upstream.
+  assert.throws(() => model('Avi', 'media.avi'), /end of data|EOF|out of bounds/i,
+    'the generated AVI reader should still be unable to walk this file');
 });
 
 test('QuicktimeMov: the same box sizes the Rust walk reported', () => {
@@ -102,9 +105,10 @@ test('QuicktimeMov: the same box sizes the Rust walk reported', () => {
   assert.deepEqual(items.map((item) => item.len32), [32, 8, 2977, 949],
     'ftyp, free, mdat, moov - exactly the boxes engine/tests/media.rs lists');
   assert.equal(items.reduce((sum, item) => sum + item.len32, 0), 3966, 'the walk consumes the file');
-  assert.equal(items[0].atomType, cc('ftyp'));
-  assert.equal(items[3].atomType, cc('moov'));
+  assert.equal(items[0].atomType, ccBe('ftyp'));
+  assert.equal(items[3].atomType, ccBe('moov'));
   const children = items[3].body.items;
   assert.deepEqual(children.map((item) => item.len32), [108, 736, 97],
     'mvhd, trak, udta inside moov');
+  assert.equal(children[0].atomType, ccBe('mvhd'));
 });
