@@ -46,6 +46,11 @@ pub fn kind() -> i32 {
     KIND.with(|slot| *slot.borrow())
 }
 
+/// The package name beside the code: docx, xlsx, pptx, odt, ods, odp or epub.
+pub fn name() -> &'static str {
+    name_of(kind())
+}
+
 pub fn count() -> i32 {
     RESULT.with(|slot| slot.borrow().len() as i32)
 }

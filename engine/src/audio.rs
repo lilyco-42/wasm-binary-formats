@@ -57,6 +57,17 @@ pub fn kind() -> i32 {
     KIND.with(|slot| *slot.borrow())
 }
 
+/// The family name beside the code, next to the constants rather than in a caller's table.
+pub fn name() -> &'static str {
+    match kind() {
+        FORMAT_FLAC => "flac",
+        FORMAT_MP3 => "mpeg-audio",
+        FORMAT_OGG => "ogg",
+        FORMAT_WAVE => "wave",
+        _ => "unknown",
+    }
+}
+
 pub fn count() -> i32 {
     RESULT.with(|slot| slot.borrow().len() as i32)
 }

@@ -228,6 +228,13 @@ pub extern "C" fn stream_kind() -> i32 {
     streams::kind()
 }
 
+/// Name of the recognised stream family, so a caller labels what it found instead of keeping a copy
+/// of the code table on its side.
+#[no_mangle]
+pub extern "C" fn stream_name(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(streams::name(), buf, cap)
+}
+
 #[no_mangle]
 pub extern "C" fn stream_field_count() -> i32 {
     streams::count()
@@ -256,6 +263,12 @@ pub extern "C" fn parse_container(ptr: *const u8, len: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn container_kind() -> i32 {
     containers::kind()
+}
+
+/// The container family this reader settled on, for a caller that has to label it.
+#[no_mangle]
+pub extern "C" fn container_name(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(containers::name(), buf, cap)
 }
 
 #[no_mangle]
@@ -369,6 +382,12 @@ pub extern "C" fn audio_kind() -> i32 {
     audio::kind()
 }
 
+/// The audio family this reader settled on, for a caller that has to label it.
+#[no_mangle]
+pub extern "C" fn audio_name(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(audio::name(), buf, cap)
+}
+
 #[no_mangle]
 pub extern "C" fn audio_count() -> i32 {
     audio::count()
@@ -397,6 +416,12 @@ pub extern "C" fn parse_document(ptr: *const u8, len: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn document_kind() -> i32 {
     documents::kind()
+}
+
+/// The document package family this reader settled on, for a caller that has to label it.
+#[no_mangle]
+pub extern "C" fn document_name(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(documents::name(), buf, cap)
 }
 
 #[no_mangle]

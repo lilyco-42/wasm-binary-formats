@@ -313,10 +313,10 @@ const STRUCT_ROWS = 240;
 // here (container before audio, both of which read the same RIFF chunks); the filename decides
 // nothing.
 const STRUCTURES = [
-  { parse: 'parse_document', count: 'document_count', field: 'document_field', what: '文档包' },
-  { parse: 'parse_container', count: 'container_count', field: 'container_entry', what: '容器' },
-  { parse: 'parse_audio', count: 'audio_count', field: 'audio_field', what: '音频' },
-  { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field', what: '压缩流' },
+  { parse: 'parse_document', count: 'document_count', field: 'document_field', name: 'document_name', what: '文档包' },
+  { parse: 'parse_container', count: 'container_count', field: 'container_entry', name: 'container_name', what: '容器' },
+  { parse: 'parse_audio', count: 'audio_count', field: 'audio_field', name: 'audio_name', what: '音频' },
+  { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field', name: 'stream_name', what: '压缩流' },
 ];
 
 function structureOf(bytes) {
@@ -327,12 +327,14 @@ function structureOf(bytes) {
   for (const shape of STRUCTURES) {
     const code = ex[shape.parse](ptr, bytes.length);
     if (code <= 0) continue;
+    // The reader names its own family: a table of codes duplicated in this page is one renamed
+    // constant away from printing a confident wrong name.
     const total = ex[shape.count]();
     const rows = [];
     for (let index = 0; index < Math.min(total, STRUCT_ROWS); index += 1) {
       rows.push(readAt(ex[shape.field], index).text);
     }
-    found = { what: shape.what, code, total, rows };
+    found = { what: shape.what, code, name: readAt(ex[shape.name]).text, total, rows };
     break;
   }
   ex.dealloc(ptr, bytes.length);
@@ -348,8 +350,8 @@ function renderLines(rows) {
       const span = document.createElement('span');
       span.textContent = cell;
       span.style.cssText = index === 0
-        ? 'color:var(--dim);display:inline-block;min-width:16ch'
-        : 'margin-right:14px';
+        ? 'color:var(--dim);display:inline-block;min-width:16ch;padding-right:14px'
+        : 'padding-right:14px';
       row.append(span);
     });
     wrap.append(row);
@@ -357,16 +359,14 @@ function renderLines(rows) {
   viewerEl.append(wrap);
 }
 
-// The name shown comes out of the reader's own first row, so no second table of format codes lives in
-// this page to drift away from the Rust constants.
+// The format name comes from the reader that accepted the bytes, not from a second table here.
 function showStructure(bytes, label) {
   const found = structureOf(bytes);
   if (!found || !found.rows.length) return false;
   viewerEl.textContent = '';
   const head = document.createElement('p');
   head.style.cssText = 'font-size:13px;margin:0 0 10px';
-  const name = found.rows[0].split('\t')[0];
-  head.textContent = `${name} · ${found.what}结构 · 代码 ${found.code} · ${bytes.length.toLocaleString('en-US')} 字节`;
+  head.textContent = `${found.name} · ${found.what}结构 · 代码 ${found.code} · ${bytes.length.toLocaleString('en-US')} 字节`;
   viewerEl.append(head);
   renderLines(found.rows);
   if (found.total > found.rows.length) {
@@ -375,7 +375,7 @@ function showStructure(bytes, label) {
     more.textContent = `另有 ${found.total - found.rows.length} 行未显示（本页上限 ${STRUCT_ROWS} 行）。`;
     viewerEl.append(more);
   }
-  report(`${label} · ${name} 已解析 ${found.rows.length}/${found.total} 行`);
+  report(`${label} · ${found.name} 已解析 ${found.rows.length}/${found.total} 行`);
   return true;
 }
 

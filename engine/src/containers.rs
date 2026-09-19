@@ -54,6 +54,26 @@ pub fn kind() -> i32 {
     KIND.with(|slot| *slot.borrow())
 }
 
+/// The family name beside the code, kept next to the constants so a caller that has to label what it
+/// found does not keep its own copy of the table.
+pub fn name() -> &'static str {
+    match kind() {
+        FORMAT_TAR => "tar",
+        FORMAT_AR => "ar",
+        FORMAT_RIFF => "riff",
+        FORMAT_TIFF => "tiff",
+        FORMAT_BMFF => "iso-base-media",
+        FORMAT_EBML => "ebml",
+        FORMAT_PDF => "pdf",
+        FORMAT_NETPBM => "netpbm",
+        FORMAT_ASF => "asf",
+        FORMAT_FLV => "flv",
+        FORMAT_CAB => "cab",
+        FORMAT_DEB => "deb",
+        _ => "unknown",
+    }
+}
+
 pub fn count() -> i32 {
     RESULT.with(|slot| slot.borrow().len() as i32)
 }

@@ -268,24 +268,24 @@ test('falls back when the optional size is not a size', () => {
 // The demo's structure panel drives these four readers through the same ABI and prints the code it
 // gets back next to the format name, so the numbers asserted here are the ones a visitor sees.
 const SHAPES = {
-  container: { parse: 'parse_container', count: 'container_count', field: 'container_entry' },
-  audio: { parse: 'parse_audio', count: 'audio_count', field: 'audio_field' },
-  stream: { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field' },
-  document: { parse: 'parse_document', count: 'document_count', field: 'document_field' },
+  container: { parse: 'parse_container', count: 'container_count', field: 'container_entry', name: 'container_name' },
+  audio: { parse: 'parse_audio', count: 'audio_count', field: 'audio_field', name: 'audio_name' },
+  stream: { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field', name: 'stream_name' },
+  document: { parse: 'parse_document', count: 'document_count', field: 'document_field', name: 'document_name' },
 };
 
 function drive(shape, file) {
-  const { parse, count, field } = SHAPES[shape];
+  const { parse, count, field, name } = SHAPES[shape];
   const bytes = new Uint8Array(readFileSync(`test/fixtures/${file}`));
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
   const code = ex[parse](ptr, bytes.length);
   ex.dealloc(ptr, bytes.length);
-  if (code <= 0) return { code, total: 0, rows: [] };
+  if (code <= 0) return { code, name: '', total: 0, rows: [] };
   const total = ex[count]();
   const rows = [];
   for (let index = 0; index < total; index += 1) rows.push(readString(ex[field], index).text);
-  return { code, total, rows };
+  return { code, name: readString(ex[name]).text, total, rows };
 }
 
 function assertReadable(shape, file, code) {
@@ -293,6 +293,7 @@ function assertReadable(shape, file, code) {
   assert.equal(seen.code, code, `${file} answered with a different format code`);
   assert.equal(seen.rows.length, seen.total, `${file} lied about how many rows it has`);
   assert.ok(seen.total >= 1, `${file} reported no rows at all`);
+  assert.match(seen.name, /^[a-z0-9-]+$/, `${file} named itself ${JSON.stringify(seen.name)}`);
   for (const row of seen.rows) {
     assert.ok(row.length > 0 && !row.includes('\0'), `${file} returned an unusable row`);
   }
@@ -343,4 +344,23 @@ test('readers stay in their lane, so the panel cannot show a confident wrong nam
   assert.ok(drive('audio', 'gnu.tar').code <= 0, 'a tar parsed as audio');
   assert.ok(drive('stream', 'gnu.tar').code <= 0, 'a tar read as a compressed stream');
   assert.ok(drive('container', 'tiny.docx').code <= 0, 'an office package walked as a container');
+});
+
+test('the reader names the family, not the first row it happened to walk', () => {
+  // A tar's first row is a member name: a panel that read the label off row zero printed "tiny.tif"
+  // for gnu.tar. The name has to come from the reader that accepted the bytes.
+  const cases = [
+    ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
+    ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
+    ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'],
+    ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
+    ['audio', 'media.wav', 'wave'],
+    ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
+    ['stream', 'stream.lz4', 'lz4'], ['stream', 'stream.zst', 'zstd'],
+    ['document', 'tiny.docx', 'docx'], ['document', 'tiny.epub', 'epub'], ['document', 'tiny.odp', 'odp'],
+  ];
+  for (const [shape, file, name] of cases) {
+    assert.equal(drive(shape, file).name, name, `${file} reported a different family name`);
+  }
 });

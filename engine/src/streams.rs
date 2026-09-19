@@ -30,6 +30,18 @@ pub fn kind() -> i32 {
     STREAM_KIND.with(|slot| *slot.borrow())
 }
 
+/// The family name beside the code, next to the constants rather than in a caller's table.
+pub fn name() -> &'static str {
+    match kind() {
+        FORMAT_XZ => "xz",
+        FORMAT_BZIP2 => "bzip2",
+        FORMAT_LZ4 => "lz4",
+        FORMAT_ZSTD => "zstd",
+        FORMAT_GZIP => "gzip",
+        _ => "unknown",
+    }
+}
+
 pub fn count() -> i32 {
     FIELDS.with(|slot| slot.borrow().len() as i32)
 }
