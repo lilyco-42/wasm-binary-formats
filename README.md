@@ -324,6 +324,11 @@ builds the wasm target and runs both test layers on CI.
   desyncs inside the nested `LIST`s and throws at end of data, while this repo's own walk, which
   adds `size & 1`, tiles the file exactly. AVI is therefore credited to the Rust reader only, and
   the test asserts the generated one still fails so the gap is visible if upstream fixes it.
+* A failing assertion on a *parsed reader object* is its own hazard: Node builds the failure diff by
+  inspecting both operands without a depth limit, and a generated object hangs off `_parent`, `_root`
+  and the stream. One `assert.equal(pcx.palette256, undefined)` cost 37 s to fail - long enough to
+  stall the CI step and look like a hang. The whole media file now runs in 18 ms, because the
+  assertions compare scalars and lengths instead of handing objects to the comparator.
 * CAB was attempted and **not** implemented, on purpose. `makecab.exe` here produces a cabinet whose
   file table decodes exactly as documented - 16-byte `CFFILE` records at `coffFiles`, names
   `payload.txt` and `second.txt`, sizes 50 and 50, matching `expand -D` - but its folder area is
