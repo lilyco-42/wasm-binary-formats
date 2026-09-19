@@ -1505,17 +1505,19 @@ fn read_ts(bytes: &[u8]) -> Option<Vec<String>> {
             }
         }
         let counter = i64::from(packet[3] & 0x0f);
-        match counters.iter_mut().find(|(known, _)| *known == pid) {
-            Some((_, last)) => {
-                if (counter - *last).rem_euclid(16) != 1 {
+        // Locate first, mutate second: an `iter_mut` borrow would still be held by the arm that
+        // pushes, and pushing on a miss is the whole point of the lookup.
+        match counters.iter().position(|(known, _)| *known == pid) {
+            Some(index) => {
+                if (counter - counters[index].1).rem_euclid(16) != 1 {
                     cc_gaps += 1;
                 }
-                *last = counter;
+                counters[index].1 = counter;
             }
             None => counters.push((pid, counter)),
         }
-        match pids.iter_mut().find(|(known, _)| *known == pid) {
-            Some((_, seen)) => *seen += 1,
+        match pids.iter().position(|(known, _)| *known == pid) {
+            Some(index) => pids[index].1 += 1,
             None if pids.len() < TS_PIDS => pids.push((pid, 1)),
             None => {}
         }
