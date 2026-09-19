@@ -169,10 +169,14 @@ The ">=200 modules" requirement is not answered by hand-writing 200 readers. It 
 the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates readers for **50 specs across 13 families** (`tools/kaitai/specs.txt`), and parses
-fixtures this repo wrote itself. Two levels are asserted separately on purpose - a load gate for
-all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 7 that have
-fixtures this repo wrote - PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
-tests, mean reader 13.7 KB). "It generated" is never reported as "it parses".
+fixtures against them. Two levels are asserted separately on purpose - a load gate for
+all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 14 formats that
+have a fixture: PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
+tests, mean reader 13.7 KB), JPEG and ZIP (`test/kaitai_formats.test.mjs`, 2 tests), and WAVE, the
+generic RIFF, Ogg, AVI and MOV/MP4 (`test/kaitai_media.test.mjs`, 5 tests) read from files ffmpeg
+muxed. The media assertions are a three-way check: the same bytes are also read by this repo's Rust
+engine and by `ffprobe`, so a shared wrong assumption has to be wrong in three places to pass.
+"It generated" is never reported as "it parses".
 
 
 * Licences: **compiler GPLv3+** (so it runs in CI and is never shipped), **JS runtime
