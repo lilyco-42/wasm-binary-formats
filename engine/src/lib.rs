@@ -22,6 +22,7 @@ pub mod containers;
 pub mod dex;
 pub mod pe;
 pub mod scan;
+pub mod streams;
 
 thread_local! {
     static ARCHIVE: RefCell<Option<ZipArchive<std::io::Cursor<Vec<u8>>>>> = const { RefCell::new(None) };
@@ -209,6 +210,33 @@ pub extern "C" fn pe_cli_rva() -> i64 {
 #[no_mangle]
 pub extern "C" fn pe_sections(buf: *mut u8, cap: i32) -> i32 {
     copy_str(&pe::sections(), buf, cap)
+}
+#[no_mangle]
+pub extern "C" fn parse_stream(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    streams::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+/// 0 none, 5 xz, 6 bzip2, 7 lz4, 8 zstd, 9 gzip.
+#[no_mangle]
+pub extern "C" fn stream_kind() -> i32 {
+    streams::kind()
+}
+
+#[no_mangle]
+pub extern "C" fn stream_field_count() -> i32 {
+    streams::count()
+}
+
+#[no_mangle]
+pub extern "C" fn stream_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
+    match streams::field(index) {
+        Some(text) => copy_str(&text, buf, cap),
+        None => -1,
+    }
 }
 
 #[no_mangle]
