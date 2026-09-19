@@ -32,7 +32,10 @@ jobs:
       - name: Build wasm
         run: cargo build --release --target wasm32-unknown-unknown
 
+      # cargo needs cwd = engine/ so it picks up engine/.cargo/config.toml; the JS test
+      # speaks repo-root paths, so it opts back out instead of doubling the prefix.
       - name: Wasm-level tests
+        working-directory: .
         run: node test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 
       - uses: actions/upload-artifact@v4
