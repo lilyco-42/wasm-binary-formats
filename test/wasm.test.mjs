@@ -373,6 +373,7 @@ test('a WebAssembly module reads back through the container reader', () => {
   // what the host engine itself reports, or the section boundaries are wrong even though the bytes
   // added up.
   const bytes = new Uint8Array(readFileSync(wasmPath));
+  const module = new WebAssembly.Module(bytes);
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
   const code = ex.parse_container(ptr, bytes.length);
@@ -386,7 +387,7 @@ test('a WebAssembly module reads back through the container reader', () => {
   assert.ok(rows.includes('walked	end'), 'the sections must tile the module');
   assert.ok(!rows.some((row) => row.startsWith('section	unknown')), 'no id should be unnamed');
   const column = (prefix) => Number(rows.find((row) => row.startsWith(prefix)).split('	')[1]);
-  assert.equal(column('exports	'), WebAssembly.Module.exports(instance).length,
+  assert.equal(column('exports	'), WebAssembly.Module.exports(module).length,
     'the reader and the engine disagree about the export count');
   assert.equal(column('code_bodies	'), column('functions	'),
     'one code body per declared function');
