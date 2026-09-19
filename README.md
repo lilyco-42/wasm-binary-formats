@@ -166,9 +166,9 @@ the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates readers for **37 specs across 10 families** (`tools/kaitai/specs.txt`), and parses
 fixtures this repo wrote itself. Two levels are asserted separately on purpose - a load gate for
-all 37 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 5 that have
-fixtures (PNG, GIF, BMP, ICO, gzip in `test/kaitai.test.mjs`, 6 tests). "It generated" is never
-reported as "it parses".
+all 37 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 7 that have
+fixtures this repo wrote - PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
+tests, mean reader 13.7 KB). "It generated" is never reported as "it parses".
 
 
 * Licences: **compiler GPLv3+** (so it runs in CI and is never shipped), **JS runtime
@@ -178,6 +178,12 @@ reported as "it parses".
 * Measured runtime trap: `new Png(uint8)` left `_io` without `readBytes` on Node 22, while
   `new Png(new KaitaiStream(bytes), null, null)` parsed the same file completely and returned the
   full three-chunk list. Drive generated readers with an explicit stream.
+* Not every generated reader is drop-in drivable, measured on two of them: `Wav` (built on
+  `common/riff`) exposes only a `chunk` root, so the interesting fields sit one object-tree walk
+  away, and `Ipv4Packet` threw `requested 4 bytes, but only 0 bytes available` on a spec-correct
+  24-byte packet (IHL 5, `totalLength` 24, protocol 6) even with 8 and 16 bytes of slack appended.
+  Both stay in the load gate, not the assertion set, until that is understood - which is the reason
+  the two levels exist.
 * [ImHex-Patterns](https://github.com/WerWolv/ImHex-Patterns) holds 314 `.hexpat` format
   descriptions but is **GPL-2.0**: something to read, not to vendor. For identification,
   [google/magika](https://github.com/google/magika) (star 18622, Apache-2.0) is the permissive pick.

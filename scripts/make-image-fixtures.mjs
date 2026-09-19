@@ -99,6 +99,29 @@ function makeBmp(width, height) {
   return file;
 }
 
+
+// Uncompressed 24-bit TGA, top-down, 4x2.
+function makeTga(width, height) {
+  const pixels = [];
+  for (let i = 0; i < width * height; i += 1) pixels.push((i * 7) & 255, (i * 11) & 255, (i * 13) & 255);
+  return Uint8Array.from([0, 0, 2, ...le16(0), ...le16(0), 0, ...le16(0), ...le16(0), ...le16(width), ...le16(height), 24, 0x28, ...pixels]);
+}
+
+const ascii = (text) => [...text].map((ch) => ch.charCodeAt(0));
+
+// The 100-byte SQLite header plus the start of the first page, enough for every header field.
+function makeSqlite() {
+  const page = new Uint8Array(512);
+  page.set([...ascii('SQLite format 3'), 0], 0);
+  page.set(be16(512), 16);
+  page[18] = 1; page[19] = 1; page[20] = 8;
+  page.set(be32(1), 28);
+  page.set(be32(1), 32);
+  page.set(be32(4096), 40);
+  page[0x4c] = 0x0d;
+  return page;
+}
+
 // An ICONDIR with one entry carrying the PNG above verbatim - the form every modern .ico uses.
 function makeIco(width, height, pngBytes) {
   return Uint8Array.from([
@@ -123,6 +146,8 @@ const fixtures = {
   'tiny.bmp': makeBmp(3, 2),
   'tiny.ico': makeIco(2, 2, png),
   'tiny.gz': makeGz(raw),
+  'tiny.tga': makeTga(4, 2),
+  'tiny.sqlite': makeSqlite(),
 };
 for (const [name, bytes] of Object.entries(fixtures)) {
   writeFileSync(join(out, name), bytes);

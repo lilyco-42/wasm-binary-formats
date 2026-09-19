@@ -77,6 +77,22 @@ const CASES = [
       { compressionMethod: 8, lenUncompressed: 8 },
     ),
   },
+  {
+    format: 'Tga',
+    fixture: 'tiny.tga',
+    check: (p) => assert.deepEqual(
+      { width: p.width, height: p.height, depth: p.imageDepth, type: p.imageType },
+      { width: 4, height: 2, depth: 24, type: 2 },
+    ),
+  },
+  {
+    format: 'Sqlite3',
+    fixture: 'tiny.sqlite',
+    check: (p) => assert.deepEqual(
+      { pageSize: p.lenPageMod, writeVersion: p.writeVersion, readVersion: p.readVersion, pages: p.numPages },
+      { pageSize: 512, writeVersion: 1, readVersion: 1, pages: 1 },
+    ),
+  },
 ];
 
 const sizes = {};
