@@ -384,6 +384,48 @@ fn walks_an_avif_that_libsvtav1_muxed() {
 }
 
 #[test]
+fn walks_a_3gp_and_reports_its_duration_as_well_as_the_mp4() {
+    // 3GP is the same ISO base media framing under another brand, so no new reader code is
+    // involved - what it needed was its own fixture (ffmpeg muxes it via libx264) and its own
+    // assertions. The 1000/1000 pair is the muxer's timescale and duration for a one-second source.
+    let gp = fixture("media.3gp");
+    let length = gp.len();
+    assert_eq!(parse_container(&gp), FORMAT_BMFF);
+    assert_eq!(container_kind(), FORMAT_BMFF);
+    let lines = container_fields();
+    assert_eq!(
+        lines[0], "ftyp\t3gp6\t256",
+        "brand and minor version: {lines:#?}"
+    );
+    assert_eq!(
+        rows_starting(&lines, "box\t"),
+        vec![
+            "box\tftyp\t32\t0".to_string(),
+            "box\tfree\t8\t32".to_string(),
+            "box\tmdat\t1337\t40".to_string(),
+            "box\tmoov\t761\t1377".to_string(),
+        ],
+        "top-level boxes of a 3GP file: {lines:#?}"
+    );
+    assert_eq!(
+        rows_starting(&lines, "brand\t").len(),
+        4,
+        "3gp6, isom, iso2, avc1"
+    );
+    assert_eq!(number(&lines, "duration", 1), 1000, "timescale");
+    assert_eq!(number(&lines, "duration", 2), 1000, "duration units");
+    assert_eq!(
+        number(&lines, "duration", 3),
+        1000,
+        "milliseconds, from the one-second source ffmpeg was given"
+    );
+    assert!(
+        lines.contains(&"walked\tend".to_string()),
+        "the boxes must account for all {length} bytes: {lines:#?}"
+    );
+}
+
+#[test]
 fn refuses_media_readers_on_bytes_that_are_not_those_formats() {
     // A png is RIFF-free and holds no fLaC, OggS or MPEG sync at the offsets these readers probe.
     let png = fixture("tiny.png");

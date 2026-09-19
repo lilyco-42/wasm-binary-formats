@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 24,
+    "selfFields": 25,
     "selfContainer": 18,
     "binarySpecAvailable": 0,
-    "gaps": 136,
+    "gaps": 135,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,6 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "video": 4,
       "unknown": 58,
       "image": 14,
       "archive": 16,
@@ -29,6 +28,7 @@
       "executable": 6,
       "text": 2,
       "inode": 3,
+      "video": 3,
       "font": 4,
       "undefined": 1,
       "audio": 1
@@ -45,8 +45,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "3ds",
