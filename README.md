@@ -218,6 +218,21 @@ Scaling: at the measured mean of 28,854 B, all 189 upstream specs would be
 about 5.2 MB of unminified JavaScript - still not hundreds of wasm modules, and the heavy tail
 above is what makes the number shrink once tiered.
 
+### Bundle budget, measured with gzip
+
+| tier | formats | raw JS | gzipped |
+|---|---|---|---|
+| light (<15 KB each) | 22 | 189,452 B | 47,269 B |
+| medium (15-60 KB) | 12 | 352,755 B | 70,884 B |
+| heavy (>=60 KB) | 3 | 525,375 B | 103,307 B |
+| shared imports (11 files) | - | 93,499 B | 26,136 B |
+| **all 37 + shared** | **37** | **1,067,582 B** | **247,596 B** |
+
+So the entire 37-format breadth is about 242 KiB gzipped, and the heavy three (Dicom, Elf, MachO)
+are 42 % of that on their own: shipping the light and medium tiers plus lazy-loading binaries costs
+~117 KiB gzipped. Scaling to all 189 upstream specs is arithmetic, not measurement - at the observed
+mean it is ~5.2 MB raw, so the tiering decision matters more than the spec count.
+
 ## Reproduce
 
 ```bash
