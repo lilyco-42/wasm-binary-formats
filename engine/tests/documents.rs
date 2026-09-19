@@ -210,11 +210,13 @@ fn reads_both_a4_pages_skia_wrote_and_keeps_their_decimal_box() {
     assert_eq!(sizes.len(), 2);
     assert!(
         sizes[0].ends_with("\tmedia\t594.95996\t841.91998"),
-        "the box as written: {sizes[0]}"
+        "the box as written: {}",
+        sizes[0]
     );
     assert!(
         sizes[1].ends_with("\tmedia\t594.95996\t841.91998"),
-        "the box as written: {sizes[1]}"
+        "the box as written: {}",
+        sizes[1]
     );
 }
 
