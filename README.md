@@ -170,11 +170,14 @@ the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates readers for **50 specs across 13 families** (`tools/kaitai/specs.txt`), and parses
 fixtures against them. Two levels are asserted separately on purpose - a load gate for
-all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 15 formats that
+all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 21 formats that
 have a fixture: PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
 tests, mean reader 13.7 KB), JPEG and ZIP (`test/kaitai_formats.test.mjs`, 2 tests), and WAVE, the
 generic RIFF, Ogg, MOV/MP4, AU and PCX (`test/kaitai_media.test.mjs`, 7 tests) read from files
-ffmpeg muxed and Pillow wrote. The media assertions are a three-way check: the same bytes are also
+ffmpeg muxed and Pillow wrote, plus the class file `javac` 17 wrote, an ID3v2.3 tag ffmpeg muxed on
+request, and hand-built MIDI / pcap / BSON / MessagePack
+(`test/kaitai_structures.test.mjs`, 6 tests). The strongest of those is the ID3 one: the reader has
+to return the exact title that was passed to the muxer two implementations earlier. The media assertions are a three-way check: the same bytes are also
 read by this repo's Rust
 engine and by `ffprobe`, so a shared wrong assumption has to be wrong in three places to pass.
 The one media spec that fails on a real file is asserted as a gap instead of dropped - see
