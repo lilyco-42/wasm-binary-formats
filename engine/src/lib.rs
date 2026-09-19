@@ -17,7 +17,10 @@ use std::cell::RefCell;
 use std::io::Read;
 use zip::ZipArchive;
 
+pub mod axml;
+pub mod dex;
 pub mod pe;
+pub mod scan;
 
 thread_local! {
     static ARCHIVE: RefCell<Option<ZipArchive<std::io::Cursor<Vec<u8>>>>> = const { RefCell::new(None) };
@@ -205,4 +208,85 @@ pub extern "C" fn pe_cli_rva() -> i64 {
 #[no_mangle]
 pub extern "C" fn pe_sections(buf: *mut u8, cap: i32) -> i32 {
     copy_str(&pe::sections(), buf, cap)
+}
+
+#[no_mangle]
+pub extern "C" fn parse_dex(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    dex::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+#[no_mangle]
+pub extern "C" fn dex_version(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(&dex::version(), buf, cap)
+}
+
+#[no_mangle]
+pub extern "C" fn dex_checksum() -> i64 {
+    dex::checksum()
+}
+#[no_mangle]
+pub extern "C" fn dex_file_size() -> i64 {
+    dex::file_size()
+}
+#[no_mangle]
+pub extern "C" fn dex_header_size() -> i64 {
+    dex::header_size()
+}
+#[no_mangle]
+pub extern "C" fn dex_map_off() -> i64 {
+    dex::map_off()
+}
+#[no_mangle]
+pub extern "C" fn dex_string_ids() -> i64 {
+    dex::string_ids()
+}
+#[no_mangle]
+pub extern "C" fn dex_type_ids() -> i64 {
+    dex::type_ids()
+}
+#[no_mangle]
+pub extern "C" fn dex_method_ids() -> i64 {
+    dex::method_ids()
+}
+#[no_mangle]
+pub extern "C" fn dex_class_defs() -> i64 {
+    dex::class_defs()
+}
+
+#[no_mangle]
+pub extern "C" fn parse_axml(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    axml::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+#[no_mangle]
+pub extern "C" fn axml_count() -> i32 {
+    axml::count()
+}
+
+#[no_mangle]
+pub extern "C" fn axml_declared() -> i32 {
+    axml::declared()
+}
+
+#[no_mangle]
+pub extern "C" fn axml_flags() -> i64 {
+    axml::flags()
+}
+
+/// One string from the pool. Returns the byte length written, or -1 if the index is out of range,
+/// so a caller that stops at the first negative value cannot read past the pool.
+#[no_mangle]
+pub extern "C" fn axml_string(index: i32, buf: *mut u8, cap: i32) -> i32 {
+    match axml::at(index) {
+        Some(text) => copy_str(&text, buf, cap),
+        None => -1,
+    }
 }
