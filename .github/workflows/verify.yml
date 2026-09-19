@@ -34,6 +34,6 @@ jobs:
             if ((s.byTier[tier] ?? 0) < min) { console.error(`${tier}: ${s.byTier[tier]} < ${min}`); process.exit(1) }
           }
           if (s.actionableWithoutSignatureTables < 130) { console.error("actionable tier shrank"); process.exit(1) }
-          if (s.implementedHere < 3) { console.error("implemented modules went missing"); process.exit(1) }
+          if (s.implementedHere < 5) { console.error("implemented modules went missing"); process.exit(1) }
           console.log("tiers", JSON.stringify(s.byTier), "actionable", s.actionableWithoutSignatureTables);
           '

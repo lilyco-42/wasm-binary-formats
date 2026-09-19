@@ -114,11 +114,11 @@ const parse = [
   },
   {
     module: 'parse:dex-header', tier: 'parse', family: 'android-package',
-    source: 'this repo: engine/src/dex.rs', status: 'draft: reverted from main, see the README',
+    source: 'this repo: engine/src/dex.rs', status: 'implemented',
   },
   {
     module: 'parse:axml-string-pool', tier: 'parse', family: 'android-package',
-    source: 'this repo: engine/src/axml.rs', status: 'draft: reverted from main, see the README',
+    source: 'this repo: engine/src/axml.rs', status: 'implemented',
   },
 ];
 
