@@ -464,7 +464,9 @@ fn vint(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
     if at + len > bytes.len() {
         return None;
     }
-    let mut value = i64::from(first & (0xff >> len));
+    // The leading byte keeps `len - 1` value bits; masking with 0xff >> len would shift a u8 by 8
+    // and panic on the all-ones first byte that means "unknown size".
+    let mut value = i64::from(first & (0x7f >> (len - 1)));
     for byte in &bytes[at + 1..at + len] {
         value = value << 8 | i64::from(*byte);
     }

@@ -176,8 +176,10 @@ fn reads_the_flac_streaminfo_block_ffmpeg_wrote() {
         number(&lines, "max_block", 1) >= number(&lines, "min_block", 1),
         "{lines:#?}"
     );
-    // The metadata blocks tile the file: block 0 is the 34-byte STREAMINFO, and the last one is
-    // flagged as such, so a length read from the wrong place stops the walk short.
+    // The metadata blocks are walked by their own declared lengths and the last is flagged, so the
+    // walk has to stop exactly where the frame area begins. Their sizes differ per encode (this one
+    // ends with an 8 KiB padding block), which is why the assertion is about the sync code rather
+    // than a fixed offset.
     let blocks = rows_starting(&lines, "block\t");
     assert!(
         blocks.len() >= 2,
@@ -187,11 +189,55 @@ fn reads_the_flac_streaminfo_block_ffmpeg_wrote() {
         blocks.last().unwrap().ends_with("\t1"),
         "the final block must carry the last-metadata-block flag: {blocks:#?}"
     );
-    assert_eq!(
-        number(&lines, "bytes_after_blocks", 1),
-        length as i64,
-        "block walk should reach EOF: {lines:#?}"
+    let start = number(&lines, "frames_start", 1) as usize;
+    assert!(
+        (42..length).contains(&start),
+        "the frame area starts after the metadata: {lines:#?}"
     );
+    assert_eq!(
+        &flac[start..start + 2],
+        [0xff, 0xf8],
+        "a FLAC frame header starts with the 14-bit sync code and a fixed block size"
+    );
+}
+
+#[test]
+fn survives_the_unknown_sizes_and_truncations_live_streams_use() {
+    // An EBML element may declare "unknown size", which Matroska and WebM streams use for the
+    // Segment, and a reader that derives a length mask from the size width can shift past the end
+    // of a byte. Both are inputs here: the goal is that they report, not that they panic.
+    let mkv = fixture("media.mkv");
+    let at = mkv
+        .windows(4)
+        .position(|window| window == [0x18, 0x53, 0x80, 0x67])
+        .expect("the Segment element id");
+    let width = (0..8)
+        .find(|shift| (mkv[at + 4] >> (7 - shift)) & 1 == 1)
+        .expect("a leading size byte")
+        + 1;
+    let mut unknown = mkv.clone();
+    unknown.splice(
+        at + 4..at + 4 + width,
+        [0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+    );
+    assert_eq!(parse_container(&unknown), FORMAT_EBML);
+    let lines = container_fields();
+    assert_eq!(
+        number(&lines, "segment", 1),
+        -1,
+        "an unknown-length Segment must be reported as such: {lines:#?}"
+    );
+    assert!(
+        rows_starting(&lines, "elem\t").len() >= 3,
+        "the walk continues past it: {lines:#?}"
+    );
+    for cut in [8, 20, 40, 60, 120, 900] {
+        let code = parse_container(&mkv[..cut]);
+        assert!(
+            code > 0 || code == -1,
+            "a {cut}-byte prefix must report, never panic (got {code})"
+        );
+    }
 }
 
 #[test]

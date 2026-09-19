@@ -141,7 +141,9 @@ fn read_flac(bytes: &[u8]) -> Option<Vec<String>> {
             break;
         }
     }
-    lines.push(field("bytes_after_blocks", at.min(bytes.len())));
+    // Everything after the last metadata block is the frame area, so this is where the first FLAC
+    // frame header has to start.
+    lines.push(field("frames_start", at.min(bytes.len())));
     Some(lines)
 }
 
