@@ -52,7 +52,7 @@ fn walks_riff_chunks_written_by_python() {
         "declared total = payload size field + 8: {lines:?}"
     );
     assert!(
-        lines.iter().any(|line| line.starts_with("fmt\t")),
+        lines.iter().any(|line| line.starts_with("fmt \t")),
         "fmt chunk present: {lines:?}"
     );
     assert!(
@@ -83,7 +83,7 @@ fn reads_an_ar_member_table() {
     assert_eq!(parse(&bytes), FORMAT_AR);
     let lines = entries();
     assert_eq!(lines.len(), 2, "{lines:?}");
-    assert_eq!(lines[0], "hello.o\t4\t0     ");
+    assert_eq!(lines[0], "hello.o\t4\t100644", "mode is the [40..48] field");
     assert_eq!(lines[1], "world.o\t6\t0     ");
 }
 
