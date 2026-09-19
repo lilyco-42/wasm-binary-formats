@@ -1,0 +1,64 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "wmav2",
+            "codec_long_name": "Windows Media Audio 2",
+            "codec_type": "audio",
+            "codec_tag_string": "a[1][0][0]",
+            "codec_tag": "0x0161",
+            "sample_fmt": "fltp",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 231,
+            "duration": "0.231000",
+            "bit_rate": "32000",
+            "extradata_size": 10,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            }
+        }
+    ],
+    "format": {
+        "filename": "media.wma",
+        "nb_streams": 1,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "asf",
+        "format_long_name": "ASF (Advanced / Active Streaming Format)",
+        "start_time": "0.000000",
+        "duration": "0.231000",
+        "size": "3742",
+        "bit_rate": "129593",
+        "probe_score": 100,
+        "tags": {
+            "creation_time": "1970-01-01T00:00:00.000000Z",
+            "encoder": "Lavf63.1.101"
+        }
+    }
+}

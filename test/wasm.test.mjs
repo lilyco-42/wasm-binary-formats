@@ -305,7 +305,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['gnu.tar', 1], ['plain.ar', 2], ['lab-fixture.deb', 23], ['media.wav', 3], ['media.avi', 3],
     ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
-    ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.flv', 21], ['tiny.cab', 22],
+    ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });

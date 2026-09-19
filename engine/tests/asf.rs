@@ -1,4 +1,4 @@
-//! ASF framing tests, on a file ffmpeg muxed.
+//! ASF framing tests, on files ffmpeg muxed: an `.asf`, a `.wma` and a `.wmv`.
 //!
 //! Every number was read out of `test/fixtures/media.asf` first, and `media_asf.probe.json` is
 //! ffprobe's independent reading of the same bytes (container `asf`, 0.200000 s, PCM s16le mono at
@@ -66,6 +66,48 @@ fn walks_the_asf_objects_ffmpeg_wrote() {
         lines.contains(&"walked\tend".to_string()),
         "456 + 6450 must account for all {length} bytes: {lines:#?}"
     );
+}
+
+#[test]
+fn walks_the_same_asf_objects_for_a_wma_and_a_wmv() {
+    // ffprobe reads both files as container `asf` (`media_wma.probe.json`: wmav2, mono at 44.1 kHz,
+    // 0.231 s; `media_wmv.probe.json`: wmv2, 64x64, 0.400 s), so the two labels that look like
+    // separate formats describe the framing this reader already walks. That is the whole claim: no
+    // codec object is decoded, and the data object's length is deliberately not asserted because it
+    // is what the encoder produced rather than a layout fact.
+    for (name, header, objects) in [("media.wma", 492i64, 2i64), ("media.wmv", 587, 3)] {
+        let file = fixture(name);
+        assert_eq!(parse(&file), FORMAT_ASF, "{name}");
+        assert_eq!(
+            kind(),
+            FORMAT_ASF,
+            "{name}: kind() must agree with the return code"
+        );
+        let lines = report();
+        assert_eq!(
+            lines[0],
+            format!("asf\t3026b2758e66cf11a6d900aa0062ce6c\t{header}\t5"),
+            "{name}: the header object declares five children: {lines:#?}"
+        );
+        assert_eq!(
+            number(&lines, "header_children_end", 1),
+            header,
+            "{name}: the children must end where the header says: {lines:#?}"
+        );
+        assert_eq!(number(&lines, "header_children_end", 3), header, "{name}");
+        assert_eq!(number(&lines, "objects", 1), objects, "{name}: {lines:#?}");
+        assert!(
+            lines
+                .iter()
+                .any(|entry| entry.starts_with("object\t3626b2758e66cf11a6d900aa0062ce6c")),
+            "{name}: no data object at the top level: {lines:#?}"
+        );
+        assert!(
+            lines.contains(&"walked\tend".to_string()),
+            "{name}: the objects must account for all {} bytes: {lines:#?}",
+            file.len()
+        );
+    }
 }
 
 #[test]

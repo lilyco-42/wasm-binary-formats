@@ -58,6 +58,11 @@ make media.avi $V -c:v mpeg4 -q:v 10
 # ASF/WMV/WMA share a GUID-object framing that no Kaitai spec covers. Kept small on purpose: 8 kHz
 # mono for 0.2 s is 6 906 bytes, and its layout is measured in the README's next-steps section.
 make media.asf $A -ar 8000 -ac 1 -c:a pcm_s16le
+# WMA and WMV are the same ASF framing under two labels of their own, so one walk covers three
+# magika types. Encoder settings are written out in full here: the tests assert the header object's
+# declared length and the child count, both of which follow from these flags.
+make media.wma -f lavfi -i "sine=frequency=440:duration=0.2" -c:a wmav2 -b:a 32k
+make media.wmv -f lavfi -i "testsrc=size=64x64:rate=5:duration=0.4" -c:v wmv2 -b:v 64k
 
 # PDF and PCX, from Pillow: independent writers, and both formats are ones the pinned Kaitai bundle
 # has a spec for, so the same bytes get read by three implementations.
