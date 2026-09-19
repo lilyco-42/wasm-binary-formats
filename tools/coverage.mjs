@@ -34,7 +34,7 @@ const SELF = {
   zip: ['container'], jar: ['container'], apk: ['container'], gzip: ['fields'], sqlite: ['fields'],
   xz: ['fields'], bzip: ['fields'], lz4: ['fields'], zst: ['container'],
   mp4: ['fields'], mkv: ['fields'], webm: ['fields'], avi: ['container'], avif: ['container'],
-  '3gp': ['fields'],
+  '3gp': ['fields'], asf: ['container'],
   flac: ['fields'], mp3: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['container'], pbm: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],

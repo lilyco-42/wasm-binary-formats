@@ -757,6 +757,76 @@ fn read_netpbm(bytes: &[u8]) -> Option<Vec<String>> {
     ])
 }
 
+pub const FORMAT_ASF: i32 = 20;
+
+/// ASF (and therefore WMV/WMA): a sequence of objects, each one a 16-byte GUID followed by a 64-bit
+/// little-endian *total* length that includes those 24 bytes. The first object is a header whose own
+/// header is `GUID(16) size(8) count(u32) two reserved bytes`, so its children begin at offset 30 -
+/// forty was the guess that a hexdump of `test/fixtures/media.asf` disproved, and the constants here
+/// are those observed bytes rather than a recollection of a specification.
+const ASF_HEADER_GUID: [u8; 16] = [
+    0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11, 0xa6, 0xd9, 0x00, 0xaa, 0x00, 0x62, 0xce, 0x6c,
+];
+
+fn guid_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn read_asf(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 64 || bytes.get(0..16) != Some(ASF_HEADER_GUID.as_slice()) {
+        return None;
+    }
+    let file = Le(bytes);
+    let header_size = file.u64(16)?;
+    if header_size < 30 || header_size > bytes.len() as i64 {
+        return None;
+    }
+    let count = file.u32(24)?;
+    let mut entries = vec![format!(
+        "asf\t{}\t{}\t{}",
+        guid_hex(&bytes[0..16]),
+        header_size,
+        count
+    )];
+    let mut at = 30usize;
+    let mut index = 0i64;
+    // Children are listed, not decoded. The documented File Description field order does not match
+    // what ffmpeg writes here - the slot named "file size" in the spec holds zero, and the real
+    // length appears two u64s later - so until that is settled from a second file and the spec text,
+    // ASF is credited at container level only, which is all this walk establishes.
+    while index < count && at + 24 <= bytes.len() {
+        let guid = bytes.get(at..at + 16)?;
+        let size = file.u64(at + 16)?;
+        entries.push(format!("object\t{}\t{}\t{}", guid_hex(guid), size, at));
+        if size < 24 {
+            break;
+        }
+        at += size as usize;
+        index += 1;
+    }
+    entries.push(format!(
+        "header_children_end\t{}\twanted\t{}",
+        at, header_size
+    ));
+    let mut top = header_size as usize;
+    let mut objects = 1i64;
+    while top + 24 <= bytes.len() && objects < 64 {
+        let guid = bytes.get(top..top + 16)?;
+        let size = file.u64(top + 16)?;
+        if size < 24 {
+            break;
+        }
+        entries.push(format!("object\t{}\t{}\t{}", guid_hex(guid), size, top));
+        objects += 1;
+        top += size as usize;
+    }
+    entries.push(format!("objects\t{objects}"));
+    if top == bytes.len() {
+        entries.push("walked\tend".to_string());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -789,8 +859,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_netpbm(bytes) {
         return accept(FORMAT_NETPBM, lines);
     }
+    if let Some(lines) = read_asf(bytes) {
+        return accept(FORMAT_ASF, lines);
+    }
     reject(
-        "not a tar, ar, RIFF, TIFF, EBML, PDF, Netpbm or ISO base media container",
+        "not a tar, ar, RIFF, TIFF, EBML, PDF, Netpbm, ASF or ISO base media container",
         -2,
     )
 }

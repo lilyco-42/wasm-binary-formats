@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 25,
-    "selfContainer": 18,
+    "selfContainer": 19,
     "binarySpecAvailable": 0,
-    "gaps": 135,
+    "gaps": 134,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -24,7 +24,7 @@
       "archive": 16,
       "code": 5,
       "document": 10,
-      "application": 12,
+      "application": 11,
       "executable": 6,
       "text": 2,
       "inode": 3,
@@ -361,8 +361,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "asm",
