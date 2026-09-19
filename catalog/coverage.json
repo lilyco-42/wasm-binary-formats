@@ -7,10 +7,10 @@
     "specGenerated": 53,
     "specAvailable": 0,
     "binaryGenerated": 51,
-    "selfFields": 13,
-    "selfContainer": 9,
+    "selfFields": 16,
+    "selfContainer": 10,
     "binarySpecAvailable": 0,
-    "gaps": 146,
+    "gaps": 142,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -22,7 +22,7 @@
       "video": 7,
       "unknown": 59,
       "image": 14,
-      "archive": 20,
+      "archive": 16,
       "code": 5,
       "document": 11,
       "application": 12,
@@ -618,8 +618,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "bzip3",
@@ -2330,8 +2330,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "lzx",
@@ -4669,8 +4669,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "yaml",
@@ -4751,8 +4751,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     }
   ]
 }
