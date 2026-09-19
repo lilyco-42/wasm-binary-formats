@@ -61,9 +61,12 @@ Each is a fetch-and-enumerate step like the five sources already wired into
 * `demo/index.html` — unpacks an APK client-side and runs `assets/**.html` in an opaque-origin
   sandbox with relative references rewritten to `data:` URLs; `classes.dex` and a binary
   `AndroidManifest.xml` render as a DEX header table and a string-pool dump, `.exe`/`.dll` as the PE
-  panel, all dispatched on magic bytes rather than filename (verified in the deployed page: DEX 035
+  panel, and anything else the engine recognises as the rows its reader returns — package, container,
+  audio or stream, each named by the reader that accepted the bytes rather than by a code table in
+  the page. All dispatched on magic bytes rather than filename (verified in the deployed page: DEX 035
   with checksum `0xdeadbeef`, and the pool's three strings, alongside `GUEST_RAN@null` from the
-  sandboxed web asset).
+  sandboxed web asset; and against `gnu.tar`, `media.mkv`, `media.flac`, `tiny.pdf` and `tiny.docx`
+  opened in a real browser).
   Live at <https://lilyco-42.github.io/wasm-binary-formats/>.
 * `test/fixtures/lab-fixture.apk` — a hand-written, deterministic APK-shaped archive (8 entries,
   mixed stored/deflated, `AndroidManifest.xml` starting with the real res chunk type 0x0003).
@@ -347,6 +350,15 @@ builds the wasm target and runs both test layers on CI.
   a poor place to read provenance from: `chrome.exe --version` prints in the console codepage, and the
   mojibake landed in the probe JSON, so the recorded producer comes from the PDF's own `/Producer`
   string (`Skia/PDF m153`) instead.
+* Opening the deployed page in a browser found two things no test could. The panel had taken its
+  format name from the reader's first row, which for a tar is a *member* name, so it printed
+  `tiny.tif` for `gnu.tar` — a wrong answer, delivered confidently; the name now comes from the
+  reader that accepted the bytes, through `container_name` / `audio_name` / `stream_name` /
+  `document_name`, with the tables kept beside the format constants. And the page had cached the
+  previous build's `apk-lens.wasm` while serving fresh HTML over it, so a call into an export the old
+  module does not have threw inside an async handler and left the status line stuck on "读取中…" with
+  nothing in the console. The wasm is fetched with `no-cache`, the new calls are feature-detected, and
+  the handler reports what it threw instead of going quiet.
 * CAB was attempted and **partly** implemented, on purpose. `makecab.exe` here produces a cabinet whose
   file table decodes exactly as documented - 16-byte `CFFILE` records at `coffFiles`, names
   `payload.txt` and `second.txt`, sizes 50 and 50, matching `expand -D` - but its folder area is
