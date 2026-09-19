@@ -6,7 +6,7 @@
 
 pub struct Le<'a>(pub &'a [u8]);
 
-impl Le<'_> {
+impl<'a> Le<'a> {
     pub fn at(&self, offset: usize) -> Option<Self> {
         if offset <= self.0.len() {
             Some(Self(&self.0[offset..]))
