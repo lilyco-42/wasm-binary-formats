@@ -933,11 +933,11 @@ fn read_cab(bytes: &[u8]) -> Option<Vec<String>> {
     let file = Le(bytes);
     let cabinet_bytes = file.u32(8)?;
     let coff_files = file.u32(16)?;
-    let folders = i64::from(file.u16(26));
-    let files = i64::from(file.u16(28));
-    let flags = i64::from(file.u16(30));
-    let set_id = i64::from(file.u16(32));
-    let index = i64::from(file.u16(34));
+    let folders = i64::from(file.u16(26)?);
+    let files = i64::from(file.u16(28)?);
+    let flags = i64::from(file.u16(30)?);
+    let set_id = i64::from(file.u16(32)?);
+    let index = i64::from(file.u16(34)?);
     if coff_files < 36 || coff_files as usize >= bytes.len() || cabinet_bytes > bytes.len() as i64 {
         return None;
     }
@@ -963,9 +963,9 @@ fn read_cab(bytes: &[u8]) -> Option<Vec<String>> {
     while listed < files && at + 16 <= bytes.len() {
         let size = file.u32(at)?;
         let uoff = file.u32(at + 4)?;
-        let folder = i64::from(file.u16(at + 8));
-        let date = i64::from(file.u16(at + 12));
-        let time = i64::from(file.u16(at + 14));
+        let folder = i64::from(file.u16(at + 8)?);
+        let date = i64::from(file.u16(at + 12)?);
+        let time = i64::from(file.u16(at + 14)?);
         let name_at = at + 16;
         let end = bytes[name_at..].iter().position(|byte| *byte == 0)? + name_at;
         let name = String::from_utf8_lossy(bytes.get(name_at..end)?).into_owned();
