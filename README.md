@@ -299,6 +299,17 @@ builds the wasm target and runs both test layers on CI.
   the bytes coming out of wasm, not what the browser does with them. Rewriting to `data:` URLs is
   what actually runs, and `test/fixtures/lab-fixture.apk` now carries a guest script that answers
   with a `postMessage`, so "it ran, and it ran as `origin: null`" is checkable from the host.
+* Writing the media readers against ffmpeg's own output corrected two more recollections. An EBML
+  size whose leading byte is all ones is the *unknown length* marker, and the value mask has to come
+  from that byte's own width: `0xff >> len` shifts a `u8` by 8 and panics on exactly the encoding a
+  streamed file uses, which is now a test rather than a crash. And FLAC's metadata blocks do not
+  tile the file - the frame area follows the last block - so a reader that expected EOF after them
+  was wrong about the format, not about the fixture: it reports where frames begin and the test
+  checks the sync code sitting there.
+* `ffprobe`'s `bit_rate` for an MP3 is the encoder's nominal average, and the first frame header of
+  a LAME file advertises a bitrate index that no later frame uses. Both are reasons the reader
+  reports the frame chain it walked, and the test asserts the *majority* index against the probe
+  instead of trusting frame zero.
 
 ## Prior art worth copying instead of rebuilding
 
