@@ -3,3 +3,4 @@ catalog/arch.h
 catalog/*-README.md
 node_modules/
 *.log
+engine/target/

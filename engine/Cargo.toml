@@ -1,0 +1,18 @@
+[package]
+name = "apk-lens"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# cdylib for the wasm artifact; rlib so the integration tests can link the same functions.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# MIT; features trimmed so the wasm build pulls no filesystem, chrono or default-crypto extras.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
