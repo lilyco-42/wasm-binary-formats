@@ -20,6 +20,9 @@ pub const FORMAT_TAR: i32 = 1;
 pub const FORMAT_AR: i32 = 2;
 pub const FORMAT_RIFF: i32 = 3;
 pub const FORMAT_TIFF: i32 = 4;
+// 5..9 are the stream formats in `streams.rs`, so these stay unique across both kinds.
+pub const FORMAT_BMFF: i32 = 10;
+pub const FORMAT_EBML: i32 = 11;
 
 thread_local! {
     static RESULT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -245,6 +248,251 @@ fn read_tiff(bytes: &[u8]) -> Option<Vec<String>> {
     }
 }
 
+/// ISO base media file format (mp4/3gp/m4v family): top-level box list, the brands in `ftyp`, and
+/// the `mvhd` timescale and duration when a `moov` is present. Boxes are 32-bit size plus FourCC,
+/// with size 0 meaning "to end of file" and size 1 meaning "the real size is the following u64".
+fn read_bmff(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 || fourcc(&bytes[4..8]) != "ftyp" {
+        return None;
+    }
+    let be = Fields {
+        bytes,
+        little: false,
+    };
+    let declared = be.u32(0)?.max(0) as usize;
+    if declared < 16 || declared > bytes.len() {
+        return None;
+    }
+    let mut entries = vec![format!("ftyp\t{}\t{}", fourcc(&bytes[8..12]), be.u32(12)?)];
+    let mut at = 16usize;
+    while at + 4 <= declared {
+        entries.push(format!("brand\t{}", fourcc(&bytes[at..at + 4])));
+        at += 4;
+    }
+    let mut cursor = 0usize;
+    let mut boxes = 0i64;
+    while cursor + 8 <= bytes.len() && boxes < 256 {
+        let Some((size, header)) = box_extent(bytes, &be, cursor) else {
+            break;
+        };
+        let kind = fourcc(&bytes[cursor + 4..cursor + 8]);
+        entries.push(format!("box\t{kind}\t{size}\t{cursor}"));
+        boxes += 1;
+        let body = cursor + header;
+        if kind == "moov" {
+            let mut inner = body;
+            let limit = (cursor + size).min(bytes.len());
+            while inner + 8 <= limit {
+                let Some((inner_size, _)) = box_extent(bytes, &be, inner) else {
+                    break;
+                };
+                let inner_kind = fourcc(&bytes[inner + 4..inner + 8]);
+                entries.push(format!("child\t{inner_kind}\t{inner_size}\t{inner}"));
+                if inner_kind == "mvhd" {
+                    let version = usize::from(bytes[inner + 8]);
+                    let (timescale, duration) = if version == 1 {
+                        (be.u32(inner + 28)?, Le(bytes).u64(inner + 32)?)
+                    } else {
+                        (be.u32(inner + 20)?, i64::from(be.u32(inner + 24)?))
+                    };
+                    let millis = if timescale > 0 {
+                        duration.saturating_mul(1000) / timescale
+                    } else {
+                        0
+                    };
+                    entries.push(format!("duration\t{timescale}\t{duration}\t{millis}"));
+                }
+                if inner_size < 8 || inner + inner_size > limit {
+                    break;
+                }
+                inner += inner_size;
+            }
+        }
+        if size < 8 || cursor + size > bytes.len() {
+            break;
+        }
+        cursor += size;
+    }
+    if cursor == bytes.len() {
+        entries.push("walked\tend".to_string());
+    }
+    Some(entries)
+}
+
+/// (total box size, bytes of header) for the box starting at `at`, honouring the size-0 and
+/// size-1 forms. None when the length cannot be read at all.
+fn box_extent(bytes: &[u8], be: &Fields, at: usize) -> Option<(usize, usize)> {
+    let first = be.u32(at)?.max(0) as usize;
+    match first {
+        0 => Some((bytes.len() - at, 8)),
+        1 => Some((Le(bytes).u64(at + 8)?.max(0) as usize, 16)),
+        other => Some((other, 8)),
+    }
+}
+
+/// EBML, the master/element tree Matroska and WebM are built from. Element ids and sizes are
+/// variable-length: the number of bytes is the position of the first set bit in the leading byte,
+/// and for a size that same leading byte carries the value's top bits.
+fn read_ebml(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 {
+        return None;
+    }
+    if ebml_id(bytes, 0)
+        .filter(|(id, _)| *id == 0x1a45_dfa3)
+        .is_none()
+    {
+        return None;
+    }
+    let (header_size, header_len) = vint(bytes, 4)?;
+    let header_end = (4 + header_len + header_size as usize).min(bytes.len());
+    let mut at = 4 + header_len;
+    let mut doctype = String::new();
+    let mut versions = [0i64; 3];
+    while at + 2 <= header_end {
+        let Some((id, id_len)) = ebml_id(bytes, at) else {
+            break;
+        };
+        let Some((size, size_len)) = vint(bytes, at + id_len) else {
+            break;
+        };
+        let body = at + id_len + size_len;
+        if body + size as usize > bytes.len() {
+            break;
+        }
+        let raw = &bytes[body..body + size as usize];
+        match id {
+            0x4282 => doctype = crate::scan::utf8_or_hex(raw),
+            0x4286 => versions[0] = unsigned(raw),
+            0x4287 => versions[1] = unsigned(raw),
+            0x4285 => versions[2] = unsigned(raw),
+            _ => {}
+        }
+        at = body + size as usize;
+    }
+    let mut entries = vec![format!(
+        "header\t{}\t{}\t{}\t{}",
+        doctype, versions[0], versions[1], versions[2]
+    )];
+    let Some((segment_id, id_len)) = ebml_id(bytes, at) else {
+        return Some(entries);
+    };
+    if segment_id != 0x1853_8067 {
+        return Some(entries);
+    }
+    let (segment_size, size_len) = vint(bytes, at + id_len)?;
+    let unknown = segment_size == (1i64 << (7 * size_len)) - 1;
+    entries.push(format!(
+        "segment\t{}\t{}",
+        if unknown { -1 } else { segment_size },
+        at
+    ));
+    let mut cursor = at + id_len + size_len;
+    let limit = if unknown {
+        bytes.len()
+    } else {
+        (cursor + segment_size as usize).min(bytes.len())
+    };
+    let mut walked = 0i64;
+    while cursor + 2 <= limit && walked < 128 {
+        let Some((id, id_len)) = ebml_id(bytes, cursor) else {
+            break;
+        };
+        let Some((size, size_len)) = vint(bytes, cursor + id_len) else {
+            break;
+        };
+        let child_unknown = size == (1i64 << (7 * size_len)) - 1;
+        entries.push(format!(
+            "elem\t{:#x}\t{}\t{}",
+            id,
+            if child_unknown { -1 } else { size },
+            cursor
+        ));
+        walked += 1;
+        let body = cursor + id_len + size_len;
+        if matches!(id, 0x1549_a966 | 0x1654_ae6b) && !child_unknown {
+            let mut inner = body;
+            let inner_limit = (body + size as usize).min(bytes.len());
+            while inner + 2 <= inner_limit {
+                let Some((inner_id, inner_len)) = ebml_id(bytes, inner) else {
+                    break;
+                };
+                let Some((inner_size, inner_size_len)) = vint(bytes, inner + inner_len) else {
+                    break;
+                };
+                let payload = inner + inner_len + inner_size_len;
+                if payload + inner_size as usize > bytes.len() {
+                    break;
+                }
+                let raw = &bytes[payload..payload + inner_size as usize];
+                match inner_id {
+                    0x2ad7_b1 => entries.push(format!("timecode_scale_ns\t{}", unsigned(raw))),
+                    0x4489 => entries.push(format!("duration_ms\t{}", float(raw))),
+                    0x4d80 | 0x5741 => entries.push(format!(
+                        "app\t{:#x}\t{}",
+                        inner_id,
+                        crate::scan::utf8_or_hex(raw)
+                    )),
+                    _ => entries.push(format!("child\t{:#x}\t{}\t{}", inner_id, inner_size, inner)),
+                }
+                inner = payload + inner_size as usize;
+            }
+        }
+        if child_unknown || size > limit as i64 {
+            break;
+        }
+        cursor = body + size as usize;
+    }
+    Some(entries)
+}
+
+fn ebml_id(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
+    let first = *bytes.get(at)?;
+    let len = (0..8).find(|shift| (first >> (7 - shift)) & 1 == 1)? + 1;
+    if len > 4 || at + len > bytes.len() {
+        return None;
+    }
+    let mut value = 0i64;
+    for byte in &bytes[at..at + len] {
+        value = value << 8 | i64::from(*byte);
+    }
+    Some((value, len))
+}
+
+fn vint(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
+    let first = *bytes.get(at)?;
+    let len = (0..8).find(|shift| (first >> (7 - shift)) & 1 == 1)? + 1;
+    if at + len > bytes.len() {
+        return None;
+    }
+    let mut value = i64::from(first & (0xff >> len));
+    for byte in &bytes[at + 1..at + len] {
+        value = value << 8 | i64::from(*byte);
+    }
+    Some((value, len))
+}
+
+fn unsigned(bytes: &[u8]) -> i64 {
+    let mut value = 0i64;
+    for byte in bytes.iter().take(8) {
+        value = value << 8 | i64::from(*byte);
+    }
+    value
+}
+
+fn float(bytes: &[u8]) -> f64 {
+    if bytes.len() == 8 {
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(bytes);
+        f64::from_bits(u64::from_be_bytes(buf))
+    } else if bytes.len() == 4 {
+        let mut buf = [0u8; 4];
+        buf.copy_from_slice(bytes);
+        f32::from_bits(u32::from_be_bytes(buf)) as f64
+    } else {
+        0.0
+    }
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -257,11 +505,20 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_ar(bytes) {
         return accept(FORMAT_AR, lines);
     }
+    if let Some(lines) = read_ebml(bytes) {
+        return accept(FORMAT_EBML, lines);
+    }
+    if let Some(lines) = read_bmff(bytes) {
+        return accept(FORMAT_BMFF, lines);
+    }
     if let Some(lines) = read_riff(bytes) {
         return accept(FORMAT_RIFF, lines);
     }
     if let Some(lines) = read_tiff(bytes) {
         return accept(FORMAT_TIFF, lines);
     }
-    reject("not a tar, ar, RIFF or TIFF container", -2)
+    reject(
+        "not a tar, ar, RIFF, TIFF, EBML or ISO base media container",
+        -2,
+    )
 }

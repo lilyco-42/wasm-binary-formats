@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::io::Read;
 use zip::ZipArchive;
 
+pub mod audio;
 pub mod axml;
 pub mod containers;
 pub mod dex;
@@ -345,6 +346,35 @@ pub extern "C" fn axml_flags() -> i64 {
 #[no_mangle]
 pub extern "C" fn axml_string(index: i32, buf: *mut u8, cap: i32) -> i32 {
     match axml::at(index) {
+        Some(text) => copy_str(&text, buf, cap),
+        None => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn parse_audio(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    audio::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+/// Which audio header was recognised: 0 none, 12 FLAC, 13 MPEG audio, 14 Ogg, 15 WAVE.
+#[no_mangle]
+pub extern "C" fn audio_kind() -> i32 {
+    audio::kind()
+}
+
+#[no_mangle]
+pub extern "C" fn audio_count() -> i32 {
+    audio::count()
+}
+
+/// One `name<TAB>value` field, or a walk row (`block`, `bitrate`, `chunk`). -1 past the end.
+#[no_mangle]
+pub extern "C" fn audio_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
+    match audio::at(index) {
         Some(text) => copy_str(&text, buf, cap),
         None => -1,
     }

@@ -1,0 +1,72 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "mpeg4",
+            "codec_long_name": "MPEG-4 part 2",
+            "profile": "Simple Profile",
+            "codec_type": "video",
+            "codec_tag_string": "FMP4",
+            "codec_tag": "0x34504d46",
+            "mime_codec_string": "mp4v.20",
+            "width": 64,
+            "height": 48,
+            "coded_width": 64,
+            "coded_height": 48,
+            "has_b_frames": 0,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "4:3",
+            "pix_fmt": "yuv420p",
+            "level": 1,
+            "chroma_location": "left",
+            "quarter_sample": "false",
+            "divx_packed": "false",
+            "r_frame_rate": "10/1",
+            "avg_frame_rate": "10/1",
+            "time_base": "1/10",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 10,
+            "duration": "1.000000",
+            "nb_frames": "10",
+            "extradata_size": 46,
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            }
+        }
+    ],
+    "format": {
+        "filename": "media.avi",
+        "nb_streams": 1,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "avi",
+        "format_long_name": "AVI (Audio Video Interleaved)",
+        "start_time": "0.000000",
+        "duration": "1.000000",
+        "size": "7162",
+        "bit_rate": "57296",
+        "probe_score": 100,
+        "tags": {
+            "software": "Lavf63.1.101"
+        }
+    }
+}

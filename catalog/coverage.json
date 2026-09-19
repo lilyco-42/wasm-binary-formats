@@ -4,13 +4,13 @@
     "labels": 353,
     "binaryLabels": 219,
     "textLabels": 134,
-    "specGenerated": 53,
+    "specGenerated": 50,
     "specAvailable": 0,
-    "binaryGenerated": 51,
-    "selfFields": 16,
-    "selfContainer": 10,
+    "binaryGenerated": 48,
+    "selfFields": 23,
+    "selfContainer": 9,
     "binarySpecAvailable": 0,
-    "gaps": 142,
+    "gaps": 139,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,7 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "video": 7,
+      "video": 5,
       "unknown": 59,
       "image": 14,
       "archive": 16,
@@ -29,9 +29,9 @@
       "executable": 6,
       "text": 2,
       "inode": 3,
-      "audio": 2,
       "font": 4,
-      "undefined": 1
+      "undefined": 1,
+      "audio": 1
     }
   },
   "rows": [
@@ -1376,8 +1376,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "flutter",
@@ -2474,8 +2474,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "mp2",
@@ -2502,8 +2502,8 @@
         "id3v2_3"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "mp4",
@@ -2517,8 +2517,8 @@
         "quicktime_mov"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "mpegts",
@@ -2839,8 +2839,8 @@
         "ogg"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "ole",
@@ -4408,8 +4408,8 @@
         "wav"
       ],
       "generatedHere": true,
-      "selfLevel": "container",
-      "status": "self-container"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "webm",
@@ -4421,8 +4421,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "webp",
