@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const generatedDir = resolve(process.argv[2] ?? 'generated/kaitai');
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const KaitaiStream = require('kaitai-struct/KaitaiStream');
 
 function load(name) {
   const file = join(generatedDir, `${name}.js`);
@@ -22,6 +23,11 @@ function load(name) {
 }
 
 const read = (name) => new Uint8Array(readFileSync(join(fixtures, name)));
+
+// Passing a bare Uint8Array is the convenience form in the generated constructor, and it is the
+// thing that broke: on Node 22 the reader ended up with an `_io` that had no readBytes, while an
+// explicit KaitaiStream parses the same file completely. So the stream is built here, once.
+const parse = (Model, bytes) => new Model(new KaitaiStream(bytes), null, null);
 
 const CASES = [
   { format: 'Png', fixture: 'tiny.png', expected: { width: 4, height: 2 } },
@@ -36,19 +42,19 @@ for (const { format, fixture, expected } of CASES) {
     const { mod, bytes } = load(format);
     sizes[format] = bytes;
     const Model = mod[format] ?? mod.default ?? mod;
-    const parsed = new Model(read(fixture));
+    const parsed = parse(Model, read(fixture));
     const dims = format === 'Png'
       ? { width: parsed.ihdr.width, height: parsed.ihdr.height }
       : format === 'Gif'
-        ? { width: parsed.logicalScreenDescriptor.width, height: parsed.logicalScreenDescriptor.height }
-        : { width: parsed.dibInfo.imageWidth, height: parsed.dibInfo.imageHeight };
+        ? { width: parsed.logicalScreenDescriptor.screenWidth, height: parsed.logicalScreenDescriptor.screenHeight }
+        : { width: parsed.dibInfo.header.imageWidth, height: parsed.dibInfo.header.imageHeight };
     assert.deepEqual(dims, expected, `${format} dimensions from ${fixture}`);
     if (format === 'Png') {
       assert.equal(parsed.ihdr.bitDepth, 8);
       assert.equal(parsed.ihdr.colorType, 2, 'truecolour');
       assert.equal(parsed.chunks.length, 3, 'tEXt, IDAT and IEND follow the IHDR');
     }
-    if (format === 'Bmp') assert.equal(parsed.dibInfo.bitsPerPixel, 24);
+    if (format === 'Bmp') assert.equal(parsed.dibInfo.header.bitsPerPixel, 24);
   });
 }
 
