@@ -233,9 +233,13 @@ fn survives_the_unknown_sizes_and_truncations_live_streams_use() {
     );
     for cut in [8, 20, 40, 60, 120, 900] {
         let code = parse_container(&mkv[..cut]);
+        // Either the EBML tree is recognised or the buffer is refused with an error code. What may
+        // not happen is a panic, and what may not happen either is a prefix being reported as some
+        // other container - the shortest header any reader uses is eight bytes, so these prefixes
+        // do reach the dispatch rather than being turned away by a length gate.
         assert!(
-            code > 0 || code == -1,
-            "a {cut}-byte prefix must report, never panic (got {code})"
+            code == FORMAT_EBML || code == -1 || code == -2,
+            "a {cut}-byte prefix reported {code}"
         );
     }
 }
