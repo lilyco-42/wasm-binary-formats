@@ -40,19 +40,12 @@ const share = (n) => `${((100 * n) / cov.binaryLabels).toFixed(1)}%`;
 const coverageTable = [
   '| state | binary labels | share |',
   '|---|---|---|',
-  `| parseable via a reader this repo generates and load-gates | **${cov.binaryGenerated}** | ${share(cov.binaryGenerated)}% |`,
-  `| an upstream spec exists but the pinned compiler does not ship it | ${cov.binarySpecAvailable} | ${share(cov.binarySpecAvailable)}% |`,
+  `| parseable via a reader this repo generates and load-gates | **${cov.binaryGenerated}** | ${share(cov.binaryGenerated)} |`,
+  `| an upstream spec exists but the pinned compiler does not ship it | ${cov.binarySpecAvailable} | ${share(cov.binarySpecAvailable)} |`,
   `| **no spec matched - real gap** | **${cov.gaps}** | ${share(cov.gaps)} |`,
 ].join('\n');
 
 let doc = readFileSync('README.md', 'utf8');
-const replace = (startMark, endMark, body) => {
-  const from = doc.indexOf(startMark);
-  const to = doc.indexOf(endMark, from);
-  if (from < 0 || to < 0) throw new Error(`anchor not found: ${startMark}`);
-  doc = `${doc.slice(0, from)}${body}\n\n${doc.slice(to === -1 ? doc.length : to)}`;
-};
-
 // A table is the contiguous run of lines starting with '|' that begins at the header row. Replacing
 // the whole run keeps this idempotent without needing marker comments in the file.
 function replaceTable(doc, headerPrefix, body) {

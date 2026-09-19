@@ -250,8 +250,8 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| parseable via a reader this repo generates and load-gates | **69** | 31.5%% |
-| an upstream spec exists but the pinned compiler does not ship it | 1 | 0.5%% |
+| parseable via a reader this repo generates and load-gates | **69** | 31.5% |
+| an upstream spec exists but the pinned compiler does not ship it | 1 | 0.5% |
 | **no spec matched - real gap** | **149** | 68.0% |
 
 Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
