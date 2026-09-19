@@ -161,8 +161,8 @@ test('reads the handwritten apk-shaped fixture', () => {
 
 const NT = 64;
 
-function minimalPe({ pe32plus = true, dll = false, cli = 0 } = {}) {
-  const optional = pe32plus ? 240 : 224;
+function minimalPe({ pe32plus = true, dll = false, cli = 0, optionalSize = null } = {}) {
+  const optional = optionalSize ?? (pe32plus ? 240 : 224);
   const file = new DataView(new ArrayBuffer(NT + 24 + optional + 80));
   const u8 = new Uint8Array(file.buffer);
   const set16 = (at, v) => file.setUint16(at, v, true);
@@ -173,8 +173,8 @@ function minimalPe({ pe32plus = true, dll = false, cli = 0 } = {}) {
   u8.set([0x50, 0x45], NT);
   set16(NT + 4, pe32plus ? 0x8664 : 0x014c);
   set16(NT + 6, 2);
-  set16(NT + 16, optional);
-  set16(NT + 18, dll ? 0x2000 : 0x0102);
+  set16(NT + 20, optional);
+  set16(NT + 22, dll ? 0x2000 : 0x0102);
   const opt = NT + 24;
   set16(opt, pe32plus ? 0x20b : 0x10b);
   set32(opt + 16, 0x1000);
@@ -236,4 +236,21 @@ test('refuses to treat an archive as an executable', () => {
   const { rc } = parsePe(bytes);
   assert.equal(rc, -2, 'MZ signature is required');
   assert.match(readString(ex.last_error).text, /MZ/);
+});
+
+test('reads a legal but smaller optional header at its real size', () => {
+  // 96 bytes of standard fields plus 15 directories = 216, which real PE32 images use. A reader
+  // that forced the canonical 224 would start the section table eight bytes late.
+  const { rc, values } = parsePe(minimalPe({ pe32plus: false, cli: 0x20d0, optionalSize: 216 }));
+  assert.equal(rc, 0);
+  assert.equal(Number(values.cli), 0x20d0);
+  assert.deepEqual(values.sections.split('\n').map((row) => row.split('\t')[0]), ['.text', '.rdata']);
+});
+
+test('falls back when the optional size is not a size', () => {
+  const bytes = minimalPe({ pe32plus: false });
+  new DataView(bytes.buffer).setUint16(NT + 20, 0, true);
+  const { rc, values } = parsePe(bytes);
+  assert.equal(rc, 0, 'a zero field must not be read as "the table starts at the header"');
+  assert.deepEqual(values.sections.split('\n').map((row) => row.split('\t')[0]), ['.text', '.rdata']);
 });

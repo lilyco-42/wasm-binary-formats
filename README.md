@@ -26,14 +26,12 @@ modules — counting them to reach "200" would be padding, so this file says 61 
   *and* deflated entries; nothing touches disk, no path is resolved.
 * PE header inspection (`engine/src/pe.rs`) — machine, PE32 vs PE32+, entry RVA, image base,
   subsystem, `IMAGE_FILE_DLL`, section table, and the COM descriptor that marks a .NET image.
-  Every offset is bounds-checked against the file, so a lied-about `SizeOfOptionalHeader` yields
-  an empty section table instead of an out-of-bounds read. **This reads, it does not run.**
-  One field is wrong in the wild rather than maliciously: `C:\Windows\System32\ScriptRunner.exe`
-  (22,984 bytes, checked 2026-09-19) declares `SizeOfOptionalHeader = 0` and
-  `Characteristics = 0` while carrying a perfectly normal optional header and `.text/.rdata/...`
-  table, so the reader falls back to the canonical 224/240 for the magic instead of parsing the
-  optional header as sections. `engine/tests/pe.rs::assumes_the_canonical_size_when_the_field_is_zeroed`
-  pins that behaviour.
+  Every offset is bounds-checked against the file. **This reads, it does not run.**
+
+  The declared `SizeOfOptionalHeader` is used but validated: an implausible value falls back to
+  the canonical 224/240 for the magic, while a legal-but-smaller 216 (96 standard bytes plus 15
+  directories, which real PE32 images use) is honoured — forcing the canonical size would shift
+  the section table by eight bytes.
 * `demo/index.html` — unpacks an APK client-side and runs `assets/**.html` in an opaque-origin
   sandbox with relative references rewritten to `blob:` URLs; `.exe`/`.dll` get the PE panel.
   Live at <https://lilyco-42.github.io/wasm-binary-formats/>.
@@ -142,12 +140,20 @@ cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
 Nothing here compiles on a phone or a weak laptop by necessity: `.github/workflows/engine.yml`
 builds the wasm target and runs both test layers on CI.
 
-### One correction worth keeping in the record
+### Corrections worth keeping in the record
 
-An earlier research pass claimed v86 has no JIT, citing [issue #547](https://github.com/copy/v86/issues/547).
-A second pass contradicted it. Checking the shipped artifact settles it: `disable_jit` is a real
-option in `https://copy.sh/v86/build/libv86.js`. The "no JIT" claim is dropped; the licence and
-payload findings stand independently of it.
+* An early research pass claimed v86 has no JIT, citing [issue #547](https://github.com/copy/v86/issues/547).
+  A second pass contradicted it. Checking the shipped artifact settles it: `disable_jit` is a real
+  option in `https://copy.sh/v86/build/libv86.js`. The "no JIT" claim is dropped; the licence and
+  payload findings stand independently of it.
+* A version of this README asserted that `ScriptRunner.exe` declares `SizeOfOptionalHeader = 0`.
+  It does not: the first implementation read that field and `Characteristics` one slot early (at
+  `NumberOfSymbols`, per a mis-counted `IMAGE_FILE_HEADER`), and a real system binary was parsed
+  into a shape that looked like a wild defect. The file actually declares 224 and `0x0022`, and
+  the accidental canonical fallback was masking the off-by-one-field, which is also why the
+  synthetic tests stayed green — they were built with the same wrong layout. Ground truth came
+  from `struct.unpack_from('<HHIIIHH', …)` over the same bytes. Offsets fixed, validation added,
+  and a legal 216-byte header is now a test case so the fallback cannot silently become the rule.
 
 ## Prior art worth copying instead of rebuilding
 

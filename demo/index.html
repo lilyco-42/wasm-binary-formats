@@ -230,7 +230,7 @@ function showPe(bytes, label) {
     ['架构', `${MACHINES[info.machine] ?? '未知'} (0x${info.machine.toString(16)})`],
     ['可选头', info.magic === 0x20b ? 'PE32+ (64 位)' : 'PE32 (32 位)'],
     ['入口 RVA', `0x${info.entry.toString(16)}`],
-    ['镜像基址', `0x${(info.base >>> 0).toString(16)}`],
+    ['镜像基址', `0x${info.base.toString(16)}`],
     ['子系统', `${SUBSYSTEMS[info.subsystem] ?? '未知'} (${info.subsystem})`],
     ['类型', characteristics & 0x2000 ? 'DLL (IMAGE_FILE_DLL)' : 'EXE'],
     ['.NET', info.cli ? `是，COM descriptor RVA 0x${info.cli.toString(16)}` : '否'],

@@ -25,7 +25,22 @@ fn put_str(bytes: &mut Vec<u8>, at: usize, text: &str) {
 
 /// A PE32 (32-bit) or PE32+ (64-bit) image with two sections, sized exactly like the spec says.
 fn build(pe32plus: bool, characteristics_value: u16, cli: u32) -> Vec<u8> {
-    let optional_size: usize = if pe32plus { 240 } else { 224 };
+    build_with_optional(
+        pe32plus,
+        characteristics_value,
+        cli,
+        if pe32plus { 240 } else { 224 },
+    )
+}
+
+/// The declared optional size is written both into the header field and as the real distance to
+/// the section table, so passing 216 reproduces the smaller-but-legal PE32 headers in the wild.
+fn build_with_optional(
+    pe32plus: bool,
+    characteristics_value: u16,
+    cli: u32,
+    optional_size: usize,
+) -> Vec<u8> {
     let dirs_at = if pe32plus { 112 } else { 96 };
     let total = NT + 24 + optional_size + 2 * 40;
     let mut bytes = vec![0u8; total];
@@ -36,8 +51,8 @@ fn build(pe32plus: bool, characteristics_value: u16, cli: u32) -> Vec<u8> {
     put_str(&mut bytes, NT, "PE");
     put_u16(&mut bytes, NT + 4, if pe32plus { 0x8664 } else { 0x014c });
     put_u16(&mut bytes, NT + 6, 2);
-    put_u16(&mut bytes, NT + 16, optional_size as u16); // SizeOfOptionalHeader lives in the COFF header, not after it
-    put_u16(&mut bytes, NT + 18, characteristics_value);
+    put_u16(&mut bytes, NT + 20, optional_size as u16); // SizeOfOptionalHeader, per IMAGE_FILE_HEADER
+    put_u16(&mut bytes, NT + 22, characteristics_value);
 
     let opt = NT + 24;
     put_u16(&mut bytes, opt, if pe32plus { 0x20b } else { 0x10b });
@@ -152,16 +167,16 @@ fn refuses_things_that_are_not_pe() {
 }
 
 #[test]
-fn survives_a_lied_about_header_size() {
-    // SizeOfOptionalHeader is attacker controlled. Pointing it past the end of the file must
-    // yield an empty section table rather than a panic or a read out of bounds.
+fn survives_an_implausible_header_size() {
+    // SizeOfOptionalHeader is attacker controlled. An absurd value must not send the reader past
+    // the end of the file; it falls back to the canonical size instead of panicking.
     let mut file = build(false, 0x0102, 0);
-    put_u16(&mut file, NT + 16, 0xffff);
+    put_u16(&mut file, NT + 20, 0xffff);
     assert_eq!(parse(&file), 0);
     assert_eq!(
-        sections(),
-        "",
-        "no sections should be reported from a bogus header size"
+        sections().lines().count(),
+        2,
+        "an out-of-range declared size falls back to the canonical 224"
     );
 
     let mut many = build(false, 0x0102, 0);
@@ -175,11 +190,27 @@ fn survives_a_lied_about_header_size() {
 }
 
 #[test]
-fn assumes_the_canonical_size_when_the_field_is_zeroed() {
-    // Not hypothetical: C:\Windows\System32\ScriptRunner.exe declares 0 here. Reading that 0
-    // literally points the section table at the start of the optional header.
+fn honours_a_smaller_but_legal_optional_header() {
+    // 96 bytes of standard fields plus 15 directories is exactly 216, and real PE32 images use
+    // it. Forcing 224 here would start the section table eight bytes late and report garbage.
+    let file = build_with_optional(false, 0x0022, 0x2008, 216);
+    assert_eq!(parse(&file), 0, "{}", error_text());
+    let listing = sections();
+    assert_eq!(listing.lines().count(), 2, "{listing:?}");
+    assert!(
+        listing.starts_with(".text\t4096\t288\t512\t1024\t"),
+        "{listing}"
+    );
+    assert_eq!(cli_rva(), 0x2008, "15 directories still fit in 216 bytes");
+    assert_eq!(characteristics() & 0x2000, 0, "0x0022 is an exe, not a dll");
+}
+
+#[test]
+fn falls_back_when_the_field_is_not_a_size_at_all() {
+    // Zero is not a header size. Reading it literally points the section table at the start of
+    // the optional header, which is the failure this guard exists to stop.
     let mut file = build(false, 0x0102, 0x2008);
-    put_u16(&mut file, NT + 16, 0);
+    put_u16(&mut file, NT + 20, 0);
     assert_eq!(parse(&file), 0, "{}", error_text());
     let listing = sections();
     assert_eq!(

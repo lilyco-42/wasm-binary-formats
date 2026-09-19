@@ -129,13 +129,22 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return fail("unknown optional header magic", -4);
     }
     let dirs = if magic == 0x10b { 24 + 96 } else { 24 + 112 };
-    // Section table follows the optional header. Its offset is derived from the declared
-    // optional-header size, which is attacker controlled *and* wrong in the wild: shipped
-    // Windows binaries (ScriptRunner.exe, 22984 bytes, seen 2026-09-19) carry zero there, so
-    // trusting it would read the optional header itself as a section table. Fall back to the
-    // canonical size for the magic; a larger-than-file value still yields no sections.
+    // IMAGE_FILE_HEADER starts after the 4-byte signature: Machine +4, NumberOfSections +6,
+    // TimeDateStamp +8, PointerToSymbolTable +12, NumberOfSymbols +16, SizeOfOptionalHeader
+    // +20, Characteristics +22. Getting these one field early reads NumberOfSymbols as a size,
+    // which is exactly the mistake a real C:\Windows\System32\ScriptRunner.exe exposed.
+    let declared = pe.u16(20).unwrap_or_default() as usize;
     let canonical = if magic == 0x10b { 224 } else { 240 };
-    let size_of_optional = pe.u16(16).unwrap_or_default().max(canonical) as usize;
+    let minimum = if magic == 0x10b { 96 } else { 112 };
+    // Trust the declared size when it is plausible: PE32 images legitimately ship with 216 or
+    // 224 here, so forcing a canonical value would misplace the section table by eight bytes.
+    let size_of_optional = if (minimum..=1024).contains(&declared) {
+        declared
+    } else {
+        canonical
+    };
+    // Section table follows the optional header; every read below is bounds-checked against the
+    // file length, so a hostile or corrupt count and offset can only shorten the table.
     let count = pe.u16(6).unwrap_or_default().max(0) as usize;
     let mut sections = Vec::new();
     if let Some(start) = lfanew.checked_add(24 + size_of_optional) {
@@ -160,7 +169,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
     PE.with(|slot| {
         *slot.borrow_mut() = Some(Header {
             machine: pe.u16(4).unwrap_or(MACHINE_UNKNOWN),
-            characteristics: pe.u16(18).unwrap_or_default(),
+            characteristics: pe.u16(22).unwrap_or_default(),
             magic,
             // AddressOfEntryPoint and Subsystem sit at the same offset in both optional header
             // flavours; only ImageBase moves. Offsets below are from the start of the NT headers,
