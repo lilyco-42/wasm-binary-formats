@@ -59,7 +59,11 @@ Each is a fetch-and-enumerate step like the five sources already wired into
   manifest decoding is deliberately not attempted: it needs the resource ID table from
   `resources.arsc`, and guessing at it would print a package name that is wrong some of the time.
 * `demo/index.html` — unpacks an APK client-side and runs `assets/**.html` in an opaque-origin
-  sandbox with relative references rewritten to `data:` URLs; `.exe`/`.dll` get the PE panel.
+  sandbox with relative references rewritten to `data:` URLs; `classes.dex` and a binary
+  `AndroidManifest.xml` render as a DEX header table and a string-pool dump, `.exe`/`.dll` as the PE
+  panel, all dispatched on magic bytes rather than filename (verified in the deployed page: DEX 035
+  with checksum `0xdeadbeef`, and the pool's three strings, alongside `GUEST_RAN@null` from the
+  sandboxed web asset).
   Live at <https://lilyco-42.github.io/wasm-binary-formats/>.
 * `test/fixtures/lab-fixture.apk` — a hand-written, deterministic APK-shaped archive (8 entries,
   mixed stored/deflated, `AndroidManifest.xml` starting with the real res chunk type 0x0003).
