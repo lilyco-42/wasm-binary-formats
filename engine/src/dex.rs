@@ -79,7 +79,12 @@ fn with<T: Copy>(default: T, read: impl Fn(&Header) -> T) -> T {
 }
 
 pub fn version() -> String {
-    with(String::new(), |header| header.version.clone())
+    DEX.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(|header| header.version.clone())
+            .unwrap_or_default()
+    })
 }
 pub fn checksum() -> i64 {
     with(0, |header| header.checksum)
