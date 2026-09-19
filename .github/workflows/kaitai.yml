@@ -46,20 +46,24 @@ jobs:
       - name: Generate JavaScript readers
         run: |
           mkdir -p generated/kaitai
+          SPECS=$(sed 's|$|.ksy|; s|^|kaitai-struct-compiler-'"${KSC_VERSION}"'/formats/|' tools/kaitai/specs.txt | tr '\n' ' ')
           "kaitai-struct-compiler-${KSC_VERSION}/bin/kaitai-struct-compiler" \
             --target javascript \
             --outdir generated/kaitai \
             --import-path "kaitai-struct-compiler-${KSC_VERSION}/formats" \
-            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/png.ksy" \
-            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/gif.ksy" \
-            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/bmp.ksy"
-          ls -l generated/kaitai
+            $SPECS
+          ls generated/kaitai | wc -l
 
       - name: Runtime from npm, exactly the version the compiler targets
         run: npm install --no-save --omit=dev "kaitai-struct@${KSC_VERSION}"
 
+      - name: Measure what each format costs
+        run: node tools/kaitai/measure.mjs generated/kaitai catalog/kaitai-sizes.json
+
       - name: Parse fixtures written by this repo
-        run: node test/kaitai.test.mjs generated/kaitai
+        run: |
+          node test/kaitai.test.mjs generated/kaitai
+          node test/kaitai_catalog.test.mjs generated/kaitai
 
       - uses: actions/upload-artifact@v4
         with:

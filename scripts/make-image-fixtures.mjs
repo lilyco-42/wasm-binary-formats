@@ -3,7 +3,7 @@
 // ships no third-party sample files and the bytes are reproducible.
 //
 //   node scripts/make-image-fixtures.mjs
-import { deflateSync } from 'node:zlib';
+import { deflateSync, gzipSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,12 +99,30 @@ function makeBmp(width, height) {
   return file;
 }
 
+// An ICONDIR with one entry carrying the PNG above verbatim - the form every modern .ico uses.
+function makeIco(width, height, pngBytes) {
+  return Uint8Array.from([
+    ...le16(0), ...le16(1), ...le16(1),
+    width, height, 0, 0,
+    ...le16(1), ...le16(32), ...le32(pngBytes.length), ...le32(22),
+    ...pngBytes,
+  ]);
+}
+
+const raw = Uint8Array.from([0x6c, 0x79, 0x63, 0x6f, 0x2d, 0x66, 0x69, 0x78]);
+function makeGz(bytes) {
+  return Uint8Array.from(gzipSync(bytes));
+}
+
 const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
 mkdirSync(out, { recursive: true });
+const png = makePng(4, 2);
 const fixtures = {
-  'tiny.png': makePng(4, 2),
+  'tiny.png': png,
   'tiny.gif': makeGif(2, 2),
   'tiny.bmp': makeBmp(3, 2),
+  'tiny.ico': makeIco(2, 2, png),
+  'tiny.gz': makeGz(raw),
 };
 for (const [name, bytes] of Object.entries(fixtures)) {
   writeFileSync(join(out, name), bytes);

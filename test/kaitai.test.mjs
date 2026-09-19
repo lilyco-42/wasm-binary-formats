@@ -30,31 +30,65 @@ const read = (name) => new Uint8Array(readFileSync(join(fixtures, name)));
 const parse = (Model, bytes) => new Model(new KaitaiStream(bytes), null, null);
 
 const CASES = [
-  { format: 'Png', fixture: 'tiny.png', expected: { width: 4, height: 2 } },
-  { format: 'Gif', fixture: 'tiny.gif', expected: { width: 2, height: 2 } },
-  { format: 'Bmp', fixture: 'tiny.bmp', expected: { width: 3, height: 2 } },
+  {
+    format: 'Png',
+    fixture: 'tiny.png',
+    check: (p) => assert.deepEqual(
+      { width: p.ihdr.width, height: p.ihdr.height, bitDepth: p.ihdr.bitDepth, colorType: p.ihdr.colorType },
+      { width: 4, height: 2, bitDepth: 8, colorType: 2 },
+    ),
+    // The trailing chunk list is what caught the bare-buffer constructor: through an explicit
+    // stream it reads tEXt, IDAT, IEND; through the convenience form the fields came back empty.
+    extra: (p) => assert.deepEqual(
+      p.chunks.map((chunk) => Buffer.from(chunk.type).toString('latin1')),
+      ['tEXt', 'IDAT', 'IEND'],
+    ),
+  },
+  {
+    format: 'Gif',
+    fixture: 'tiny.gif',
+    check: (p) => assert.deepEqual(
+      { width: p.logicalScreenDescriptor.screenWidth, height: p.logicalScreenDescriptor.screenHeight },
+      { width: 2, height: 2 },
+    ),
+  },
+  {
+    format: 'Bmp',
+    fixture: 'tiny.bmp',
+    check: (p) => assert.deepEqual(
+      { width: p.dibInfo.header.imageWidth, height: p.dibInfo.header.imageHeight, bpp: p.dibInfo.header.bitsPerPixel },
+      { width: 3, height: 2, bpp: 24 },
+    ),
+  },
+  {
+    format: 'Ico',
+    fixture: 'tiny.ico',
+    check: (p) => assert.deepEqual(
+      { images: p.numImages, width: p.images[0].width, height: p.images[0].height },
+      { images: 1, width: 2, height: 2 },
+    ),
+  },
+  {
+    format: 'Gzip',
+    fixture: 'tiny.gz',
+    // gzip.ksy inlines the member header on the root object rather than nesting it.
+    check: (p) => assert.deepEqual(
+      { compressionMethod: p.compressionMethod, lenUncompressed: p.lenUncompressed },
+      { compressionMethod: 8, lenUncompressed: 8 },
+    ),
+  },
 ];
 
 const sizes = {};
 
-for (const { format, fixture, expected } of CASES) {
+for (const { format, fixture, check, extra } of CASES) {
   test(`${format}: the generated reader agrees with the bytes we wrote`, () => {
     const { mod, bytes } = load(format);
     sizes[format] = bytes;
     const Model = mod[format] ?? mod.default ?? mod;
     const parsed = parse(Model, read(fixture));
-    const dims = format === 'Png'
-      ? { width: parsed.ihdr.width, height: parsed.ihdr.height }
-      : format === 'Gif'
-        ? { width: parsed.logicalScreenDescriptor.screenWidth, height: parsed.logicalScreenDescriptor.screenHeight }
-        : { width: parsed.dibInfo.header.imageWidth, height: parsed.dibInfo.header.imageHeight };
-    assert.deepEqual(dims, expected, `${format} dimensions from ${fixture}`);
-    if (format === 'Png') {
-      assert.equal(parsed.ihdr.bitDepth, 8);
-      assert.equal(parsed.ihdr.colorType, 2, 'truecolour');
-      assert.equal(parsed.chunks.length, 3, 'tEXt, IDAT and IEND follow the IHDR');
-    }
-    if (format === 'Bmp') assert.equal(parsed.dibInfo.header.bitsPerPixel, 24);
+    check(parsed);
+    extra?.(parsed);
   });
 }
 
