@@ -170,11 +170,12 @@ the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates readers for **50 specs across 13 families** (`tools/kaitai/specs.txt`), and parses
 fixtures against them. Two levels are asserted separately on purpose - a load gate for
-all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 13 formats that
+all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 15 formats that
 have a fixture: PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
 tests, mean reader 13.7 KB), JPEG and ZIP (`test/kaitai_formats.test.mjs`, 2 tests), and WAVE, the
-generic RIFF, Ogg and MOV/MP4 (`test/kaitai_media.test.mjs`, 5 tests) read from files ffmpeg
-muxed. The media assertions are a three-way check: the same bytes are also read by this repo's Rust
+generic RIFF, Ogg, MOV/MP4, AU and PCX (`test/kaitai_media.test.mjs`, 7 tests) read from files
+ffmpeg muxed and Pillow wrote. The media assertions are a three-way check: the same bytes are also
+read by this repo's Rust
 engine and by `ffprobe`, so a shared wrong assumption has to be wrong in three places to pass.
 The one media spec that fails on a real file is asserted as a gap instead of dropped - see
 `test/kaitai_media.test.mjs` and the AVI note below.
@@ -323,6 +324,14 @@ builds the wasm target and runs both test layers on CI.
   desyncs inside the nested `LIST`s and throws at end of data, while this repo's own walk, which
   adds `size & 1`, tiles the file exactly. AVI is therefore credited to the Rust reader only, and
   the test asserts the generated one still fails so the gap is visible if upstream fixes it.
+* CAB was attempted and **not** implemented, on purpose. `makecab.exe` here produces a cabinet whose
+  file table decodes exactly as documented - 16-byte `CFFILE` records at `coffFiles`, names
+  `payload.txt` and `second.txt`, sizes 50 and 50, matching `expand -D` - but its folder area is
+  `coffFiles - 36 = 8` bytes for `cFolders = 1`, where `CFFOLDER` is specified as 16, and the two
+  u16s in those 8 bytes read 1 and 1 rather than the 59 compressed / 100 uncompressed bytes the
+  folder actually holds. Rather than guess a layout from one sample, the reader was left unwritten
+  and `cab` stays a recorded gap. Revisit with a second cabinet (a larger one, and one from another
+  writer) before coding against either interpretation.
 
 ## Prior art worth copying instead of rebuilding
 

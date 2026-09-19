@@ -41,6 +41,9 @@ make media.webm $V -c:v libvpx-vp9
 
 # Audio: RIFF, an MPEG frame chain, and two containers of their own.
 make media.wav $A -ar 8000 -c:a pcm_s16le
+# The AU muxer only accepts the codecs it can name in a Sun header, and 8 kHz is the rate the
+# classic header describes; pcm_s16le is refused outright by ffmpeg 9 here.
+make media.au $A -ar 8000 -c:a pcm_mulaw
 make media.mp3 $A -c:a libmp3lame -b:a 32k
 make media.flac $A -c:a flac
 make media.ogg $A -c:a libvorbis -q:a 1
@@ -48,8 +51,8 @@ make media.ogg $A -c:a libvorbis -q:a 1
 # AVI is RIFF again, but with the LIST nesting that webp never exercises.
 make media.avi $V -c:v mpeg4 -q:v 10
 
-# PDF, from Pillow: an independent writer, and the object/xref layer is what the reader claims to
-# walk. PSD is not saved here because Pillow can only read it, so its fixture stays handwritten.
+# PDF and PCX, from Pillow: independent writers, and both formats are ones the pinned Kaitai bundle
+# has a spec for, so the same bytes get read by three implementations.
 python - <<'PY'
 from PIL import Image
 try:
@@ -57,6 +60,13 @@ try:
     print("made tiny.pdf")
 except Exception as exc:
     print("skipped: tiny.pdf", exc.__class__.__name__)
+try:
+    indexed = Image.new("P", (7, 5))
+    indexed.paste(2, (0, 0, 3, 4))
+    indexed.save("tiny.pcx")
+    print("made tiny.pcx")
+except Exception as exc:
+    print("skipped: tiny.pcx", exc.__class__.__name__)
 PY
 
 # Ground truth for the files that exist.

@@ -89,6 +89,43 @@ test('Ogg: pages, sequence numbers and the granule position ffmpeg wrote', () =>
   assert.ok(last.isEndOfStream, 'and the last one ends it');
 });
 
+test('Pcx: the header Pillow wrote comes back field for field', () => {
+  const pcx = model('Pcx', 'tiny.pcx');
+  assert.equal(byteOf(pcx.hdr.magic), 10, 'the manufacturer code is 0x0A');
+  assert.equal(pcx.hdr.version, 5, 'PCX version 5, i.e. 256 colours with an RLE encoder');
+  assert.equal(pcx.hdr.encoding, 1, '1 is run-length encoded');
+  assert.equal(pcx.hdr.bitsPerPixel, 8);
+  assert.equal(pcx.hdr.numPlanes, 1);
+  // A 7x5 image is indexed 0..6 and 0..4: the window corners are inclusive, which is the classic
+  // off-by-one trap in this header.
+  assert.deepEqual(
+    [pcx.hdr.imgXMin, pcx.hdr.imgYMin, pcx.hdr.imgXMax, pcx.hdr.imgYMax],
+    [0, 0, 6, 4],
+    `the picture window: ${JSON.stringify(pcx.hdr)}`
+  );
+  assert.equal(pcx.hdr.hdpi, 100, 'Pillow writes 100 dpi for both axes');
+  assert.equal(pcx.hdr.vdpi, 100);
+  // The spec only walks the trailing 769-byte VGA palette when `version == 3`, so a version 5 file
+  // - which is exactly the kind that has that palette - leaves it unread. Asserting the absence
+  // keeps the gap visible: PCX's credit here is the fixed header, not its colour table.
+  assert.equal(pcx.palette256, undefined, 'the conditional palette is not parsed for version 5');
+  assert.equal(pcx._io.size, 920);
+});
+
+test('Au: the Sun/NeXT header ffmpeg wrote agrees with its own data length', () => {
+  const au = model('Au', 'media.au');
+  assert.equal(Buffer.from(au.magic).toString('latin1'), '.snd');
+  assert.equal(au.ofsData, 32, 'the header carries a comment past the fixed fields');
+  assert.equal(au.header.dataSize, 1600);
+  assert.equal(au.header.sampleRate, 8000, '-ar 8000, and ffprobe reads the same');
+  assert.equal(au.header.numChannels, 1);
+  assert.equal(Number(au.lenData), 1600, 'derived: data size is explicit here, not EOF-relative');
+  assert.equal(au.ofsData + Number(au.lenData), au._io.size, 'header plus data is the whole file');
+  // ffmpeg labels 8-bit mu-law with encoding code 1 rather than the 3 the Sun table uses for
+  // G.711 mu-law, which is why the number is asserted from the bytes and not from the codec name.
+  assert.equal(au.header.encoding, 1);
+});
+
 test('Avi: the pinned spec cannot read a real ffmpeg AVI, so the AVI credit rests on our reader', () => {
   // media/avi.ksy steps from one block to the next by the declared size alone and never skips
   // RIFF's odd-size padding byte. ffmpeg's file has five such blocks nested inside the LISTs -
