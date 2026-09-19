@@ -102,7 +102,7 @@ fn module(sections: &[&[u8]]) -> Vec<u8> {
 fn a_section_that_overshoots_the_file_is_named_not_assumed() {
     // Self-authored: a type section that declares more bytes than remain. The walk has to stop and
     // say so, instead of reporting a completed module.
-    let bytes = module(&[[0x01, 0x40, 0x00, 0x00]]);
+    let bytes = module(&[&[0x01, 0x40, 0x00, 0x00]]);
     assert_eq!(parse(&bytes), FORMAT_WASM);
     let lines = report();
     assert_eq!(number(&lines, "truncated", 1), 1, "{lines:#?}");
