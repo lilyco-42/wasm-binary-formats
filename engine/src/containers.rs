@@ -827,6 +827,167 @@ fn read_asf(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+pub const FORMAT_FLV: i32 = 21;
+
+fn be_u32(bytes: &[u8], at: usize) -> Option<i64> {
+    let part = bytes.get(at..at + 4)?;
+    Some(i64::from(u32::from_be_bytes([
+        part[0], part[1], part[2], part[3],
+    ])))
+}
+
+fn be_u24(bytes: &[u8], at: usize) -> Option<i64> {
+    let part = bytes.get(at..at + 3)?;
+    Some(i64::from(part[0]) << 16 | i64::from(part[1]) << 8 | i64::from(part[2]))
+}
+
+/// FLV: a nine-byte header, then tags of `type u8`, `data size u24be`, `timestamp u24be` plus an
+/// extended timestamp byte, `stream id u24be`, the data, and a 32-bit back-pointer that has to equal
+/// 11 + data size. That back-pointer is what makes the walk checkable: a single wrong length throws
+/// every later tag out of step, so the mismatch count is reported rather than hidden.
+fn read_flv(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 17 || bytes.get(0..3) != Some(b"FLV") {
+        return None;
+    }
+    let version = i64::from(bytes[3]);
+    let flags = i64::from(bytes[4]);
+    let hdrlen = be_u32(bytes, 5)?;
+    if version != 1 || hdrlen < 9 || (hdrlen as usize) + 17 > bytes.len() {
+        return None;
+    }
+    let prev0 = be_u32(bytes, hdrlen as usize)?;
+    let mut at = (hdrlen as usize) + 4;
+    let mut tags = 0i64;
+    let mut audio = 0i64;
+    let mut video = 0i64;
+    let mut script = 0i64;
+    let mut mismatches = 0i64;
+    let mut last_ts = 0i64;
+    let mut entries = vec![
+        format!("version\t{version}"),
+        format!("flags\t{flags}"),
+        format!("audio_present	{}", (flags >> 2) & 1),
+        format!("video_present	{}", flags & 1),
+        format!("header_bytes	{hdrlen}"),
+        format!("previous_tag_size_zero	{prev0}"),
+    ];
+    while at + 11 <= bytes.len() && tags < 200_000 {
+        let kind = i64::from(bytes[at]);
+        let size = be_u24(bytes, at + 1)?;
+        let low = be_u24(bytes, at + 4)?;
+        let ts = (i64::from(bytes[at + 7]) << 24) | low;
+        let label = match kind {
+            8 => "audio",
+            9 => "video",
+            18 => "script",
+            _ => "other",
+        };
+        match kind {
+            8 => audio += 1,
+            9 => video += 1,
+            18 => script += 1,
+            _ => {}
+        }
+        entries.push(format!("tag	{label}	{size}	{ts}	{at}"));
+        last_ts = ts;
+        let after = at + 11 + size as usize;
+        if after + 4 > bytes.len() {
+            at = after;
+            break;
+        }
+        if be_u32(bytes, after)? != 11 + size {
+            mismatches += 1;
+        }
+        at = after + 4;
+        tags += 1;
+    }
+    entries.push(format!("tags	{tags}	audio	{audio}	video	{video}"));
+    entries.push(format!("script_tags	{script}"));
+    entries.push(format!("last_timestamp_ms	{last_ts}"));
+    entries.push(format!("backpointer_mismatches	{mismatches}"));
+    if at == bytes.len() {
+        entries.push("walked	end".to_string());
+    }
+    Some(entries)
+}
+
+fn folder_area_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+pub const FORMAT_CAB: i32 = 22;
+
+/// Microsoft cabinet: a 36-byte header, a folder area, then `cFiles` records of 16 bytes
+/// (`cbFile u32`, uncompressed offset `u32`, folder `u16`, date `u16`, time `u16`, attributes `u16`)
+/// each followed by a NUL-terminated name.
+///
+/// The folder area is listed, not decoded: two cabinets written by `makecab` here both leave eight
+/// bytes between the header and `coffFiles`, where the specification describes a 16-byte `CFFOLDER`,
+/// and the two 16-bit fields in those bytes hold 1 and 1 for a 100-byte folder and 19 and 1 for a
+/// 600 KB one. Neither reading gives a byte count, so the bytes are reported verbatim and CAB is
+/// credited at container level only.
+fn read_cab(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 60 || bytes.get(0..4) != Some(b"MSCF") {
+        return None;
+    }
+    let file = Le(bytes);
+    let cabinet_bytes = file.u32(8)?;
+    let coff_files = file.u32(16)?;
+    let folders = file.u16(26)?;
+    let files = file.u16(28)?;
+    let flags = file.u16(30)?;
+    let set_id = file.u16(32)?;
+    let index = file.u16(34)?;
+    if coff_files < 36 || coff_files as usize >= bytes.len() || cabinet_bytes > bytes.len() as i64 {
+        return None;
+    }
+    let area = bytes.get(36..coff_files as usize)?;
+    let mut entries = vec![
+        format!("cabinet_bytes	{cabinet_bytes}"),
+        format!("version	{}{}", char::from(bytes[25]), char::from(bytes[24])),
+        format!("folders	{folders}"),
+        format!("files	{files}"),
+        format!("flags	{flags}"),
+        format!("set_id	{set_id}"),
+        format!("set_index	{index}"),
+        format!("files_offset	{coff_files}"),
+        format!(
+            "folder_area\t{}",
+            folder_area_hex(&area[..area.len().min(64)])
+        ),
+    ];
+    let mut at = coff_files as usize;
+    let mut listed = 0i64;
+    let mut total = 0i64;
+    let mut offset_sum = 0i64;
+    while listed < files && at + 16 <= bytes.len() {
+        let size = file.u32(at)?;
+        let uoff = file.u32(at + 4)?;
+        let folder = file.u16(at + 8)?;
+        let date = file.u16(at + 12)?;
+        let time = file.u16(at + 14)?;
+        let name_at = at + 16;
+        let end = *bytes[name_at..].iter().position(|byte| *byte == 0)? + name_at;
+        let name = String::from_utf8_lossy(bytes.get(name_at..end)?).into_owned();
+        entries.push(format!("file	{name}	{size}	{uoff}	{folder}	{date}	{time}"));
+        total += size;
+        if uoff == offset_sum {
+            offset_sum += size;
+        }
+        at = end + 1;
+        listed += 1;
+    }
+    entries.push(format!("files_listed	{listed}"));
+    entries.push(format!("uncompressed_total	{total}"));
+    entries.push(format!(
+        "contiguous_offsets	{}",
+        i64::from(offset_sum == total)
+    ));
+    entries.push(format!("data_offset	{}", file.u32(36)?));
+    Some(entries)
+}
+
+/// -1 buffer too small to hold any header
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -861,6 +1022,12 @@ pub fn parse(bytes: &[u8]) -> i32 {
     }
     if let Some(lines) = read_asf(bytes) {
         return accept(FORMAT_ASF, lines);
+    }
+    if let Some(lines) = read_flv(bytes) {
+        return accept(FORMAT_FLV, lines);
+    }
+    if let Some(lines) = read_cab(bytes) {
+        return accept(FORMAT_CAB, lines);
     }
     reject(
         "not a tar, ar, RIFF, TIFF, EBML, PDF, Netpbm, ASF or ISO base media container",

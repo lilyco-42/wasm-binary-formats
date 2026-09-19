@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 25,
-    "selfContainer": 19,
+    "selfContainer": 21,
     "binarySpecAvailable": 0,
-    "gaps": 134,
+    "gaps": 132,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -21,14 +21,14 @@
     "gapByGroup": {
       "unknown": 58,
       "image": 14,
-      "archive": 16,
+      "archive": 15,
       "code": 5,
       "document": 10,
       "application": 11,
       "executable": 6,
       "text": 2,
       "inode": 3,
-      "video": 3,
+      "video": 2,
       "font": 4,
       "undefined": 1,
       "audio": 1
@@ -657,8 +657,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "cad",
@@ -1400,8 +1400,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "fortran",

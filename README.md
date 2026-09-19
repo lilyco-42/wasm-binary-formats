@@ -261,11 +261,11 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 25 | 11.4% |
-| own Rust reader, container framing only | 19 | 8.7% |
+| own Rust reader, container framing only | 21 | 9.6% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **134** | 61.2% |
-| **covered, any level** | **85** | 38.8% |
+| **no parser at all - real gap** | **132** | 60.3% |
+| **covered, any level** | **87** | 39.7% |
 
 Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
 MKV/WebM/EBML, FLAC, MP3 audio frames, tar, 7z, bzip2/bzip3, xz, zstd, cab, ar/arc/arj, deb, CHM,
