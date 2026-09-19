@@ -543,7 +543,13 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
         let Some((count, after_count)) = digits(bytes, at) else {
             break 'table;
         };
-        cursor = after_count;
+        // The row area starts after the newline that ends the "first count" line: reading from the
+        // digit run's end would shift every 20-byte record by one byte, which still counts the rows
+        // but reads each row's type character out of the generation field.
+        let Some(cursor_after_header) = skip_white(bytes, after_count) else {
+            break 'table;
+        };
+        cursor = cursor_after_header;
         if count > 8192 || first > bytes.len() as i64 {
             break 'table;
         }
