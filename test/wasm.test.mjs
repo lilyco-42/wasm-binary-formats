@@ -366,3 +366,31 @@ test('the reader names the family, not the first row it happened to walk', () =>
     assert.equal(drive(shape, file).name, name, `${file} reported a different family name`);
   }
 });
+
+test('a WebAssembly module reads back through the container reader', () => {
+  // The artifact under test is the module the browser is loading right now: LLVM output, not a
+  // fixture of ours. The check that matters is agreement - what the walk counts as exports has to be
+  // what the host engine itself reports, or the section boundaries are wrong even though the bytes
+  // added up.
+  const bytes = new Uint8Array(readFileSync(wasmPath));
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  const code = ex.parse_container(ptr, bytes.length);
+  const total = ex.container_count();
+  const rows = [];
+  for (let index = 0; index < total; index += 1) rows.push(readString(ex.container_entry, index).text);
+  const family = readString(ex.container_name).text;
+  ex.dealloc(ptr, bytes.length);
+  assert.equal(code, 26, `the module was not read as WebAssembly (code ${code})`);
+  assert.equal(family, 'wasm');
+  assert.ok(rows.includes('walked	end'), 'the sections must tile the module');
+  assert.ok(!rows.some((row) => row.startsWith('section	unknown')), 'no id should be unnamed');
+  const column = (prefix) => Number(rows.find((row) => row.startsWith(prefix)).split('	')[1]);
+  assert.equal(column('exports	'), WebAssembly.Module.exports(instance).length,
+    'the reader and the engine disagree about the export count');
+  assert.equal(column('code_bodies	'), column('functions	'),
+    'one code body per declared function');
+  assert.ok(column('types	') > 0 && column('data_segments	') > 0, 'counts should be present');
+  assert.ok(rows.some((row) => row.startsWith('custom	producers')),
+    'the toolchain records itself in a custom section');
+});

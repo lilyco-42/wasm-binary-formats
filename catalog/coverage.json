@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 28,
+    "selfFields": 29,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 127,
+    "gaps": 126,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -25,7 +25,7 @@
       "code": 5,
       "document": 10,
       "application": 11,
-      "executable": 6,
+      "executable": 5,
       "text": 2,
       "inode": 3,
       "font": 4,
@@ -4392,8 +4392,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "wav",

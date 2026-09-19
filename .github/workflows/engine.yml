@@ -25,12 +25,14 @@ jobs:
           node-version: "22"
 
       # The same code, two targets: host tests exercise the logic, the wasm build is
-      # what the browser actually loads.
-      - name: Host tests
-        run: cargo test
-
+      # what the browser actually loads. The wasm goes first because one host test reads it:
+      # the WebAssembly section walk runs over the module LLVM just produced, which is bytes no
+      # fixture of ours authored. Locally, where the file may not exist, that test skips.
       - name: Build wasm
         run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Host tests
+        run: cargo test
 
       # cargo needs cwd = engine/ so it picks up engine/.cargo/config.toml; the JS test
       # speaks repo-root paths, so it opts back out instead of doubling the prefix.

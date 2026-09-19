@@ -71,6 +71,7 @@ pub fn name() -> &'static str {
         FORMAT_CAB => "cab",
         FORMAT_DEB => "deb",
         FORMAT_TS => "mpegts",
+        FORMAT_WASM => "wasm",
         _ => "unknown",
     }
 }
@@ -1537,6 +1538,143 @@ fn read_ts(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// WebAssembly modules: the section directory, the counts inside each vector-headed section, and
+/// the custom-section names. 26, following the transport stream at 25.
+pub const FORMAT_WASM: i32 = 26;
+
+/// An unsigned LEB128, as the value and the number of bytes it took. Six bytes is the limit because
+/// a seventh would shift past the 32 bits this format uses for these fields.
+fn uleb(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
+    let mut value = 0i64;
+    let mut shift = 0u32;
+    let mut taken = 0usize;
+    loop {
+        let byte = *bytes.get(at + taken)?;
+        value |= i64::from(byte & 0x7f) << shift;
+        taken += 1;
+        shift += 7;
+        if byte & 0x80 == 0 {
+            return Some((value, taken));
+        }
+        if taken >= 6 {
+            return None;
+        }
+    }
+}
+
+/// The name a custom section carries, and where its payload starts.
+fn wasm_custom_name(bytes: &[u8], at: usize) -> Option<(String, usize)> {
+    let (length, taken) = uleb(bytes, at)?;
+    let start = at + taken;
+    let end = start + usize::try_from(length).ok()?;
+    if end > bytes.len() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&bytes[start..end]).into_owned();
+    Some((text, end))
+}
+
+fn wasm_section_name(id: u8) -> &'static str {
+    match id {
+        0 => "custom",
+        1 => "type",
+        2 => "import",
+        3 => "function",
+        4 => "table",
+        5 => "memory",
+        6 => "global",
+        7 => "export",
+        8 => "start",
+        9 => "element",
+        10 => "code",
+        11 => "data",
+        12 => "data_count",
+        _ => "unknown",
+    }
+}
+
+/// A module is a version, then sections of `id u8` + `size u32(LEB)` + that many bytes. Every vector
+/// headed section opens with an entry count, and the function/code pair is the check that the walk
+/// is on the real section boundaries rather than merely adding up.
+fn read_wasm(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 12 || &bytes[0..4] != b"\x00asm" {
+        return None;
+    }
+    let version = i64::from(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]));
+    let mut rows: Vec<String> = Vec::new();
+    let mut counts: Vec<(&'static str, i64)> = Vec::new();
+    let mut customs: Vec<String> = Vec::new();
+    let mut sections = 0i64;
+    let mut unknown = 0i64;
+    let mut truncated = 0i64;
+    let mut at = 8usize;
+    while at < bytes.len() {
+        let id = bytes[at];
+        let Some((size, taken)) = uleb(bytes, at + 1) else {
+            truncated = 1;
+            break;
+        };
+        let body = at + 1 + taken;
+        let Ok(span) = usize::try_from(size) else {
+            truncated = 1;
+            break;
+        };
+        if body + span > bytes.len() {
+            truncated = 1;
+            break;
+        }
+        let name = wasm_section_name(id);
+        rows.push(format!("section\t{name}\t{size}\t{body}"));
+        sections += 1;
+        if name == "unknown" {
+            unknown += 1;
+        }
+        let counted = match id {
+            1 => Some("types"),
+            2 => Some("imports"),
+            3 => Some("functions"),
+            4 => Some("tables"),
+            5 => Some("memories"),
+            6 => Some("globals"),
+            7 => Some("exports"),
+            9 => Some("elements"),
+            10 => Some("code_bodies"),
+            11 => Some("data_segments"),
+            12 => Some("data_count"),
+            _ => None,
+        };
+        if let Some(key) = counted {
+            if let Some((value, _)) = uleb(bytes, body) {
+                counts.push((key, value));
+            }
+        } else if id == 0 && customs.len() < 16 {
+            if let Some((text, _)) = wasm_custom_name(bytes, body) {
+                customs.push(format!("custom\t{text}\t{size}"));
+            }
+        }
+        at = body + span;
+    }
+    let mut entries = vec![format!("wasm\t{version}\t{sections}\t{unknown}")];
+    entries.extend(rows);
+    for (key, value) in &counts {
+        entries.push(format!("{key}\t{value}"));
+    }
+    let functions = counts.iter().find(|(key, _)| *key == "functions");
+    let bodies = counts.iter().find(|(key, _)| *key == "code_bodies");
+    if let (Some((_, listed)), Some((_, coded))) = (functions, bodies) {
+        entries.push(format!(
+            "code_matches_functions\t{}",
+            i64::from(listed == coded)
+        ));
+    }
+    entries.extend(customs);
+    entries.push(format!("truncated\t{truncated}"));
+    if at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -1584,8 +1722,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_ts(bytes) {
         return accept(FORMAT_TS, lines);
     }
+    if let Some(lines) = read_wasm(bytes) {
+        return accept(FORMAT_WASM, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB or MPEG-TS container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS or WebAssembly container",
         -2,
     )
 }
