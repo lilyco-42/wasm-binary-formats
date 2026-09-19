@@ -261,8 +261,8 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 24 | 11.0% |
-| own Rust reader, container framing only | 11 | 5.0% |
-| generated Kaitai reader, load-gated in CI | 48 | 21.9% |
+| own Rust reader, container framing only | 18 | 8.2% |
+| generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
 | **no parser at all - real gap** | **136** | 62.1% |
 | **covered, any level** | **83** | 37.9% |

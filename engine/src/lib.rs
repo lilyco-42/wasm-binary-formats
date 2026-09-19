@@ -21,6 +21,7 @@ pub mod audio;
 pub mod axml;
 pub mod containers;
 pub mod dex;
+pub mod documents;
 pub mod pe;
 pub mod scan;
 pub mod streams;
@@ -376,6 +377,37 @@ pub extern "C" fn audio_count() -> i32 {
 #[no_mangle]
 pub extern "C" fn audio_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
     match audio::at(index) {
+        Some(text) => copy_str(&text, buf, cap),
+        None => -1,
+    }
+}
+
+/// Office document packages (OOXML, OpenDocument, EPUB): 0 none, 1 docx, 2 xlsx, 3 pptx,
+/// 4 odt, 5 ods, 6 odp, 7 epub; -1 not a zip, -2 a zip that is not one of these packages.
+#[no_mangle]
+pub extern "C" fn parse_document(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    documents::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+#[no_mangle]
+pub extern "C" fn document_kind() -> i32 {
+    documents::kind()
+}
+
+#[no_mangle]
+pub extern "C" fn document_count() -> i32 {
+    documents::count()
+}
+
+/// One `name<TAB>value` row: document, then main_part, mimetype or rootfile, plus entries,
+/// archive_bytes and has_manifest.
+#[no_mangle]
+pub extern "C" fn document_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
+    match documents::at(index) {
         Some(text) => copy_str(&text, buf, cap),
         None => -1,
     }

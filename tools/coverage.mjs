@@ -36,6 +36,8 @@ const SELF = {
   mp4: ['fields'], mkv: ['fields'], webm: ['fields'], avi: ['container'], avif: ['container'],
   flac: ['fields'], mp3: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['container'], pbm: ['fields'],
+  docx: ['container'], xlsx: ['container'], pptx: ['container'],
+  odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };
 
 const ALIAS = {

@@ -4,11 +4,11 @@
     "labels": 353,
     "binaryLabels": 219,
     "textLabels": 134,
-    "specGenerated": 50,
+    "specGenerated": 43,
     "specAvailable": 0,
-    "binaryGenerated": 48,
+    "binaryGenerated": 41,
     "selfFields": 24,
-    "selfContainer": 11,
+    "selfContainer": 18,
     "binarySpecAvailable": 0,
     "gaps": 136,
     "implementedHere": [
@@ -1128,8 +1128,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "dosmbr",
@@ -1297,8 +1297,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "erb",
@@ -2794,8 +2794,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "ods",
@@ -2809,8 +2809,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "odt",
@@ -2824,8 +2824,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "ogg",
@@ -3179,8 +3179,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "printfox",
@@ -4615,8 +4615,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "selfLevel": "",
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "xml",
