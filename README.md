@@ -157,6 +157,28 @@ with a freely redistributable guest such as ReactOS, sold as "legacy 16/32-bit",
 .exe".
 
 
+## Breadth: the Kaitai route, measured rather than assumed
+
+The ">=200 modules" requirement is not answered by hand-writing 200 readers. It is answered by
+[kaitai-io/kaitai_struct_formats](https://github.com/kaitai-io/kaitai_struct_formats): **189
+`.ksy` specs** (counted from the git tree, star 795, pushed 2026-09-18), from whose descriptions
+the compiler emits parsers for 13 languages including JavaScript and Rust.
+`.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
+generates PNG/GIF/BMP readers, and parses fixtures this repo wrote itself - 4 tests, 0 failures.
+
+* Measured cost per generated JS reader: `Png=22672 B`, `Gif=13680 B`, `Bmp=28163 B`, mean 21.5 KB
+  before minification. 189 formats is megabytes of source, not hundreds of wasm blobs.
+* Licences: **compiler GPLv3+** (so it runs in CI and is never shipped), **JS runtime
+  `kaitai-struct@0.11.0` Apache-2.0**, Python and Rust runtimes MIT. What kaitai.io does **not**
+  state is the licence of generated code - that has to be settled in writing before a generated
+  reader is linked into a paid product.
+* Measured runtime trap: `new Png(uint8)` left `_io` without `readBytes` on Node 22, while
+  `new Png(new KaitaiStream(bytes), null, null)` parsed the same file completely and returned the
+  full three-chunk list. Drive generated readers with an explicit stream.
+* [ImHex-Patterns](https://github.com/WerWolv/ImHex-Patterns) holds 314 `.hexpat` format
+  descriptions but is **GPL-2.0**: something to read, not to vendor. For identification,
+  [google/magika](https://github.com/google/magika) (star 18622, Apache-2.0) is the permissive pick.
+
 ## Reproduce
 
 ```bash
