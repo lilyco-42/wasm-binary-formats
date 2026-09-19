@@ -84,7 +84,7 @@ fn reads_an_ar_member_table() {
     let lines = entries();
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert_eq!(lines[0], "hello.o\t4\t100644", "mode is the [40..48] field");
-    assert_eq!(lines[1], "world.o\t6\t0     ");
+    assert_eq!(lines[1], "world.o\t6\t100644");
 }
 
 #[test]
