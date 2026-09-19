@@ -1,0 +1,5 @@
+catalog/tika.xml
+catalog/arch.h
+catalog/*-README.md
+node_modules/
+*.log

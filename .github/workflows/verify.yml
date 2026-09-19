@@ -1,0 +1,35 @@
+name: Verify catalog
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Re-fetches the upstream enumerations weekly so the counts in README.md cannot rot
+  # quietly, and refuses to let the actionable tier shrink.
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/fetch-sources.mjs
+      - run: node scripts/build-catalog.mjs
+      - name: Assert the counts still hold
+        run: |
+          node -e '
+          const s = require("./catalog/formats.json").summary;
+          const floor = { identify: 1500, unpack: 40, parse: 10, execute: 2 };
+          for (const [tier, min] of Object.entries(floor)) {
+            if ((s.byTier[tier] ?? 0) < min) { console.error(`${tier}: ${s.byTier[tier]} < ${min}`); process.exit(1) }
+          }
+          if (s.actionableWithoutSignatureTables < 60) { console.error("actionable tier shrank"); process.exit(1) }
+          console.log("tiers", JSON.stringify(s.byTier), "actionable", s.actionableWithoutSignatureTables);
+          '
