@@ -12,6 +12,9 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   PDF   "%PDF-x.y" header, `startxref` offset near the end of the file, then a classic `xref`
+//!         table of 20-byte rows and a `trailer` dictionary (PDF 1.5 xref streams are reported as
+//!         unsupported rather than walked)
 
 use crate::scan::Le;
 use std::cell::RefCell;
@@ -20,9 +23,11 @@ pub const FORMAT_TAR: i32 = 1;
 pub const FORMAT_AR: i32 = 2;
 pub const FORMAT_RIFF: i32 = 3;
 pub const FORMAT_TIFF: i32 = 4;
-// 5..9 are the stream formats in `streams.rs`, so these stay unique across both kinds.
+// 5..9 are the stream formats in `streams.rs`, 12..15 the audio formats in `audio.rs`, so these
+// stay unique across all three kinds.
 pub const FORMAT_BMFF: i32 = 10;
 pub const FORMAT_EBML: i32 = 11;
+pub const FORMAT_PDF: i32 = 16;
 
 thread_local! {
     static RESULT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -495,6 +500,180 @@ fn float(bytes: &[u8]) -> f64 {
     }
 }
 
+/// Classic-cross-reference PDFs: the header version, the entry point the file advertises, the xref
+/// rows with the offsets they claim, and the object references in the trailer dictionary. PDF 1.5
+/// xref and object streams are recognised and reported as unsupported rather than guessed at,
+/// because their offsets live in a compressed stream this reader does not decode.
+fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 64 || &bytes[0..5] != b"%PDF-" {
+        return None;
+    }
+    let version = String::from_utf8_lossy(bytes.get(5..8)?).into_owned();
+    let mut entries = vec![format!("pdf\t{version}")];
+    // Writers put `startxref` in the last few bytes, so only the tail is searched: a hostile file
+    // cannot make this scan the whole buffer for a nine-byte needle.
+    let tail = bytes.len().saturating_sub(1024);
+    let found = find(bytes, tail, b"startxref")?;
+    let (offset, _) = digits(bytes, skip_white(bytes, found + b"startxref".len())?)?;
+    entries.push(format!("startxref\t{offset}"));
+    let base = skip_white(bytes, offset as usize)?;
+    if bytes.get(base..base + 4) != Some(b"xref") {
+        let stream = find(bytes, base, b"/Type/XRef").is_some()
+            || find(bytes, base, b"/Type /XRef").is_some();
+        entries.push(format!("xref_stream\t{}", if stream { 1 } else { 0 }));
+        return Some(entries);
+    }
+    let mut cursor = base + 4;
+    let mut rows = 0i64;
+    let mut live = 0i64;
+    let mut free = 0i64;
+    let mut verified = 0i64;
+    // Subsections are "first count" followed by `count` records of exactly 20 bytes:
+    // 10-digit offset, space, 5-digit generation, space, 'n' or 'f', then a two-byte end of line.
+    'table: for _subsection in 0..64 {
+        let Some(at) = skip_white(bytes, cursor) else {
+            break 'table;
+        };
+        let Some((first, after_first)) = digits(bytes, at) else {
+            break 'table;
+        };
+        let Some(at) = skip_white(bytes, after_first) else {
+            break 'table;
+        };
+        let Some((count, after_count)) = digits(bytes, at) else {
+            break 'table;
+        };
+        cursor = after_count;
+        if count > 8192 || first > bytes.len() as i64 {
+            break 'table;
+        }
+        for index in 0..count {
+            let record = cursor + index as usize * 20;
+            let Some(body) = bytes.get(record..record + 20) else {
+                break 'table;
+            };
+            let row_offset = digits(body, 0).map_or(0, |(value, _)| value);
+            let generation = digits(body, 11).map_or(0, |(value, _)| value);
+            let kind = char::from(body[17]);
+            rows += 1;
+            if kind == 'n' {
+                live += 1;
+                let at = row_offset as usize;
+                let head = bytes.get(at..at + 12).unwrap_or(b"");
+                let label = format!("{} ", first + index);
+                let named = String::from_utf8_lossy(head).starts_with(&label);
+                let open = find(bytes, at, b" obj").is_some_and(|pos| pos - at <= 12);
+                if named && open {
+                    verified += 1;
+                }
+            } else if kind == 'f' {
+                free += 1;
+            }
+            entries.push(format!(
+                "xref\t{}\t{}\t{}\t{}",
+                first + index,
+                row_offset,
+                generation,
+                kind
+            ));
+        }
+        cursor += count as usize * 20;
+        match skip_white(bytes, cursor) {
+            Some(at) if bytes.get(at..at + 7) == Some(b"trailer") => {
+                cursor = at + 7;
+                break 'table;
+            }
+            _ => continue 'table,
+        }
+    }
+    entries.push(format!("rows\t{rows}\tlive\t{live}\tfree\t{free}"));
+    entries.push(format!("verified\t{verified}\tof\t{live}"));
+    // The trailer dictionary, read as tokens: a `/Name` followed by `number number R` is a
+    // reference, which is what `/Root` and `/Info` are. A lone number (`/Size 7`) is not.
+    let Some(dict) = skip_white(bytes, cursor).and_then(|at| find(bytes, at, b"<<")) else {
+        return Some(entries);
+    };
+    let stop = find(bytes, dict, b">>")
+        .unwrap_or(bytes.len())
+        .min(bytes.len());
+    let mut scan = dict;
+    let mut name = String::new();
+    let mut guard = 0usize;
+    while scan < stop && guard < 8192 {
+        guard += 1;
+        match bytes[scan] {
+            b'/' => {
+                let mut end = scan + 1;
+                while end < stop
+                    && !matches!(
+                        bytes[end],
+                        b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'<' | b'>'
+                    )
+                {
+                    end += 1;
+                }
+                name = String::from_utf8_lossy(&bytes[scan + 1..end]).into_owned();
+                scan = end;
+            }
+            b'0'..=b'9' => {
+                let Some((number, after)) = digits(bytes, scan) else {
+                    scan += 1;
+                    continue;
+                };
+                let reference = skip_white(bytes, after)
+                    .and_then(|at| digits(bytes, at))
+                    .and_then(|(gen, next)| Some((gen, skip_white(bytes, next)?)))
+                    .filter(|(_, at)| bytes.get(*at) == Some(&b'R'));
+                match reference {
+                    Some((generation, at)) => {
+                        entries.push(format!("ref\t{name}\t{number}\t{generation}"));
+                        scan = at + 1;
+                    }
+                    None => scan = after,
+                }
+            }
+            _ => scan += 1,
+        }
+    }
+    Some(entries)
+}
+
+/// Index of the first occurrence of `needle` at or after `from`.
+fn find(bytes: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
+    if from > bytes.len() || needle.is_empty() || from + needle.len() > bytes.len() {
+        return None;
+    }
+    bytes[from..]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|offset| from + offset)
+}
+
+/// First index at or after `at` that is not whitespace or a NUL byte.
+fn skip_white(bytes: &[u8], mut at: usize) -> Option<usize> {
+    while at < bytes.len() {
+        if matches!(bytes[at], b' ' | b'\t' | b'\r' | b'\n' | 0) {
+            at += 1;
+        } else {
+            return Some(at);
+        }
+    }
+    None
+}
+
+/// (value, index just past the digits) for an unsigned decimal run.
+fn digits(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
+    let mut end = at;
+    while end < bytes.len() && bytes[end].is_ascii_digit() {
+        end += 1;
+    }
+    if end == at {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&bytes[at..end]);
+    Some((text.parse::<i64>().unwrap_or(0), end))
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -519,8 +698,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_tiff(bytes) {
         return accept(FORMAT_TIFF, lines);
     }
+    if let Some(lines) = read_pdf(bytes) {
+        return accept(FORMAT_PDF, lines);
+    }
     reject(
-        "not a tar, ar, RIFF, TIFF, EBML or ISO base media container",
+        "not a tar, ar, RIFF, TIFF, EBML, PDF or ISO base media container",
         -2,
     )
 }

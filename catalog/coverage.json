@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 48,
     "selfFields": 23,
-    "selfContainer": 9,
+    "selfContainer": 10,
     "binarySpecAvailable": 0,
-    "gaps": 139,
+    "gaps": 138,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -24,7 +24,7 @@
       "image": 14,
       "archive": 16,
       "code": 5,
-      "document": 11,
+      "document": 10,
       "application": 12,
       "executable": 6,
       "text": 2,
@@ -3007,8 +3007,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "pebin",

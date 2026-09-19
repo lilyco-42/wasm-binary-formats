@@ -249,7 +249,8 @@ pub extern "C" fn parse_container(ptr: *const u8, len: i32) -> i32 {
     containers::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
 }
 
-/// Which container was recognised: 0 none, 1 tar, 2 ar, 3 RIFF, 4 TIFF.
+/// Which container was recognised: 0 none, 1 tar, 2 ar, 3 RIFF, 4 TIFF, 10 ISO base media,
+/// 11 EBML (Matroska/WebM), 16 PDF with a classic cross-reference table.
 #[no_mangle]
 pub extern "C" fn container_kind() -> i32 {
     containers::kind()
