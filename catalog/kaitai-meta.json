@@ -1,0 +1,1611 @@
+{
+  "source": "kaitai spec meta as declared by each .ksy",
+  "specs": [
+    {
+      "path": "3d/gltf_binary.ksy",
+      "id": "gltf_binary",
+      "category": "3d",
+      "title": "GL Transmission Format, binary container",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_bootldr_asus.ksy",
+      "id": "android_bootldr_asus",
+      "category": "archive",
+      "title": "ASUS Fugu bootloader.img format (version 2 and later)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_bootldr_huawei.ksy",
+      "id": "android_bootldr_huawei",
+      "category": "archive",
+      "title": "Huawei Bootloader packed image format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_bootldr_qcom.ksy",
+      "id": "android_bootldr_qcom",
+      "category": "archive",
+      "title": "Qualcomm Snapdragon (MSM) bootloader.img format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_dto.ksy",
+      "id": "android_dto",
+      "category": "archive",
+      "title": "Android DTB/DTBO Partition",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_img.ksy",
+      "id": "android_img",
+      "category": "archive",
+      "title": "Android Boot Image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/android_sparse.ksy",
+      "id": "android_sparse",
+      "category": "archive",
+      "title": "Android sparse image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/cpio_old_le.ksy",
+      "id": "cpio_old_le",
+      "category": "archive",
+      "title": "cpio archive, old binary variant, little-endian",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/gzip.ksy",
+      "id": "gzip",
+      "category": "archive",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/lzh.ksy",
+      "id": "lzh",
+      "category": "archive",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/mozilla_mar.ksy",
+      "id": "mozilla_mar",
+      "category": "archive",
+      "title": "Mozilla ARchive",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/phar_without_stub.ksy",
+      "id": "phar_without_stub",
+      "category": "archive",
+      "title": "PHP phar archive (without stub)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/rar.ksy",
+      "id": "rar",
+      "category": "archive",
+      "title": "RAR (Roshall ARchiver) archive files",
+      "extensions": [],
+      "mimes": [
+        "application/vnd.rar",
+        "application/x-rar-compressed"
+      ]
+    },
+    {
+      "path": "archive/respack.ksy",
+      "id": "respack",
+      "category": "archive",
+      "title": "ResPack",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/rpm.ksy",
+      "id": "rpm",
+      "category": "archive",
+      "title": "RPM package file",
+      "extensions": [
+        "drpm",
+        "rpm",
+        "src.rpm",
+        "srpm"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "archive/xar.ksy",
+      "id": "xar",
+      "category": "archive",
+      "title": "XAR (eXtensible ARchive)",
+      "extensions": [
+        "pkg",
+        "xar",
+        "xip"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "archive/zip.ksy",
+      "id": "zip",
+      "category": "archive",
+      "title": "ZIP archive file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "archive/zisofs.ksy",
+      "id": "zisofs",
+      "category": "archive",
+      "title": "zisofs",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "cad/monomakh_sapr_chg.ksy",
+      "id": "monomakh_sapr_chg",
+      "category": "cad",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/bcd.ksy",
+      "id": "bcd",
+      "category": "common",
+      "title": "BCD (Binary Coded Decimals)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/bytes_with_io.ksy",
+      "id": "bytes_with_io",
+      "category": "common",
+      "title": "Byte array with an `_io` member",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/dos_datetime.ksy",
+      "id": "dos_datetime",
+      "category": "common",
+      "title": "MS-DOS datetime",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/riff.ksy",
+      "id": "riff",
+      "category": "common",
+      "title": "Resource Interchange File Format (RIFF)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/utf8_string.ksy",
+      "id": "utf8_string",
+      "category": "common",
+      "title": "UTF-8-encoded string",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/vlq_base128_be.ksy",
+      "id": "vlq_base128_be",
+      "category": "common",
+      "title": "Variable length quantity, unsigned integer, base128, big-endian",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "common/vlq_base128_le.ksy",
+      "id": "vlq_base128_le",
+      "category": "common",
+      "title": "Variable length quantity, unsigned/signed integer, base128, little-endian",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "database/dbf.ksy",
+      "id": "dbf",
+      "category": "database",
+      "title": "",
+      "extensions": [],
+      "mimes": [
+        "application/dbase",
+        "application/dbf"
+      ]
+    },
+    {
+      "path": "database/gettext_mo.ksy",
+      "id": "gettext_mo",
+      "category": "database",
+      "title": "gettext binary database",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "database/sqlite3.ksy",
+      "id": "sqlite3",
+      "category": "database",
+      "title": "SQLite3 database file",
+      "extensions": [
+        "db",
+        "db3",
+        "sqlite",
+        "sqlite3"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "database/tsm.ksy",
+      "id": "tsm",
+      "category": "database",
+      "title": "InfluxDB TSM file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/android_nanoapp_header.ksy",
+      "id": "android_nanoapp_header",
+      "category": "executable",
+      "title": "Android nanoapp header",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/dex.ksy",
+      "id": "dex",
+      "category": "executable",
+      "title": "Android Dalvik VM executable (dex)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/dos_mz.ksy",
+      "id": "dos_mz",
+      "category": "executable",
+      "title": "DOS MZ executable",
+      "extensions": [
+        "exe",
+        "ovl"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "executable/elf.ksy",
+      "id": "elf",
+      "category": "executable",
+      "title": "Executable and Linkable Format",
+      "extensions": [],
+      "mimes": [
+        "application/x-coredump",
+        "application/x-elf",
+        "application/x-executable",
+        "application/x-object",
+        "application/x-sharedlib"
+      ]
+    },
+    {
+      "path": "executable/java_class.ksy",
+      "id": "java_class",
+      "category": "executable",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/mach_o_fat.ksy",
+      "id": "mach_o_fat",
+      "category": "executable",
+      "title": "macOS Mach-O multiarch (\"fat\") binary",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/mach_o.ksy",
+      "id": "mach_o",
+      "category": "executable",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/microsoft_pe.ksy",
+      "id": "microsoft_pe",
+      "category": "executable",
+      "title": "Microsoft PE (Portable Executable) file format",
+      "extensions": [
+        "dll",
+        "exe",
+        "sys"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "executable/python_pyc_27.ksy",
+      "id": "python_pyc_27",
+      "category": "executable",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/swf.ksy",
+      "id": "swf",
+      "category": "executable",
+      "title": "Adobe Flash (AKA Shockwave Flash, Macromedia Flash)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "executable/uefi_te.ksy",
+      "id": "uefi_te",
+      "category": "executable",
+      "title": "TE (Terse Executable) file",
+      "extensions": [
+        "efi",
+        "te"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/amlogic_emmc_partitions.ksy",
+      "id": "amlogic_emmc_partitions",
+      "category": "filesystem",
+      "title": "Amlogic proprietary eMMC partition table",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/android_super.ksy",
+      "id": "android_super",
+      "category": "filesystem",
+      "title": "Android Dynamic Partitions metadata",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/apm_partition_table.ksy",
+      "id": "apm_partition_table",
+      "category": "filesystem",
+      "title": "APM (Apple Partition Map) partition table",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/apple_single_double.ksy",
+      "id": "apple_single_double",
+      "category": "filesystem",
+      "title": "AppleSingle / AppleDouble",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/btrfs_stream.ksy",
+      "id": "btrfs_stream",
+      "category": "filesystem",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/cramfs.ksy",
+      "id": "cramfs",
+      "category": "filesystem",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/ext2.ksy",
+      "id": "ext2",
+      "category": "filesystem",
+      "title": "ext2 filesystem",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/gpt_partition_table.ksy",
+      "id": "gpt_partition_table",
+      "category": "filesystem",
+      "title": "GPT (GUID) partition table",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/iso9660.ksy",
+      "id": "iso9660",
+      "category": "filesystem",
+      "title": "ISO9660 CD filesystem",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/luks.ksy",
+      "id": "luks",
+      "category": "filesystem",
+      "title": "Linux Unified Key Setup",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/lvm2.ksy",
+      "id": "lvm2",
+      "category": "filesystem",
+      "title": "Logical Volume Manager version 2",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/mbr_partition_table.ksy",
+      "id": "mbr_partition_table",
+      "category": "filesystem",
+      "title": "MBR (Master Boot Record) partition table",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/tr_dos_image.ksy",
+      "id": "tr_dos_image",
+      "category": "filesystem",
+      "title": "TR-DOS flat-file disk image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/vdi.ksy",
+      "id": "vdi",
+      "category": "filesystem",
+      "title": "VirtualBox Disk Image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/vfat.ksy",
+      "id": "vfat",
+      "category": "filesystem",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/vmware_vmdk.ksy",
+      "id": "vmware_vmdk",
+      "category": "filesystem",
+      "title": "VMWare Virtual Disk",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "filesystem/zx_spectrum_tap.ksy",
+      "id": "zx_spectrum_tap",
+      "category": "filesystem",
+      "title": "ZX Spectrum tape file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "firmware/andes_firmware.ksy",
+      "id": "andes_firmware",
+      "category": "firmware",
+      "title": "Andes Firmware Image layout as seen in MT76 Wifi Chipsets",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "firmware/broadcom_trx.ksy",
+      "id": "broadcom_trx",
+      "category": "firmware",
+      "title": "Broadcom devices .trx firmware packaging",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "firmware/ines.ksy",
+      "id": "ines",
+      "category": "firmware",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "firmware/uimage.ksy",
+      "id": "uimage",
+      "category": "firmware",
+      "title": "U-Boot Image wrapper",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "font/grub2_font.ksy",
+      "id": "grub2_font",
+      "category": "font",
+      "title": "GRUB 2 font",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "font/pcf_font.ksy",
+      "id": "pcf_font",
+      "category": "font",
+      "title": "Portable Compiled Format (PCF) font",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "font/ttf.ksy",
+      "id": "ttf",
+      "category": "font",
+      "title": "TrueType Font File",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/allegro_dat.ksy",
+      "id": "allegro_dat",
+      "category": "game",
+      "title": "Allegro data file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/doom_wad.ksy",
+      "id": "doom_wad",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/dune_2_pak.ksy",
+      "id": "dune_2_pak",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/fallout_dat.ksy",
+      "id": "fallout_dat",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/fallout2_dat.ksy",
+      "id": "fallout2_dat",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/ftl_dat.ksy",
+      "id": "ftl_dat",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/gran_turismo_vol.ksy",
+      "id": "gran_turismo_vol",
+      "category": "game",
+      "title": "Gran Turismo File System (GTFS)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/heaps_pak.ksy",
+      "id": "heaps_pak",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/heroes_of_might_and_magic_agg.ksy",
+      "id": "heroes_of_might_and_magic_agg",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/heroes_of_might_and_magic_bmp.ksy",
+      "id": "heroes_of_might_and_magic_bmp",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/minecraft_nbt.ksy",
+      "id": "minecraft_nbt",
+      "category": "game",
+      "title": "Minecraft NBT (Named Binary Tag)",
+      "extensions": [
+        "dat",
+        "nbt",
+        "schem",
+        "schematic # https://minecraft.wiki/w/schematic_file_format"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "game/quake_mdl.ksy",
+      "id": "quake_mdl",
+      "category": "game",
+      "title": "Quake 1 (idtech2) model format (MDL version 6)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/quake_pak.ksy",
+      "id": "quake_pak",
+      "category": "game",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/quake2_md2.ksy",
+      "id": "quake2_md2",
+      "category": "game",
+      "title": "Quake II player model (version 8)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/renderware_binary_stream.ksy",
+      "id": "renderware_binary_stream",
+      "category": "game",
+      "title": "RenderWare binary stream",
+      "extensions": [
+        "dff",
+        "txd"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "game/saints_row_2_vpp_pc.ksy",
+      "id": "saints_row_2_vpp_pc",
+      "category": "game",
+      "title": "Saints Rows 2 game packages",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "game/warcraft_2_pud.ksy",
+      "id": "warcraft_2_pud",
+      "category": "game",
+      "title": "Warcraft II map files",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "geospatial/shapefile_index.ksy",
+      "id": "shapefile_index",
+      "category": "geospatial",
+      "title": "Shapefile index file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "geospatial/shapefile_main.ksy",
+      "id": "shapefile_main",
+      "category": "geospatial",
+      "title": "Shapefile main file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "hardware/dtb.ksy",
+      "id": "dtb",
+      "category": "hardware",
+      "title": "Flattened Devicetree Format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "hardware/edid.ksy",
+      "id": "edid",
+      "category": "hardware",
+      "title": "EDID (VESA Enhanced Extended Display Identification Data)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "hardware/mifare/mifare_classic.ksy",
+      "id": "mifare_classic",
+      "category": "hardware/mifare",
+      "title": "Mifare Classic RFID tag dump",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/bmp.ksy",
+      "id": "bmp",
+      "category": "image",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/dicom.ksy",
+      "id": "dicom",
+      "category": "image",
+      "title": "Digital Imaging and Communications in Medicine (DICOM) file format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/exif.ksy",
+      "id": "exif",
+      "category": "image",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/gif.ksy",
+      "id": "gif",
+      "category": "image",
+      "title": "GIF (Graphics Interchange Format) image file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/gimp_brush.ksy",
+      "id": "gimp_brush",
+      "category": "image",
+      "title": "GIMP brush file version 2",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/icc_4.ksy",
+      "id": "icc_4",
+      "category": "image",
+      "title": "ICC profile, version 4",
+      "extensions": [
+        "icc",
+        "icm"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "image/ico.ksy",
+      "id": "ico",
+      "category": "image",
+      "title": "Microsoft Windows icon file",
+      "extensions": [],
+      "mimes": [
+        "image/vnd.microsoft.icon",
+        "image/x-icon"
+      ]
+    },
+    {
+      "path": "image/jpeg.ksy",
+      "id": "jpeg",
+      "category": "image",
+      "title": "JPEG (Joint Photographic Experts Group) File Interchange Format",
+      "extensions": [
+        "jfi",
+        "jfif",
+        "jif",
+        "jpe",
+        "jpeg",
+        "jpg"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "image/nitf.ksy",
+      "id": "nitf",
+      "category": "image",
+      "title": "National Imagery Transmission Format",
+      "extensions": [
+        "nitf",
+        "ntf",
+        "ntf.r0",
+        "ntf.r1",
+        "ntf.r2",
+        "ntf.r3",
+        "ntf.r4",
+        "ntf.r5"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "image/pcx_dcx.ksy",
+      "id": "pcx_dcx",
+      "category": "image",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/pcx.ksy",
+      "id": "pcx",
+      "category": "image",
+      "title": "",
+      "extensions": [],
+      "mimes": [
+        "image/vnd.zbrush.pcx",
+        "image/x-pcx"
+      ]
+    },
+    {
+      "path": "image/pif.ksy",
+      "id": "pif",
+      "category": "image",
+      "title": "Portable Image Format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/png.ksy",
+      "id": "png",
+      "category": "image",
+      "title": "PNG (Portable Network Graphics) file",
+      "extensions": [
+        "apng",
+        "png"
+      ],
+      "mimes": [
+        "image/apng",
+        "image/png",
+        "image/vnd.mozilla.apng"
+      ]
+    },
+    {
+      "path": "image/psx_tim.ksy",
+      "id": "psx_tim",
+      "category": "image",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/tga.ksy",
+      "id": "tga",
+      "category": "image",
+      "title": "TGA (AKA Truevision TGA, AKA TARGA) raster image file format",
+      "extensions": [
+        "icb",
+        "tga",
+        "vda",
+        "vst"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "image/wmf.ksy",
+      "id": "wmf",
+      "category": "image",
+      "title": "Windows Metafile (WMF) vector image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "image/xwd.ksy",
+      "id": "xwd",
+      "category": "image",
+      "title": "xwd (X Window Dump) bitmap image",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/aix_utmp.ksy",
+      "id": "aix_utmp",
+      "category": "log",
+      "title": "utmp log file, IBM AIX version",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/glibc_utmp.ksy",
+      "id": "glibc_utmp",
+      "category": "log",
+      "title": "utmp log file, Linux/glibc version",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/hashcat_restore.ksy",
+      "id": "hashcat_restore",
+      "category": "log",
+      "title": "Hashcat Restore file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/mcap.ksy",
+      "id": "mcap",
+      "category": "log",
+      "title": "MCAP",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/sudoers_ts.ksy",
+      "id": "sudoers_ts",
+      "category": "log",
+      "title": "Sudoers Time Stamp file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/systemd_journal.ksy",
+      "id": "systemd_journal",
+      "category": "log",
+      "title": "systemd journal file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "log/windows_evt_log.ksy",
+      "id": "windows_evt_log",
+      "category": "log",
+      "title": "Windows Event Log (EVT)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "machine_code/code_6502.ksy",
+      "id": "code_6502",
+      "category": "machine_code",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/compressed_resource.ksy",
+      "id": "compressed_resource",
+      "category": "macos",
+      "title": "Compressed Macintosh resource",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/ds_store.ksy",
+      "id": "ds_store",
+      "category": "macos",
+      "title": "macOS '.DS_Store' format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/mac_os_resource_snd.ksy",
+      "id": "mac_os_resource_snd",
+      "category": "macos",
+      "title": "Classic MacOS Sound Resource",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/resource_compression/dcmp_0.ksy",
+      "id": "dcmp_0",
+      "category": "macos/resource_compression",
+      "title": "Compressed Macintosh resource data, Apple `'dcmp' (0)` format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/resource_compression/dcmp_1.ksy",
+      "id": "dcmp_1",
+      "category": "macos/resource_compression",
+      "title": "Compressed Macintosh resource data, Apple `'dcmp' (1)` format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/resource_compression/dcmp_2.ksy",
+      "id": "dcmp_2",
+      "category": "macos/resource_compression",
+      "title": "Compressed Macintosh resource data, Apple `'dcmp' (2)` format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/resource_compression/dcmp_variable_length_integer.ksy",
+      "id": "dcmp_variable_length_integer",
+      "category": "macos/resource_compression",
+      "title": "Variable-length integer used in Apple `'dcmp' (0)` and `'dcmp' (1)` compressed resource formats",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "macos/resource_fork.ksy",
+      "id": "resource_fork",
+      "category": "macos",
+      "title": "Macintosh resource fork data",
+      "extensions": [
+        "dfont # datafork font suitcase (a special case of the above, used by certain mac fonts)",
+        "rsrc # resource fork data stored in a separate file (as a data fork)"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "media/android_opengl_shaders_cache.ksy",
+      "id": "android_opengl_shaders_cache",
+      "category": "media",
+      "title": "com.android.opengl.shaders_cache file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/au.ksy",
+      "id": "au",
+      "category": "media",
+      "title": "AU audio format",
+      "extensions": [
+        "au # sun",
+        "snd # next"
+      ],
+      "mimes": [
+        "audio/basic"
+      ]
+    },
+    {
+      "path": "media/avi.ksy",
+      "id": "avi",
+      "category": "media",
+      "title": "Microsoft AVI file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/blender_blend.ksy",
+      "id": "blender_blend",
+      "category": "media",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/creative_voice_file.ksy",
+      "id": "creative_voice_file",
+      "category": "media",
+      "title": "Creative Voice File",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/genmidi_op2.ksy",
+      "id": "genmidi_op2",
+      "category": "media",
+      "title": "GENMIDI.OP2 OPL2 sound bank",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/id3v1_1.ksy",
+      "id": "id3v1_1",
+      "category": "media",
+      "title": "ID3v1.1 tag for .mp3 files",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/id3v2_3.ksy",
+      "id": "id3v2_3",
+      "category": "media",
+      "title": "ID3v2.3 tag for .mp3 files",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/id3v2_4.ksy",
+      "id": "id3v2_4",
+      "category": "media",
+      "title": "ID3v2.4 tag for .mp3 files",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/magicavoxel_vox.ksy",
+      "id": "magicavoxel_vox",
+      "category": "media",
+      "title": "MagicaVoxel File",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/ogg.ksy",
+      "id": "ogg",
+      "category": "media",
+      "title": "Ogg media container file",
+      "extensions": [
+        "oga",
+        "ogg",
+        "ogv",
+        "ogx",
+        "spx"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "media/quicktime_mov.ksy",
+      "id": "quicktime_mov",
+      "category": "media",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/standard_midi_file.ksy",
+      "id": "standard_midi_file",
+      "category": "media",
+      "title": "Standard MIDI file",
+      "extensions": [
+        "mid",
+        "midi",
+        "smf"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "media/stl.ksy",
+      "id": "stl",
+      "category": "media",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/tracker_modules/fasttracker_xm_module.ksy",
+      "id": "fasttracker_xm_module",
+      "category": "media/tracker_modules",
+      "title": "Extended Module",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/tracker_modules/s3m.ksy",
+      "id": "s3m",
+      "category": "media/tracker_modules",
+      "title": "Scream Tracker 3 module",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/vp8_duck_ivf.ksy",
+      "id": "vp8_duck_ivf",
+      "category": "media",
+      "title": "Duck IVF (container format for VP8)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "media/wav.ksy",
+      "id": "wav",
+      "category": "media",
+      "title": "Microsoft WAVE audio file",
+      "extensions": [
+        "bwf",
+        "wav"
+      ],
+      "mimes": [
+        "audio/vnd.wave",
+        "audio/wav",
+        "audio/wave",
+        "audio/x-wav"
+      ]
+    },
+    {
+      "path": "network/bitcoin_transaction.ksy",
+      "id": "bitcoin_transaction",
+      "category": "network",
+      "title": "Bitcoin Transaction",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/dime_message.ksy",
+      "id": "dime_message",
+      "category": "network",
+      "title": "DIME (Direct Internet Message Encapsulation) Message",
+      "extensions": [
+        "dim",
+        "dime"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "network/dns_packet.ksy",
+      "id": "dns_packet",
+      "category": "network",
+      "title": "DNS (Domain Name Service) packet",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/ethernet_frame.ksy",
+      "id": "ethernet_frame",
+      "category": "network",
+      "title": "Ethernet frame (layer 2, IEEE 802.3)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/hccap.ksy",
+      "id": "hccap",
+      "category": "network",
+      "title": "Hashcat capture file (old version)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/hccapx.ksy",
+      "id": "hccapx",
+      "category": "network",
+      "title": "Hashcat capture file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/icmp_packet.ksy",
+      "id": "icmp_packet",
+      "category": "network",
+      "title": "ICMP network packet",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/ipv4_packet.ksy",
+      "id": "ipv4_packet",
+      "category": "network",
+      "title": "IPv4 network packet",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/ipv6_packet.ksy",
+      "id": "ipv6_packet",
+      "category": "network",
+      "title": "IPv6 network packet",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/microsoft_network_monitor_v2.ksy",
+      "id": "microsoft_network_monitor_v2",
+      "category": "network",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/packet_ppi.ksy",
+      "id": "packet_ppi",
+      "category": "network",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/pcap.ksy",
+      "id": "pcap",
+      "category": "network",
+      "title": "",
+      "extensions": [
+        "pcap",
+        "pcapdump"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "network/protocol_body.ksy",
+      "id": "protocol_body",
+      "category": "network",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/rtcp_payload.ksy",
+      "id": "rtcp_payload",
+      "category": "network",
+      "title": "rtcp network payload (single udp packet)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/rtp_packet.ksy",
+      "id": "rtp_packet",
+      "category": "network",
+      "title": "RTP (Real-time Transport Protocol)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/rtpdump.ksy",
+      "id": "rtpdump",
+      "category": "network",
+      "title": "Rtpdump (rtptools)",
+      "extensions": [
+        "rtp",
+        "rtpdump"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "network/some_ip/some_ip_container.ksy",
+      "id": "some_ip_container",
+      "category": "network/some_ip",
+      "title": "AUTOSAR SOME/IP container",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/some_ip/some_ip_sd_entries.ksy",
+      "id": "some_ip_sd_entries",
+      "category": "network/some_ip",
+      "title": "AUTOSAR SOME/IP Service Discovery Entries",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/some_ip/some_ip_sd_options.ksy",
+      "id": "some_ip_sd_options",
+      "category": "network/some_ip",
+      "title": "AUTOSAR SOME/IP Service Discovery Options",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/some_ip/some_ip_sd.ksy",
+      "id": "some_ip_sd",
+      "category": "network/some_ip",
+      "title": "AUTOSAR SOME/IP Service Discovery",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/some_ip/some_ip.ksy",
+      "id": "some_ip",
+      "category": "network/some_ip",
+      "title": "AUTOSAR SOME/IP",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/tcp_segment.ksy",
+      "id": "tcp_segment",
+      "category": "network",
+      "title": "TCP (Transmission Control Protocol) segment",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/tls_client_hello.ksy",
+      "id": "tls_client_hello",
+      "category": "network",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/udp_datagram.ksy",
+      "id": "udp_datagram",
+      "category": "network",
+      "title": "UDP (User Datagram Protocol) datagram",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "network/websocket.ksy",
+      "id": "websocket",
+      "category": "network",
+      "title": "WebSocket",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "scientific/nt_mdt/nt_mdt_pal.ksy",
+      "id": "nt_mdt_pal",
+      "category": "scientific/nt_mdt",
+      "title": "NT-MDT palette format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "scientific/nt_mdt/nt_mdt.ksy",
+      "id": "nt_mdt",
+      "category": "scientific/nt_mdt",
+      "title": "NT-MDT data",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "scientific/spectroscopy/avantes_roh60.ksy",
+      "id": "avantes_roh60",
+      "category": "scientific/spectroscopy",
+      "title": "Avantes USB spectrometer ROH file 6.0",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "scientific/spectroscopy/specpr.ksy",
+      "id": "specpr",
+      "category": "scientific/spectroscopy",
+      "title": "SPECtrum Processing Routines Data Format 3/4/88",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "security/efivar_signature_list.ksy",
+      "id": "efivar_signature_list",
+      "category": "security",
+      "title": "UEFI Variable with Signature List",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "security/openpgp_message.ksy",
+      "id": "openpgp_message",
+      "category": "security",
+      "title": "OpenPGP message",
+      "extensions": [
+        "gpg",
+        "pgp",
+        "pub"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "security/ssh_public_key.ksy",
+      "id": "ssh_public_key",
+      "category": "security",
+      "title": "SSH public key",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/asn1/asn1_der.ksy",
+      "id": "asn1_der",
+      "category": "serialization/asn1",
+      "title": "ASN.1 DER (Abstract Syntax Notation One, Distinguished Encoding Rules)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/bson.ksy",
+      "id": "bson",
+      "category": "serialization",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/chrome_pak.ksy",
+      "id": "chrome_pak",
+      "category": "serialization",
+      "title": "Chrome PAK serialization format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/google_protobuf.ksy",
+      "id": "google_protobuf",
+      "category": "serialization",
+      "title": "Google Protocol Buffers (protobuf)",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/microsoft_cfb.ksy",
+      "id": "microsoft_cfb",
+      "category": "serialization",
+      "title": "Microsoft Compound File Binary (CFB), AKA OLE (Object Linking and Embedding) file format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/msgpack.ksy",
+      "id": "msgpack",
+      "category": "serialization",
+      "title": "MessagePack (msgpack) serialization format",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/php_serialized_value.ksy",
+      "id": "php_serialized_value",
+      "category": "serialization",
+      "title": "Serialized PHP value",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "serialization/python_pickle.ksy",
+      "id": "python_pickle",
+      "category": "serialization",
+      "title": "Python pickle serialization format",
+      "extensions": [
+        "pickle",
+        "pkl"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "serialization/ruby_marshal.ksy",
+      "id": "ruby_marshal",
+      "category": "serialization",
+      "title": "",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "windows/regf.ksy",
+      "id": "regf",
+      "category": "windows",
+      "title": "Windows registry database",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "windows/windows_lnk_file.ksy",
+      "id": "windows_lnk_file",
+      "category": "windows",
+      "title": "Windows shell link file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "windows/windows_minidump.ksy",
+      "id": "windows_minidump",
+      "category": "windows",
+      "title": "Windows MiniDump",
+      "extensions": [
+        "dmp",
+        "mdmp"
+      ],
+      "mimes": []
+    },
+    {
+      "path": "windows/windows_resource_file.ksy",
+      "id": "windows_resource_file",
+      "category": "windows",
+      "title": "Windows resource file",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "windows/windows_shell_items.ksy",
+      "id": "windows_shell_items",
+      "category": "windows",
+      "title": "Windows Shell Items",
+      "extensions": [],
+      "mimes": []
+    },
+    {
+      "path": "windows/windows_systemtime.ksy",
+      "id": "windows_systemtime",
+      "category": "windows",
+      "title": "Microsoft Windows SYSTEMTIME structure",
+      "extensions": [],
+      "mimes": []
+    }
+  ]
+}
