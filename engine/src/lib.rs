@@ -17,6 +17,8 @@ use std::cell::RefCell;
 use std::io::Read;
 use zip::ZipArchive;
 
+pub mod pe;
+
 thread_local! {
     static ARCHIVE: RefCell<Option<ZipArchive<std::io::Cursor<Vec<u8>>>>> = const { RefCell::new(None) };
     static LAST_ERROR: RefCell<String> = const { RefCell::new(String::new()) };
@@ -27,7 +29,9 @@ fn set_error(message: &str) {
 }
 
 fn copy_str(text: &str, buf: *mut u8, cap: i32) -> i32 {
-    if buf.is_null() || cap <= 0 { return -1 }
+    if buf.is_null() || cap <= 0 {
+        return -1;
+    }
     let bytes = text.as_bytes();
     let n = bytes.len().min(cap as usize);
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, n) };
@@ -36,7 +40,9 @@ fn copy_str(text: &str, buf: *mut u8, cap: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn alloc(len: i32) -> *mut u8 {
-    if len <= 0 { return std::ptr::null_mut() }
+    if len <= 0 {
+        return std::ptr::null_mut();
+    }
     let mut v: Vec<u8> = Vec::with_capacity(len as usize);
     let ptr = v.as_mut_ptr();
     std::mem::forget(v);
@@ -45,7 +51,9 @@ pub extern "C" fn alloc(len: i32) -> *mut u8 {
 
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: *mut u8, len: i32) {
-    if ptr.is_null() || len <= 0 { return }
+    if ptr.is_null() || len <= 0 {
+        return;
+    }
     unsafe { drop(Vec::from_raw_parts(ptr, len as usize, len as usize)) }
 }
 
@@ -82,24 +90,43 @@ pub extern "C" fn count() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn entry(index: i32, buf: *mut u8, cap: i32) -> i32 {
-    if index < 0 { return -1 }
+    if index < 0 {
+        return -1;
+    }
     ARCHIVE.with(|slot| match slot.borrow_mut().as_mut() {
         None => -2,
         Some(archive) => match archive.by_index(index as usize) {
-            Ok(file) => copy_str(&format!("{}\t{}\t{}", file.name(), file.size(), file.compressed_size()), buf, cap),
-            Err(error) => { set_error(&error.to_string()); -3 }
+            Ok(file) => copy_str(
+                &format!(
+                    "{}\t{}\t{}",
+                    file.name(),
+                    file.size(),
+                    file.compressed_size()
+                ),
+                buf,
+                cap,
+            ),
+            Err(error) => {
+                set_error(&error.to_string());
+                -3
+            }
         },
     })
 }
 
 #[no_mangle]
 pub extern "C" fn extract(index: i32, buf: *mut u8, cap: i32) -> i32 {
-    if index < 0 || buf.is_null() || cap <= 0 { return -1 }
+    if index < 0 || buf.is_null() || cap <= 0 {
+        return -1;
+    }
     let out = unsafe { std::slice::from_raw_parts_mut(buf, cap as usize) };
     ARCHIVE.with(|slot| match slot.borrow_mut().as_mut() {
         None => -2,
         Some(archive) => match archive.by_index(index as usize) {
-            Err(error) => { set_error(&error.to_string()); -3 }
+            Err(error) => {
+                set_error(&error.to_string());
+                -3
+            }
             Ok(mut file) => {
                 if file.size() > cap as u64 {
                     set_error("buffer too small for this entry");
@@ -112,14 +139,70 @@ pub extern "C" fn extract(index: i32, buf: *mut u8, cap: i32) -> i32 {
                     match file.read(&mut out[written..]) {
                         Ok(0) => break,
                         Ok(n) => written += n,
-                        Err(error) => { result = Err(error); break }
+                        Err(error) => {
+                            result = Err(error);
+                            break;
+                        }
                     }
                 }
                 match result {
                     Ok(()) => written as i32,
-                    Err(error) => { set_error(&format!("decompress failed: {error}")); -5 }
+                    Err(error) => {
+                        set_error(&format!("decompress failed: {error}"));
+                        -5
+                    }
                 }
             }
         },
     })
+}
+
+#[no_mangle]
+pub extern "C" fn parse_pe(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    pe::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+#[no_mangle]
+pub extern "C" fn pe_machine() -> i32 {
+    pe::machine()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_magic() -> i32 {
+    pe::magic()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_entry_rva() -> i64 {
+    pe::entry_rva()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_image_base() -> i64 {
+    pe::image_base()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_subsystem() -> i32 {
+    pe::subsystem()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_characteristics() -> i32 {
+    pe::characteristics()
+}
+
+/// Non-zero means the file carries a COM descriptor, i.e. it is a .NET assembly.
+#[no_mangle]
+pub extern "C" fn pe_cli_rva() -> i64 {
+    pe::cli_rva()
+}
+
+#[no_mangle]
+pub extern "C" fn pe_sections(buf: *mut u8, cap: i32) -> i32 {
+    copy_str(&pe::sections(), buf, cap)
 }
