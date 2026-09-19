@@ -20,7 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node scripts/fetch-sources.mjs
+      - name: Re-fetch upstream enumerations
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/fetch-sources.mjs
       - run: node scripts/build-catalog.mjs
       - name: Assert the counts still hold
         run: |

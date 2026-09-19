@@ -9,11 +9,15 @@ const SOURCES = {
   'catalog/arch.h': 'https://raw.githubusercontent.com/libarchive/libarchive/master/libarchive/archive.h',
   'catalog/LIEF-README.md': 'https://raw.githubusercontent.com/lief-project/LIEF/main/README.md',
   'catalog/Apktool-README.md': 'https://raw.githubusercontent.com/iBotPeaches/Apktool/master/README.md',
-  'catalog/v86-README.md': 'https://raw.githubusercontent.com/copy/v86/master/README.md',
+  // Resolved through the API because the readme's filename and default branch differ
+  // per repository, and guessing them produced a 404.
+  'catalog/v86-README.md': 'https://api.github.com/repos/copy/v86/readme',
 };
 
 for (const [path, url] of Object.entries(SOURCES)) {
-  const res = await fetch(url, { headers: { 'user-agent': 'wasm-binary-formats source fetch' } });
+  const headers = { 'user-agent': 'wasm-binary-formats source fetch', accept: 'application/vnd.github.raw+json' };
+  if (process.env.GITHUB_TOKEN && url.startsWith('https://api.github.com/')) headers.authorization = `bearer ${process.env.GITHUB_TOKEN}`;
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     console.error(`${path}: HTTP ${res.status} from ${url}`);
     process.exitCode = 1;
