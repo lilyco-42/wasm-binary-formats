@@ -66,6 +66,8 @@ jobs:
           node test/kaitai_formats.test.mjs generated/kaitai
           node test/kaitai_catalog.test.mjs generated/kaitai
           node test/kaitai_media.test.mjs generated/kaitai
+          node test/kaitai_structures.test.mjs generated/kaitai
+          node test/kaitai_exec.test.mjs generated/kaitai
 
       - uses: actions/upload-artifact@v4
         with:
