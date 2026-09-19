@@ -164,9 +164,20 @@ function show(index) {
     return;
   }
 
+  // Dispatch on the magic, not the filename: an APK can store its manifest under any name,
+  // and a dex file inside an AAB is still a dex file.
+  if (bytes.length > 4 && bytes[0] === 0x64 && bytes[1] === 0x65 && bytes[2] === 0x78 && bytes[3] === 0x0a) {
+    showDex(bytes, entry.name);
+    return;
+  }
+  if (bytes.length > 8 && new DataView(bytes.buffer, bytes.byteOffset, 8).getUint16(0, true) === 0x0003) {
+    showAxml(bytes, entry.name);
+    return;
+  }
+
   if (entry.name.toLowerCase().endsWith('.html') || entry.name.toLowerCase().endsWith('.htm')) {
-    // Rewrite relative references to blob: URLs built from sibling entries, so a
-    // multi-file web asset inside the APK can actually load its own css/js/img.
+    // Rewrite relative references to data: URLs built from sibling entries, so a multi-file
+    // web asset inside the APK can load its own css/js/img - blob: URLs do not resolve here.
     let text = new TextDecoder().decode(bytes);
     const dir = entry.name.includes('/') ? entry.name.slice(0, entry.name.lastIndexOf('/') + 1) : '';
     text = text.replace(/(src|href)=(["'])([^"']+)\2/gi, (match, attr, quote, ref) => {
@@ -263,6 +274,75 @@ function showPe(bytes, label) {
   warn.textContent = '这里只读头，不运行。网页里跑 Win32 技术上做得到：v86 是 BSD-2 的全 x86 PC 模拟器，自带 x86→wasm JIT，托管版 libv86.js 里 SharedArrayBuffer 出现 0 次，因此不需要 COOP/COEP。真正拦路的是许可与体积——跑 Windows 要一张专有磁盘镜像，免镜像的那条路（BoxedWine）是 GPL-2.0，链进产品即受传染，而 v86 只到 32 位、没有现代 .NET。引擎本身 2.1 MB 起，再叠几十 MB 客户机镜像，和这个约 200 KB 的演示不在一个量级。要运行请用原生版本。';
   viewerEl.append(dl, warn);
   report(`${label} · PE 头已解析 · ${bytes.length} 字节`);
+}
+
+function renderRows(rows) {
+  const dl = document.createElement('dl');
+  dl.style.cssText = 'display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:0';
+  for (const [key, value] of rows) {
+    const dt = document.createElement('dt');
+    dt.textContent = key;
+    const dd = document.createElement('dd');
+    dd.style.margin = '0';
+    dd.textContent = value;
+    dl.append(dt, dd);
+  }
+  viewerEl.append(dl);
+  return dl;
+}
+
+const hex = (value) => `0x${Number(value).toString(16)}`;
+
+function showDex(bytes, label) {
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  const rc = ex.parse_dex(ptr, bytes.length);
+  const info = rc === 0 ? {
+    version: readAt(ex.dex_version).text, checksum: ex.dex_checksum(), fileSize: ex.dex_file_size(),
+    headerSize: ex.dex_header_size(), mapOff: ex.dex_map_off(), stringIds: ex.dex_string_ids(),
+    typeIds: ex.dex_type_ids(), methodIds: ex.dex_method_ids(), classDefs: ex.dex_class_defs(),
+  } : null;
+  ex.dealloc(ptr, bytes.length);
+  viewerEl.textContent = '';
+  if (rc !== 0) { report(`${label}：不是可解析的 DEX（${readAt(ex.last_error).text || `code ${rc}`}）`); return }
+  renderRows([
+    ['DEX 版本', info.version],
+    ['头部', `${info.headerSize} 字节 · 声明文件大小 ${info.fileSize.toLocaleString('en-US')} B`],
+    ['校验和', hex(info.checksum)],
+    ['map list', hex(info.mapOff)],
+    ['string / type', `${info.stringIds.toLocaleString('en-US')} / ${info.typeIds.toLocaleString('en-US')}`],
+    ['method / class', `${info.methodIds.toLocaleString('en-US')} / ${info.classDefs.toLocaleString('en-US')}`],
+  ]);
+  report(`${label} · DEX 头已解析 · ${bytes.length.toLocaleString('en-US')} 字节`);
+}
+
+function showAxml(bytes, label) {
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  const rc = ex.parse_axml(ptr, bytes.length);
+  const declared = rc === 0 ? ex.axml_declared() : 0;
+  const shown = rc === 0 ? ex.axml_count() : 0;
+  // axml_flags comes back as wasm i64, which JS hands over as BigInt: mixing it with a
+  // number literal throws, so convert first.
+  const utf8 = rc === 0 && (Number(ex.axml_flags()) & 0x100) !== 0;
+  const strings = [];
+  if (rc === 0) {
+    for (let index = 0; index < Math.min(shown, 80); index += 1) {
+      strings.push(readAt(ex.axml_string, index).text);
+    }
+  }
+  ex.dealloc(ptr, bytes.length);
+  viewerEl.textContent = '';
+  if (rc !== 0) { report(`${label}：不是二进制 XML（${readAt(ex.last_error).text || `code ${rc}`}）`); return }
+  renderRows([
+    ['字符串池', `声明 ${declared} 条 · 读到 ${shown} 条 · 编码 ${utf8 ? 'UTF-8' : 'UTF-16'}`],
+    ['前若干条', strings.slice(0, 24).join(' · ') || '（空）'],
+  ]);
+  const note = document.createElement('p');
+  note.className = 'note';
+  note.textContent = '这里给的是字符串池，不是解析后的清单属性：属性级解码需要 resources.arsc 的资源 ID 表，缺了它去猜包名会有部分是错的，所以宁可不猜。';
+  viewerEl.append(note);
+  report(`${label} · 二进制 XML 字符串池已读出 ${shown} 条`);
 }
 
 document.getElementById('pick').addEventListener('click', () => document.getElementById('file').click());
