@@ -34,11 +34,11 @@ code{background:#f4f6f8;padding:1px 5px;border-radius:4px;font-size:13px}
 <body>
 <div class="wrap">
   <h1>APK 解包与网页资源运行</h1>
-  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。<code>.exe</code> / <code>.dll</code> 会走 PE 头解析，只读不运行。文件不上传，解包与解析都在 WebAssembly 内完成。</p>
+  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。<code>.exe</code> / <code>.dll</code> 走 PE 头解析，只读不运行。其余常见二进制（tar / ar / deb / cab、gz / xz / bz2 / lz4 / zst、RIFF 与 TIFF、Matroska / WebM / MP4 家族、FLAC / MP3 / Ogg / WAVE、PDF 页树、docx / xlsx / pptx / odt / epub 包）会走结构解析，把头部字段、成员表与页树逐行列出来——读结构，不解码像素、不渲染文档、不执行任何代码。文件不上传，解包与解析都在 WebAssembly 内完成。</p>
 
   <div class="bar">
-    <button class="primary" id="pick">选择 APK / ZIP / EXE</button>
-    <input type="file" id="file" accept=".apk,.zip,.jar,.apk7,.exe,.dll,application/zip" hidden>
+    <button class="primary" id="pick">选择 APK / ZIP / EXE / 常见二进制</button>
+    <input type="file" id="file" accept=".apk,.zip,.jar,.exe,.dll,.docx,.xlsx,.pptx,.odt,.ods,.odp,.epub,.tar,.ar,.deb,.cab,.gz,.xz,.bz2,.lz4,.zst,.wav,.avi,.webp,.tiff,.tif,.flac,.mp3,.ogg,.mkv,.webm,.mp4,.m4a,.mov,.avif,.3gp,.asf,.flv,.pdf,.pbm,.pgm,.ppm,.pnm,.dex" hidden>
     <label class="chk"><input type="checkbox" id="allowjs" checked> 允许运行网页内的脚本</label>
     <span id="name" style="color:var(--dim);font-size:13px"></span>
   </div>
@@ -166,11 +166,11 @@ function show(index) {
 
   // Dispatch on the magic, not the filename: an APK can store its manifest under any name,
   // and a dex file inside an AAB is still a dex file.
-  if (bytes.length > 4 && bytes[0] === 0x64 && bytes[1] === 0x65 && bytes[2] === 0x78 && bytes[3] === 0x0a) {
+  if (looksLikeDex(bytes)) {
     showDex(bytes, entry.name);
     return;
   }
-  if (bytes.length > 8 && new DataView(bytes.buffer, bytes.byteOffset, 8).getUint16(0, true) === 0x0003) {
+  if (looksLikeAxml(bytes)) {
     showAxml(bytes, entry.name);
     return;
   }
@@ -213,14 +213,25 @@ function show(index) {
     pre.style.cssText = 'white-space:pre-wrap;font-size:12px;max-height:60vh;overflow:auto;margin:0';
     pre.textContent = new TextDecoder().decode(bytes);
     viewerEl.append(pre);
+  } else if (showStructure(bytes, entry.name)) {
+    return;
   } else {
-    const hex = Array.from(bytes.slice(0, 256)).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+    const hexdump = Array.from(bytes.slice(0, 256)).map((b) => b.toString(16).padStart(2, '0')).join(' ');
     const pre = document.createElement('pre');
     pre.style.cssText = 'white-space:pre-wrap;font-size:12px;max-height:60vh;overflow:auto;margin:0';
-    pre.textContent = `${bytes.length} bytes · ${mime}\n\n${hex}${bytes.length > 256 ? '\n…' : ''}`;
+    pre.textContent = `${bytes.length} bytes · ${mime}\n\n${hexdump}${bytes.length > 256 ? '\n…' : ''}`;
     viewerEl.append(pre);
   }
   report(`${entry.name} · ${(entry.size / 1024).toFixed(1)} KB`);
+}
+
+function looksLikeDex(bytes) {
+  // "dex\n" - the order marker of Android bytecode, which no filename can vouch for.
+  return bytes.length > 4 && bytes[0] === 0x64 && bytes[1] === 0x65 && bytes[2] === 0x78 && bytes[3] === 0x0a;
+}
+
+function looksLikeAxml(bytes) {
+  return bytes.length > 8 && new DataView(bytes.buffer, bytes.byteOffset, 8).getUint16(0, true) === 0x0003;
 }
 
 function mimeFor(name) {
@@ -293,6 +304,81 @@ function renderRows(rows) {
 
 const hex = (value) => `0x${Number(value).toString(16)}`;
 
+// Feeding a 400 MB video to a structural walker in a browser tab is not what the reader is for, and
+// the declared size of an archive entry is chosen by the archive.
+const STRUCT_LIMIT = 32 * 1024 * 1024;
+const STRUCT_ROWS = 240;
+
+// The panel shows the first reader that answers, so the order below decides what a .wav looks like
+// here (container before audio, both of which read the same RIFF chunks); the filename decides
+// nothing.
+const STRUCTURES = [
+  { parse: 'parse_document', count: 'document_count', field: 'document_field', what: '文档包' },
+  { parse: 'parse_container', count: 'container_count', field: 'container_entry', what: '容器' },
+  { parse: 'parse_audio', count: 'audio_count', field: 'audio_field', what: '音频' },
+  { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field', what: '压缩流' },
+];
+
+function structureOf(bytes) {
+  if (bytes.length > STRUCT_LIMIT) return null;
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  let found = null;
+  for (const shape of STRUCTURES) {
+    const code = ex[shape.parse](ptr, bytes.length);
+    if (code <= 0) continue;
+    const total = ex[shape.count]();
+    const rows = [];
+    for (let index = 0; index < Math.min(total, STRUCT_ROWS); index += 1) {
+      rows.push(readAt(ex[shape.field], index).text);
+    }
+    found = { what: shape.what, code, total, rows };
+    break;
+  }
+  ex.dealloc(ptr, bytes.length);
+  return found;
+}
+
+function renderLines(rows) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-height:60vh;overflow:auto';
+  for (const line of rows) {
+    const row = document.createElement('div');
+    line.split('\t').forEach((cell, index) => {
+      const span = document.createElement('span');
+      span.textContent = cell;
+      span.style.cssText = index === 0
+        ? 'color:var(--dim);display:inline-block;min-width:16ch'
+        : 'margin-right:14px';
+      row.append(span);
+    });
+    wrap.append(row);
+  }
+  viewerEl.append(wrap);
+}
+
+// The name shown comes out of the reader's own first row, so no second table of format codes lives in
+// this page to drift away from the Rust constants.
+function showStructure(bytes, label) {
+  const found = structureOf(bytes);
+  if (!found || !found.rows.length) return false;
+  viewerEl.textContent = '';
+  const head = document.createElement('p');
+  head.style.cssText = 'font-size:13px;margin:0 0 10px';
+  const name = found.rows[0].split('\t')[0];
+  head.textContent = `${name} · ${found.what}结构 · 代码 ${found.code} · ${bytes.length.toLocaleString('en-US')} 字节`;
+  viewerEl.append(head);
+  renderLines(found.rows);
+  if (found.total > found.rows.length) {
+    const more = document.createElement('p');
+    more.className = 'note';
+    more.textContent = `另有 ${found.total - found.rows.length} 行未显示（本页上限 ${STRUCT_ROWS} 行）。`;
+    viewerEl.append(more);
+  }
+  report(`${label} · ${name} 已解析 ${found.rows.length}/${found.total} 行`);
+  return true;
+}
+
 function showDex(bytes, label) {
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
@@ -358,14 +444,29 @@ document.getElementById('file').addEventListener('change', async (event) => {
   releaseBlobs();
   const bytes = new Uint8Array(await file.arrayBuffer());
 
-  // An .exe arriving on its own takes the PE path instead of the archive path.
+  // An .exe arriving on its own takes the PE path instead of the archive path, and a classes.dex
+  // pulled out of an AAB takes the DEX path.
   if (bytes.length > 1 && bytes[0] === 0x4d && bytes[1] === 0x5a) { showPe(bytes, file.name); return }
+  if (looksLikeDex(bytes)) { showDex(bytes, file.name); return }
 
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
   const rc = ex.open(ptr, bytes.length);
+  // An Office package is a zip too, so name what the classifier thinks it is before listing parts.
+  let packName = '';
+  if (rc === 0 && ex.parse_document(ptr, bytes.length) > 0) {
+    packName = readAt(ex.document_field, 0).text.split('\t')[1] || '';
+  }
   ex.dealloc(ptr, bytes.length);
-  if (rc !== 0) { report(`无法打开：${readAt(ex.last_error).text}`); return }
+  if (rc !== 0) {
+    const label = `${file.name}：不是可列目的压缩包`;
+    if (showStructure(bytes, file.name)) {
+      report(`${label}，已按结构解析`);
+    } else {
+      report(`${label}（${readAt(ex.last_error).text || `code ${rc}`}）`);
+    }
+    return;
+  }
 
   entries = Array.from({ length: ex.count() }, (_, index) => {
     const [name, size, compressed] = readAt(ex.entry, index).text.split('\t');
@@ -375,7 +476,8 @@ document.getElementById('file').addEventListener('change', async (event) => {
   if (refusal) { entries = []; render(); report(`已拒绝：${refusal}`); return }
   render();
   const webAssets = entries.filter((e) => /\.html?$/i.test(e.name));
-  report(`${entries.length} 个条目；${webAssets.length ? `发现 ${webAssets.length} 个网页资源，点它即可运行` : '没有 .html 资源（原生 APK 通常如此）'}`);
+  const named = packName ? `${packName} 压缩包 · ` : '';
+  report(`${named}${entries.length} 个条目；${webAssets.length ? `发现 ${webAssets.length} 个网页资源，点它即可运行` : '没有 .html 资源（原生 APK 通常如此）'}`);
   if (webAssets.length) {
     const target = entries.findIndex((e) => e.name === webAssets[0].name);
     listEl.children[target]?.click();

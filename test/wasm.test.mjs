@@ -264,3 +264,83 @@ test('falls back when the optional size is not a size', () => {
   assert.equal(rc, 0, 'a zero field must not be read as "the table starts at the header"');
   assert.deepEqual(values.sections.split('\n').map((row) => row.split('\t')[0]), ['.text', '.rdata']);
 });
+
+// The demo's structure panel drives these four readers through the same ABI and prints the code it
+// gets back next to the format name, so the numbers asserted here are the ones a visitor sees.
+const SHAPES = {
+  container: { parse: 'parse_container', count: 'container_count', field: 'container_entry' },
+  audio: { parse: 'parse_audio', count: 'audio_count', field: 'audio_field' },
+  stream: { parse: 'parse_stream', count: 'stream_field_count', field: 'stream_field' },
+  document: { parse: 'parse_document', count: 'document_count', field: 'document_field' },
+};
+
+function drive(shape, file) {
+  const { parse, count, field } = SHAPES[shape];
+  const bytes = new Uint8Array(readFileSync(`test/fixtures/${file}`));
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  const code = ex[parse](ptr, bytes.length);
+  ex.dealloc(ptr, bytes.length);
+  if (code <= 0) return { code, total: 0, rows: [] };
+  const total = ex[count]();
+  const rows = [];
+  for (let index = 0; index < total; index += 1) rows.push(readString(ex[field], index).text);
+  return { code, total, rows };
+}
+
+function assertReadable(shape, file, code) {
+  const seen = drive(shape, file);
+  assert.equal(seen.code, code, `${file} answered with a different format code`);
+  assert.equal(seen.rows.length, seen.total, `${file} lied about how many rows it has`);
+  assert.ok(seen.total >= 1, `${file} reported no rows at all`);
+  for (const row of seen.rows) {
+    assert.ok(row.length > 0 && !row.includes('\0'), `${file} returned an unusable row`);
+  }
+  return seen;
+}
+
+test('every container the demo offers answers with the code the page prints', () => {
+  const cases = [
+    ['gnu.tar', 1], ['plain.ar', 2], ['lab-fixture.deb', 23], ['media.wav', 3], ['media.avi', 3],
+    ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10],
+    ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
+    ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.flv', 21], ['tiny.cab', 22],
+  ];
+  for (const [file, code] of cases) assertReadable('container', file, code);
+});
+
+test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
+  for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
+    const rows = assertReadable('container', file, 16).rows;
+    assert.ok(rows.some((row) => row.startsWith('resolves\tRoot\t') && row.endsWith('\t1')),
+      `${file}: nothing resolved through the table`);
+    assert.ok(rows.some((row) => row.startsWith('page\t') && row.includes('\tmedia\t')),
+      `${file}: no page row`);
+    const leaves = rows.find((row) => row.startsWith('leaves\t'));
+    assert.ok(Number(leaves.split('\t')[1]) >= 1, `${file}: ${leaves}`);
+    assert.equal(Number(leaves.split('\t')[5]), 0, `${file}: the walk hit a cap`);
+  }
+});
+
+test('the audio, stream and package readers answer the same way', () => {
+  const cases = [
+    ['audio', 'media.flac', 12], ['audio', 'media.mp3', 13],
+    ['audio', 'media.ogg', 14], ['audio', 'media.wav', 15],
+    ['stream', 'stream.gz', 9], ['stream', 'stream.xz', 5], ['stream', 'stream.bz2', 6],
+    ['stream', 'stream.lz4', 7], ['stream', 'stream.zst', 8],
+    ['document', 'tiny.docx', 1], ['document', 'tiny.xlsx', 2], ['document', 'tiny.pptx', 3],
+    ['document', 'tiny.odt', 4], ['document', 'tiny.ods', 5], ['document', 'tiny.odp', 6],
+    ['document', 'tiny.epub', 7],
+  ];
+  for (const [shape, file, code] of cases) assertReadable(shape, file, code);
+});
+
+test('readers stay in their lane, so the panel cannot show a confident wrong name', () => {
+  // A zip is none of the ten container families, a tar is not an office package, and neither one is
+  // audio. Each of those has to come back refused rather than with a plausible row.
+  assert.ok(drive('container', 'lab-fixture.apk').code <= 0, 'a zip walked as a container');
+  assert.ok(drive('document', 'gnu.tar').code <= 0, 'a tar classified as a document package');
+  assert.ok(drive('audio', 'gnu.tar').code <= 0, 'a tar parsed as audio');
+  assert.ok(drive('stream', 'gnu.tar').code <= 0, 'a tar read as a compressed stream');
+  assert.ok(drive('container', 'tiny.docx').code <= 0, 'an office package walked as a container');
+});

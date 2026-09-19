@@ -251,7 +251,8 @@ pub extern "C" fn parse_container(ptr: *const u8, len: i32) -> i32 {
 }
 
 /// Which container was recognised: 0 none, 1 tar, 2 ar, 3 RIFF, 4 TIFF, 10 ISO base media,
-/// 11 EBML (Matroska/WebM), 16 PDF with a classic cross-reference table.
+/// 11 EBML (Matroska/WebM), 16 PDF with a classic cross-reference table, 19 Netpbm, 20 ASF,
+/// 21 FLV, 22 CAB (file table only), 23 Debian package.
 #[no_mangle]
 pub extern "C" fn container_kind() -> i32 {
     containers::kind()
