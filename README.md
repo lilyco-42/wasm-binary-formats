@@ -350,7 +350,14 @@ does not re-derive them:
 
 * Ready to build, producers verified on this machine: ASF/WMV/WMA and FLV. ffmpeg 9 writes both here
   (a 6 906-byte `.asf` and a 1 772-byte `.flv`), and neither has a Kaitai spec in the pinned bundle,
-  so each needs one new framing reader plus a fixture and its own assertions.
+  so each needs one new framing reader plus a fixture and its own assertions. `test/fixtures/media.asf`
+  and `test/fixtures/media_asf.probe.json` are committed already, measured rather than recalled:
+  top level is two objects of 456 and 6 450 bytes whose lengths sum to the file exactly, each
+  preceded by a 16-byte GUID and a `u64le` size, and `ffprobe` independently reads the same file as
+  container `asf`, 0.200000 s, PCM s16le mono at 8 kHz. One caution from writing this note: the GUID
+  tail I expected for the header object from memory was wrong (`…00AA0061CE80` versus the file's
+  `3026b2758e66cf11a6d900aa0062ce6c`), so the constants should be lifted from the spec text or from
+  these bytes - not from a recollection, which is the failure mode this section keeps documenting.
 * Refused rather than guessed: **CAB** - `makecab` produces a cabinet whose *file* table decodes
   exactly as documented and matches `expand -D`, but whose folder area is 8 bytes where `CFFOLDER` is
   specified as 16, so one sample contradicts the layout and no reader was written. **PAM (P7)** ends
