@@ -116,6 +116,19 @@ fn reads_the_handwritten_apk_fixture() {
         .position(|name| name == "AndroidManifest.xml")
         .unwrap() as i32;
     let m = unsafe { extract(manifest, out.as_mut_ptr(), out.len() as i32) };
-    assert_eq!(m, 28);
+    assert_eq!(m, 186, "AXML chunk length");
+    assert_eq!(
+        &out[8..10],
+        &[0x01, 0x00],
+        "the child chunk is a string pool"
+    );
+    let dex = names.iter().position(|name| name == "classes.dex").unwrap() as i32;
+    let d = unsafe { extract(dex, out.as_mut_ptr(), out.len() as i32) };
+    assert_eq!(d, 0x70, "DEX header length");
+    assert_eq!(
+        &out[0x28..0x2c],
+        &[0x78, 0x56, 0x34, 0x12],
+        "little-endian endian tag"
+    );
     assert_eq!(&out[..2], &[0x03, 0x00], "binary AXML magic");
 }
