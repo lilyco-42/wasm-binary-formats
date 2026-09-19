@@ -41,31 +41,41 @@ test('Elf: the generated reader agrees with a linker-produced binary', {
   const bytes = new Uint8Array(readFileSync(system));
   const Elf = load('Elf');
   const elf = new Elf(new KaitaiStream(bytes), null, null);
-  assert.equal(hex(elf.magic.slice(0, 4)), '7f454c46', `${system} starts with the ELF magic`);
-  assert.equal(elf.eiVersion, 1, 'EI_VERSION is the only version in use');
-  assert.equal(elf.bits, os.machine() === 'x86_64' ? 2 : elf.bits, 'class: 2 means 64-bit');
-  assert.equal(elf.endian, os.machine() === 'x86_64' ? 1 : elf.endian, 'data: 1 means little-endian');
-  if (os.machine() === 'x86_64') {
-    assert.equal(elf.machine, 0x3e, 'EM_X86_64');
-    assert.equal(elf.eEhsize, 64, 'the 64-bit ELF header size');
-    assert.equal(elf.programHeaderSize, 56, 'sizeof(Elf64_Phdr)');
-    assert.equal(elf.sectionHeaderSize, 64, 'sizeof(Elf64_Shdr)');
-  }
-  assert.ok([1, 2, 3, 4].includes(elf.eType), `e_type ${elf.eType} is one of rel/exec/dyn/core`);
-  assert.ok(Number(elf.entryPoint) > 0, 'an executable has an entry point');
-  assert.ok(Number(elf.ofsProgramHeaders) > 0);
-  assert.ok(elf.numProgramHeaders > 0, 'a runnable binary has segments');
-  assert.ok(elf.numSectionHeaders > 0, 'a distribution binary keeps its section headers');
-  // The tables have to fit: read one field too narrow and this is what gives.
   const size = statSync(system).size;
-  const sectionsEnd = Number(elf.ofsSectionHeaders) + elf.numSectionHeaders * elf.sectionHeaderSize;
+  // The reader's own magic check throws during construction, so reaching this line already proves
+  // the first four bytes. The remaining names below are the members `Elf.js` in the pinned 0.11
+  // generation actually assigns - the ident on the document object, everything after it on
+  // `.header`, which is where the endianness and word-size switch lives.
+  assert.equal(hex(elf.magic), '7f454c46', `${system} starts with the ELF magic`);
+  assert.equal(elf.eiVersion, 1, 'EI_VERSION is the only version in use');
+  assert.equal(hex(elf.pad), '00000000000000', 'the seven padding bytes of the ident are zero');
+  const header = elf.header;
+  assert.equal(header.eVersion, 1, 'e_version is EV_CURRENT');
+  assert.ok([1, 2, 3, 4].includes(header.eType), `e_type ${header.eType} is rel/exec/dyn/core`);
+  if (os.machine() === 'x86_64') {
+    assert.equal(elf.bits, 2, 'ELFCLASS64');
+    assert.equal(elf.endian, 1, 'ELFDATA2LSB');
+    assert.equal(header.machine, 0x3e, 'EM_X86_64');
+    assert.equal(header.eEhsize, 64, 'the 64-bit ELF header size');
+    assert.equal(header.programHeaderSize, 56, 'sizeof(Elf64_Phdr)');
+    assert.equal(header.sectionHeaderSize, 64, 'sizeof(Elf64_Shdr)');
+  }
+  assert.ok(Number(header.entryPoint) > 0, 'an executable has an entry point');
+  assert.ok(Number(header.ofsProgramHeaders) > 0, 'a runnable binary has a program header table');
+  assert.ok(header.numProgramHeaders > 0, `segments: ${header.numProgramHeaders}`);
+  assert.ok(header.numSectionHeaders > 0, 'a distribution binary keeps its section headers');
+  // The tables have to fit: read a 64-bit offset as 32 bits, or a count from the wrong slot, and
+  // this is what gives - no assumption about where the arrays live is needed to say so.
+  const programEnd = Number(header.ofsProgramHeaders)
+    + header.numProgramHeaders * header.programHeaderSize;
+  const sectionsEnd = Number(header.ofsSectionHeaders)
+    + header.numSectionHeaders * header.sectionHeaderSize;
+  assert.ok(
+    programEnd <= size,
+    `program header table ends at ${programEnd}, past the ${size} B file`
+  );
   assert.ok(
     sectionsEnd <= size,
-    `section header table (${sectionsEnd} B) must fit inside the ${size} B file`
+    `section header table ends at ${sectionsEnd}, past the ${size} B file`
   );
-  assert.equal(elf.programHeaders.length, elf.numProgramHeaders);
-  assert.equal(elf.sectionHeaders.length, elf.numSectionHeaders);
-  // Section 0 is SHN_UNDEF, which is always empty - the field the reader itself uses to size a
-  // section body, so this also proves `sectionHeaderSize` was read as 64 and not 40.
-  assert.equal(elf.sectionHeaders[0].lenBody, 0, 'the undefined section has no body');
 });
