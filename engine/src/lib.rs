@@ -18,6 +18,7 @@ use std::io::Read;
 use zip::ZipArchive;
 
 pub mod axml;
+pub mod containers;
 pub mod dex;
 pub mod pe;
 pub mod scan;
@@ -208,6 +209,36 @@ pub extern "C" fn pe_cli_rva() -> i64 {
 #[no_mangle]
 pub extern "C" fn pe_sections(buf: *mut u8, cap: i32) -> i32 {
     copy_str(&pe::sections(), buf, cap)
+}
+
+#[no_mangle]
+pub extern "C" fn parse_container(ptr: *const u8, len: i32) -> i32 {
+    if ptr.is_null() || len <= 0 {
+        set_error("empty input");
+        return -1;
+    }
+    containers::parse(unsafe { std::slice::from_raw_parts(ptr, len as usize) })
+}
+
+/// Which container was recognised: 0 none, 1 tar, 2 ar, 3 RIFF, 4 TIFF.
+#[no_mangle]
+pub extern "C" fn container_kind() -> i32 {
+    containers::kind()
+}
+
+#[no_mangle]
+pub extern "C" fn container_count() -> i32 {
+    containers::count()
+}
+
+/// One entry: tar "name	size	typeflag", ar "name	size	mode",
+/// RIFF "form	FORM	declared" then "ID	size	offset", TIFF "ifdN	tag	type	count".
+#[no_mangle]
+pub extern "C" fn container_entry(index: i32, buf: *mut u8, cap: i32) -> i32 {
+    match containers::at(index) {
+        Some(text) => copy_str(&text, buf, cap),
+        None => -1,
+    }
 }
 
 #[no_mangle]
