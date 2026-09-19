@@ -179,6 +179,7 @@ fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
     } else {
         [22050, 24000, 16000]
     };
+    let table: [i64; 16] = if version == 3 { MPEG1_L3 } else { MPEG2_L3 };
     let sample_rate_index = ((header >> 10) & 3) as usize;
     let first_rate = *rates.get(sample_rate_index)?;
     let mut lines = vec![
@@ -239,7 +240,7 @@ fn read_mp3(bytes: &[u8]) -> Option<Vec<String>> {
     lines.push(field("frames", frames));
     lines.push(field("samples", samples));
     let duration_ms = if first_rate > 0 {
-        (samples as f64 / f64::from(first_rate) * 1000.0).round() as i64
+        (samples as f64 / first_rate as f64 * 1000.0).round() as i64
     } else {
         0
     };
