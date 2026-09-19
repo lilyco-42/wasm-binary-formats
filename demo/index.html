@@ -48,7 +48,7 @@ code{background:#f4f6f8;padding:1px 5px;border-radius:4px;font-size:13px}
     <div class="pane"><h2>预览 / 运行</h2><div id="viewer" style="color:var(--dim);font-size:13px">选中左侧一个条目。HTML 条目会在隔离 iframe 中运行。</div></div>
   </div>
   <div id="status"></div>
-  <p class="note">隔离方式：<code>sandbox="allow-scripts"</code> 且不给 <code>allow-same-origin</code>，因此被解出来的页面拿到的是独立的不透明源，读不到本站的 cookie、localStorage 或同源文档。勾选"允许运行脚本"关闭时，脚本一并禁用。注意：允许脚本意味着那段代码仍可能自行发起网络请求。</p>
+  <p class="note">隔离方式：<code>sandbox="allow-scripts"</code> 且不给 <code>allow-same-origin</code>，因此被解出来的页面拿到的是独立的不透明源，读不到本站的 cookie、localStorage 或同源文档。相对引用一律改写成 <code>data:</code> URL —— <code>blob:</code> 在 Chromium 里会被存储键规则挡住，隔离中的页面取不到宿主生成的 blob。勾选"允许运行脚本"关闭时，脚本一并禁用。Chrome 还会额外执行帧内 CSP，把 <code>fetch</code>/XHR、嵌套 frame 与 worker 禁掉；不支持 <code>csp</code> 属性的浏览器只剩 sandbox 这一层，脚本仍可自行发起网络请求。</p>
 </div>
 
 <script type="module">
@@ -136,6 +136,21 @@ function blobFor(bytes, type) {
   return url;
 }
 
+// A sandboxed frame without allow-same-origin has its own storage key, and Chromium will not
+// let it resolve a blob: URL minted by the host. data: URLs carry no reference to an origin, so
+// they are the one form that survives isolation - verified against both cases in Chrome.
+function dataFor(bytes, name) {
+  const mime = mimeFor(name);
+  if (/^text\/|^application\/(json|xml)$/.test(mime)) {
+    return `data:${mime};charset=utf-8,${encodeURIComponent(new TextDecoder().decode(bytes))}`;
+  }
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + 8192));
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
 function show(index) {
   const entry = entries[index];
   const bytes = extract(index, entry.size);
@@ -160,15 +175,15 @@ function show(index) {
       const found = entries.findIndex((e) => e.name === target);
       if (found < 0) return match;
       const sibling = entries[found];
-      return `${attr}=${quote}${blobFor(extract(found, sibling.size), mimeFor(sibling.name))}${quote}`;
+      return `${attr}=${quote}${dataFor(extract(found, sibling.size), sibling.name)}${quote}`;
     });
     const frame = document.createElement('iframe');
     frame.setAttribute('sandbox', document.getElementById('allowjs').checked ? 'allow-scripts' : '');
-    // A srcdoc document resolves anything left un-rewritten against this page's URL, and a
-    // blob: URL was minted by this origin, so both facts need to stay visible to the user.
+    // A srcdoc document resolves anything left un-rewritten against this page's URL, so the
+    // frame policy has to close the hole the rewrite cannot reach: no fetch, no nested frames.
     frame.setAttribute('referrerpolicy', 'no-referrer');
     try {
-      frame.csp = "default-src 'none'; script-src blob:; style-src blob: 'unsafe-inline'; img-src blob: data:; font-src blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'";
+      frame.csp = "default-src 'none'; script-src 'unsafe-inline' data:; style-src 'unsafe-inline' data:; img-src data:; font-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'";
     } catch { /* the csp attribute is Chrome-only; sandbox is the layer that always applies */ }
     frame.srcdoc = text;
     viewerEl.append(frame);

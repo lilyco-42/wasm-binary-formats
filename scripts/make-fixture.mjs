@@ -43,7 +43,7 @@ const INDEX_HTML = `<!doctype html>
 `;
 
 const STYLE_CSS = '#title{color:#1f5fd0}body{font-family:system-ui;padding:16px}\n';
-const APP_JS = "document.getElementById('probe').textContent = 'guest script ran';\n";
+const APP_JS = "document.getElementById('probe').textContent = 'guest script ran';\ntry { parent.postMessage('GUEST_RAN', '*'); } catch (e) {}\n";
 const LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e07a2f"/></svg>';
 
 const ENTRIES = [

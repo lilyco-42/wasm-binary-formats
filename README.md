@@ -76,19 +76,23 @@ What that shape cannot do, and why:
 
 | Guest feature | Works? | Reason |
 |---|---|---|
-| classic `<script>` / `<link>` / `<img>` | yes | rewritten to `blob:` URLs before the frame is created |
-| `fetch()`/XHR to a relative path, history routing, path-based routers | no | a `blob:` URL's path is a UUID with no path space ([FileAPI §8.3](https://w3c.github.io/FileAPI/#blob-url)); in Chrome the guest also cannot re-fetch the host's blobs, but that is a storage-key behaviour with a spec-carved-out creator/opaque-origin exception ([MDN](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/blob)), so the CSP line below is what makes it deterministic rather than the origin |
+| classic `<script>` / `<link>` / `<img>` | yes, via `data:` URLs | **`blob:` does not work**: measured in Chromium, a `sandbox="allow-scripts"` frame without `allow-same-origin` never executes a `blob:` script minted by the host, while the identical URL loads fine in an unsandboxed frame and an inline script runs fine in the sandboxed one. The isolation boundary and the storage key are the same thing here ([FileAPI §8.3](https://w3c.github.io/FileAPI/#blob-url)) |
+| `fetch()`/XHR to a relative path, history routing, path-based routers | no | a `data:`/`blob:` document has no path space to resolve against, and the frame policy sets `connect-src 'none'` |
 | `<script type="module">` | no | module scripts require the CORS protocol ([host-environment-resolution](https://html.spec.whatwg.org/multipage/webappapis.html#host-environment-resolution)) |
-| Web Worker, `localStorage`, `document.cookie` | no | opaque origin + no storage ([Worker](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker)) |
+| Web Worker, `localStorage`, `document.cookie` | no | opaque origin + no storage; measured `localStorage.getItem` throws inside the guest ([Worker](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker)) |
 | its own Service Worker | no | SW needs same-origin + secure context ([Using SW](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers)) |
+
+Every one of those rows was measured in the deployed page rather than read off the spec: inline
+guest script arrives at the host as a `postMessage` with `origin: "null"`, `data:` script /
+stylesheet / image all load, `localStorage` throws, and `blob:` silently does nothing.
 
 Un-rewritten references in a `srcdoc` document resolve against **this page's** URL, so they hit
 GitHub Pages rather than the archive; outbound network calls by guest script are not stopped by
-`sandbox`. Two cheap layers that do apply: a Chrome-only `csp` attribute on the frame
+`sandbox` alone. Two layers that do apply: a Chrome-only `csp` attribute on the frame
 ([HTMLIFrameElement.csp](https://developer.mozilla.org/en-US/docs/Web/API/HTMLIFrameElement/csp),
-not usable via `<meta>`) and `referrerpolicy="no-referrer"`. Blob URLs are revoked on each render
-because one leaked `blob:https://lilyco-42.github.io/…` HTML document, if a user opens it in a new
-tab, runs as first-party on the origin shared by every Pages site under that user.
+not usable via `<meta>`) and `referrerpolicy="no-referrer"`. Host-side previews still use `blob:`
+and revoke them on every render, because a leaked `blob:https://lilyco-42.github.io/…` HTML
+document opened in a new tab runs as first-party on the origin shared by every Pages site.
 
 Getting the missing features means a real guest origin, and COOP/COEP is not the lever — those
 only produce `crossOriginIsolated` for `SharedArrayBuffer` and finer timers
@@ -154,6 +158,12 @@ builds the wasm target and runs both test layers on CI.
   synthetic tests stayed green — they were built with the same wrong layout. Ground truth came
   from `struct.unpack_from('<HHIIIHH', …)` over the same bytes. Offsets fixed, validation added,
   and a legal 216-byte header is now a test case so the fallback cannot silently become the rule.
+* The demo shipped rewriting the APK's relative references to `blob:` URLs, which reads as correct
+  and does nothing: the frames are isolated, so Chromium refuses the host's blobs and the guest
+  page rendered without its scripts or styles. The unit tests stayed green because they only check
+  the bytes coming out of wasm, not what the browser does with them. Rewriting to `data:` URLs is
+  what actually runs, and `test/fixtures/lab-fixture.apk` now carries a guest script that answers
+  with a `postMessage`, so "it ran, and it ran as `origin: null`" is checkable from the host.
 
 ## Prior art worth copying instead of rebuilding
 

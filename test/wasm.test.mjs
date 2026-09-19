@@ -157,6 +157,16 @@ test('reads the handwritten apk-shaped fixture', () => {
   ex.dealloc(ptr, cap);
   assert.ok(body.startsWith('<!doctype html>'), body.slice(0, 40));
   assert.match(body, /src="app\.js"/, 'the guest page keeps its relative references');
+
+  // The demo's end-to-end check depends on this: the guest script has to answer with a
+  // postMessage, which is only observable from the host if it actually executed.
+  const scriptIndex = entries.findIndex((entry) => entry.name === 'assets/www/app.js');
+  const scriptCap = 4096;
+  const scriptPtr = ex.alloc(scriptCap);
+  const scriptWritten = ex.extract(scriptIndex, scriptPtr, scriptCap);
+  const script = new TextDecoder().decode(new Uint8Array(ex.memory.buffer.slice(scriptPtr, scriptPtr + scriptWritten)));
+  ex.dealloc(scriptPtr, scriptCap);
+  assert.match(script, /parent\.postMessage\('GUEST_RAN'/, script);
 });
 
 const NT = 64;
