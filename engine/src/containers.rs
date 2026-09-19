@@ -70,6 +70,7 @@ pub fn name() -> &'static str {
         FORMAT_FLV => "flv",
         FORMAT_CAB => "cab",
         FORMAT_DEB => "deb",
+        FORMAT_TS => "mpegts",
         _ => "unknown",
     }
 }
@@ -1332,7 +1333,208 @@ fn read_deb(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
-/// -1 buffer too small to hold any header
+/// MPEG-2 transport stream: 188-byte packets, and the PAT/PMT sections that name the elementary
+/// streams inside them. 25, because 1..23 are the containers above and 24 is Layer II in `audio.rs`.
+pub const FORMAT_TS: i32 = 25;
+
+const TS_PACKET: usize = 188;
+const TS_PIDS: usize = 32;
+const TS_PROGRAMS: usize = 16;
+const TS_STREAMS: usize = 32;
+
+fn ts_pid(packet: &[u8]) -> i64 {
+    i64::from(packet[1] & 0x1f) << 8 | i64::from(packet[2])
+}
+
+/// A 13-bit PID carried in the low bits of two bytes.
+fn ts_u16_pid(packet: &[u8], at: usize) -> i64 {
+    i64::from(packet[at] & 0x1f) << 8 | i64::from(packet[at + 1])
+}
+
+/// Where a packet's payload starts, honouring the adaptation field; `None` when there is none.
+fn ts_payload(packet: &[u8]) -> Option<usize> {
+    let control = (packet[3] >> 4) & 3;
+    if control & 1 == 0 {
+        return None;
+    }
+    if control & 2 == 0 {
+        return Some(4);
+    }
+    let length = usize::from(*packet.get(4)?);
+    let start = 5 + length;
+    if start >= TS_PACKET {
+        None
+    } else {
+        Some(start)
+    }
+}
+
+/// The table a payload-unit-start packet begins, as its offset in the packet and the offset where
+/// that section's CRC starts. `section_length` counts the bytes after its own field, CRC included.
+/// A section that does not fit in the packet is counted as partial and skipped: stitching tables
+/// across packets needs the whole stream buffered, and half a section decoded is worse than none.
+fn ts_section(packet: &[u8], partial: &mut i64) -> Option<(usize, usize)> {
+    let start = ts_payload(packet)?;
+    let pointer = usize::from(*packet.get(start)?);
+    let table = start + 1 + pointer;
+    if table + 3 >= TS_PACKET {
+        *partial += 1;
+        return None;
+    }
+    let length = i64::from(packet[table + 1] & 0x0f) << 8 | i64::from(packet[table + 2]);
+    let end = table + 3 + length as usize;
+    if length < 9 || end > TS_PACKET {
+        *partial += 1;
+        return None;
+    }
+    Some((table, end - 4))
+}
+
+/// One PAT section, as a row per program naming the PID its PMT arrives on. A stream repeats the
+/// same table every few packets, so a mapping already listed is not listed twice.
+fn ts_pat(
+    packet: &[u8],
+    table: usize,
+    crc_end: usize,
+    rows: &mut Vec<String>,
+    listed: &mut Vec<(i64, i64)>,
+) {
+    let stream_id = i64::from(packet[table + 3]) << 8 | i64::from(packet[table + 4]);
+    let mut entry = table + 8;
+    while entry + 4 <= crc_end && listed.len() < TS_PROGRAMS {
+        let number = i64::from(packet[entry] & 0x7f) << 8 | i64::from(packet[entry + 1]);
+        let named = ts_u16_pid(packet, entry + 2);
+        // A program number of zero is the network entry: it points at a NIT, not at a service, so it
+        // is keyed as -1 and never counted as a program.
+        let key = if number == 0 {
+            (-1, named)
+        } else {
+            (number, named)
+        };
+        if !listed.contains(&key) {
+            listed.push(key);
+            if number == 0 {
+                rows.push(format!("nit\t{stream_id}\t{named}"));
+            } else {
+                rows.push(format!("pat\t{stream_id}\t{number}\t{named}"));
+            }
+        }
+        entry += 4;
+    }
+}
+
+/// One PMT section: the PCR PID it names, then a row per elementary stream. A version already
+/// mapped is a repeat of the same table; a version bump is different content and is reported.
+fn ts_pmt(
+    packet: &[u8],
+    table: usize,
+    crc_end: usize,
+    rows: &mut Vec<String>,
+    mapped: &mut Vec<(i64, i64)>,
+    streams: &mut Vec<(i64, i64, i64)>,
+) {
+    let program = i64::from(packet[table + 3] & 0x1f) << 8 | i64::from(packet[table + 4]);
+    let version = i64::from((packet[table + 5] >> 1) & 31);
+    if mapped.contains(&(program, version)) {
+        return;
+    }
+    mapped.push((program, version));
+    let pcr = ts_u16_pid(packet, table + 8);
+    let info = usize::from(packet[table + 10] & 0x0f) << 8 | usize::from(packet[table + 11]);
+    // A program_info_length that runs past the section ends the table rather than failing the file.
+    let mut stream = table.saturating_add(12 + info).min(crc_end).max(table + 12);
+    let mut found = 0i64;
+    while stream + 5 <= crc_end && streams.len() < TS_STREAMS {
+        let kind = i64::from(packet[stream]);
+        let elementary = ts_u16_pid(packet, stream + 1);
+        let descriptors =
+            usize::from(packet[stream + 3] & 0x0f) << 8 | usize::from(packet[stream + 4]);
+        if !streams.contains(&(program, kind, elementary)) {
+            streams.push((program, kind, elementary));
+            rows.push(format!("es\t{program}\t{kind:#x}\t{elementary}"));
+            found += 1;
+        }
+        stream = stream.saturating_add(5 + descriptors).max(stream + 1);
+    }
+    rows.push(format!("pmt\t{program}\t{version}\t{pcr}\t{found}"));
+}
+
+/// MPEG-2 transport stream: the packet grid is checked stride by stride, then the program map is
+/// followed from the PAT to the PMTs, so the elementary streams come out of the tables rather than
+/// from a census of PIDs.
+fn read_ts(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < TS_PACKET * 2 || bytes[0] != 0x47 || bytes[TS_PACKET] != 0x47 {
+        return None;
+    }
+    let mut packets = 0i64;
+    let mut bad_sync = 0i64;
+    let mut pusi = 0i64;
+    let mut cc_gaps = 0i64;
+    let mut partial = 0i64;
+    let mut pids: Vec<(i64, i64)> = Vec::new();
+    let mut counters: Vec<(i64, i64)> = Vec::new();
+    let mut programs: Vec<(i64, i64)> = Vec::new();
+    let mut mapped: Vec<(i64, i64)> = Vec::new();
+    let mut streams: Vec<(i64, i64, i64)> = Vec::new();
+    let mut tables: Vec<String> = Vec::new();
+    let mut at = 0usize;
+    while at + TS_PACKET <= bytes.len() && packets < 200_000 {
+        let packet = &bytes[at..at + TS_PACKET];
+        packets += 1;
+        if packet[0] != 0x47 {
+            bad_sync += 1;
+            at += TS_PACKET;
+            continue;
+        }
+        let pid = ts_pid(packet);
+        if packet[1] & 0x40 != 0 {
+            pusi += 1;
+            if let Some((table, crc_end)) = ts_section(packet, &mut partial) {
+                match packet[table] {
+                    0x00 => ts_pat(packet, table, crc_end, &mut tables, &mut programs),
+                    0x02 => ts_pmt(
+                        packet,
+                        table,
+                        crc_end,
+                        &mut tables,
+                        &mut mapped,
+                        &mut streams,
+                    ),
+                    _ => {}
+                }
+            }
+        }
+        let counter = i64::from(packet[3] & 0x0f);
+        match counters.iter_mut().find(|(known, _)| *known == pid) {
+            Some((_, last)) => {
+                if (counter - *last).rem_euclid(16) != 1 {
+                    cc_gaps += 1;
+                }
+                *last = counter;
+            }
+            None => counters.push((pid, counter)),
+        }
+        match pids.iter_mut().find(|(known, _)| *known == pid) {
+            Some((_, seen)) => *seen += 1,
+            None if pids.len() < TS_PIDS => pids.push((pid, 1)),
+            None => {}
+        }
+        at += TS_PACKET;
+    }
+    let mut entries = vec![format!("ts\t{TS_PACKET}\t{packets}\t{bad_sync}")];
+    entries.extend(tables);
+    for (pid, seen) in &pids {
+        entries.push(format!("pid\t{pid}\t{seen}"));
+    }
+    entries.push(format!("pusi\t{pusi}\tcc_gaps\t{cc_gaps}"));
+    entries.push(format!("trailer_bytes\t{}", bytes.len() - at));
+    entries.push(format!("partial_sections\t{partial}"));
+    if at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -1377,8 +1579,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_cab(bytes) {
         return accept(FORMAT_CAB, lines);
     }
+    if let Some(lines) = read_ts(bytes) {
+        return accept(FORMAT_TS, lines);
+    }
     reject(
-        "not a tar, ar, RIFF, TIFF, EBML, PDF, Netpbm, ASF or ISO base media container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB or MPEG-TS container",
         -2,
     )
 }

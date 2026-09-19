@@ -56,6 +56,8 @@ make media.ogg $A -c:a libvorbis -q:a 1
 # Two bitrates, because a single file cannot tell a looked-up table from a hardcoded stride.
 make media.mp2 -f lavfi -i "sine=frequency=440:duration=1" -c:a mp2 -b:a 128k
 make media-192k.mp2 -f lavfi -i "sine=frequency=440:duration=1" -c:a mp2 -b:a 192k
+# MPEG-2 transport stream: the 188-byte grid plus the PAT/PMT sections inside it.
+make media.ts -f lavfi -i "testsrc2=size=64x48:rate=10:duration=0.4" -c:v mpeg2video -b:v 200k -f mpegts
 
 # AVI is RIFF again, but with the LIST nesting that webp never exercises.
 make media.avi $V -c:v mpeg4 -q:v 10

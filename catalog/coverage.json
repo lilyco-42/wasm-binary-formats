@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 27,
+    "selfFields": 28,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 128,
+    "gaps": 127,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -28,7 +28,6 @@
       "executable": 6,
       "text": 2,
       "inode": 3,
-      "video": 1,
       "font": 4,
       "undefined": 1
     }
@@ -2533,8 +2532,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "mscompress",
