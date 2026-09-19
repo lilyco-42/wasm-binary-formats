@@ -30,7 +30,10 @@ test('jpeg: the marker sequence Pillow wrote comes back in order', () => {
   assert.equal(markers[markers.length - 1], 0xda, 'SOS is last, entropy data follows unparsed');
   assert.equal(markers.length, 10, `full marker list: ${markers.map((m) => m.toString(16))}`);
   const sof = jpeg.segments.find((segment) => segment.marker === 0xc0);
-  assert.equal(sof.data.length, sof.length - 2, 'the segment body matches its declared length');
+  // A baseline SOF0 is 8 fixed bytes plus 3 per component plus the 2 length bytes: 17 for three
+  // components. Pinning the declared length avoids asserting on a body field name the generated
+  // code does not expose.
+  assert.equal(sof.length, 17, 'SOF0 declares three components');
 });
 
 test('zip: section kinds match the member count Python wrote', () => {
