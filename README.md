@@ -264,22 +264,21 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 26 | 11.9% |
-| own Rust reader, container framing only | 21 | 9.6% |
+| own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **131** | 59.8% |
-| **covered, any level** | **88** | 40.2% |
+| **no parser at all - real gap** | **129** | 58.9% |
+| **covered, any level** | **90** | 41.1% |
 
 Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, `ttf`/`otf`/`woff`/
-`woff2`, `psd`/`qoi`/`icc`-class image types, and `wma`/`wmv` (whose ASF container we do walk, but the
-matrix counts a label covered only where a reader is keyed to it).
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `ttf`/`otf`/
+`woff`/`woff2` - the last four because no font writer runs here, not because the table format is hard.
 
-So the honest answer to the objective is **no, not yet**: 88 of 219 binary labels have a parser
-that runs here (26 field-level and 21 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 131 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 90 of 219 binary labels have a parser
+that runs here (26 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 129 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -371,11 +370,17 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **88 covered** (26 field-level and 21
-container-level from this repo's own readers, 41 generated and mostly load-gated), **131 with no
-parser**. Three things follow from measuring rather than assuming, and are recorded so the next pass
+Coverage is scored against magika's 219 binary labels: **90 covered** (26 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **129 with no
+parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
+* Labels that share framing are where the cheap breadth is, and the count moves only when a fixture
+  proves it: `.wma` and `.wmv` are ASF files with different codec objects, so the walk that was written
+  for `media.asf` covered both once ffmpeg produced one of each and `engine/tests/asf.rs` checked that
+  the header object's five children end where its own declared length says and that the top-level
+  objects tile the file. **88 → 90 covered, 131 → 129 gaps**, at container level, with no new reader
+  code - which is exactly why the tier is not called "fields".
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

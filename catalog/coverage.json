@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 26,
-    "selfContainer": 21,
+    "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 131,
+    "gaps": 129,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -28,10 +28,9 @@
       "executable": 6,
       "text": 2,
       "inode": 3,
-      "video": 2,
+      "video": 1,
       "font": 4,
-      "undefined": 1,
-      "audio": 1
+      "undefined": 1
     }
   },
   "rows": [
@@ -4491,8 +4490,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "wmf",
@@ -4519,8 +4518,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "woff",
