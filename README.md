@@ -168,9 +168,9 @@ The ">=200 modules" requirement is not answered by hand-writing 200 readers. It 
 `.ksy` specs** (counted from the git tree, star 795, pushed 2026-09-18), from whose descriptions
 the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
-generates readers for **37 specs across 10 families** (`tools/kaitai/specs.txt`), and parses
+generates readers for **50 specs across 13 families** (`tools/kaitai/specs.txt`), and parses
 fixtures this repo wrote itself. Two levels are asserted separately on purpose - a load gate for
-all 37 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 7 that have
+all 50 (`test/kaitai_catalog.test.mjs`, 2 tests) and byte-level correctness for the 7 that have
 fixtures this repo wrote - PNG, GIF, BMP, ICO, gzip, TGA and SQLite (`test/kaitai.test.mjs`, 8
 tests, mean reader 13.7 KB). "It generated" is never reported as "it parses".
 
@@ -197,19 +197,22 @@ tests, mean reader 13.7 KB). "It generated" is never reported as "it parses".
 
 Re-generated on CI from compiler 0.11 (the numbers below are the CI numbers, not a local run):
 
-| family | formats | generated JS | mean | heaviest |
+| family | formats | raw JS | gzipped | heaviest |
 |---|---|---|---|---|
-| image | 8 | 440,090 B | 55,011 B | Dicom 347,766 B |
-| executable | 7 | 289,667 B | 41,381 B | MachO 92,584 B |
-| archive | 6 | 85,933 B | 14,322 B | Rpm 38,514 B |
-| media | 4 | 70,569 B | 17,642 B | Wav 33,543 B |
-| serialization | 4 | 54,514 B | 13,629 B | PhpSerializedValue 21,631 B |
-| font | 1 | 52,968 B | 52,968 B | Ttf 52,968 B |
-| filesystem | 4 | 46,764 B | 11,691 B | Vfat 16,072 B |
-| database | 1 | 13,475 B | 13,475 B | Sqlite3 13,475 B |
-| log | 1 | 9,437 B | 9,437 B | SystemdJournal 9,437 B |
-| network | 1 | 4,165 B | 4,165 B | Ipv4Packet 4,165 B |
-| **total** | **37** | **1,067,582 B** | 28,854 B | + 11 shared files, 93,499 B |
+| image | 9 | 455,301 B | 77,230 B | Dicom 347,766 B |
+| executable | 8 | 306,134 B | 12,242 B | MachO 92,584 B |
+| media | 7 | 94,956 B | 8,308 B | Wav 33,543 B |
+| archive | 7 | 90,431 B | 8,589 B | Rpm 38,514 B |
+| serialization | 6 | 88,220 B | 4,303 B | PythonPickle 24,181 B |
+| font | 1 | 52,968 B | 9,686 B | Ttf 52,968 B |
+| filesystem | 4 | 46,764 B | 3,782 B | Vfat 16,072 B |
+| windows | 2 | 29,625 B | 3,242 B | Regf 15,847 B |
+| network | 2 | 18,193 B | 4,689 B | Pcap 14,028 B |
+| macos | 1 | 15,646 B | 2,980 B | DsStore 15,646 B |
+| database | 1 | 13,475 B | 3,026 B | Sqlite3 13,475 B |
+| common | 1 | 11,858 B | 2,254 B | Riff 11,858 B |
+| log | 1 | 9,437 B | 2,201 B | SystemdJournal 9,437 B |
+| **total** | **50** | **1,233,008 B** | 258,654 B | + 13 shared files, 108,293 B raw |
 
 **Three tiers, because the mean hides the tail.** 22 formats stay under 15 KB apiece (189 KB
 together) and can ship in one bundle; 12 land between 15 and 60 KB (353 KB); 3 are heavy enough
@@ -226,11 +229,11 @@ above is what makes the number shrink once tiered.
 
 | tier | formats | raw JS | gzipped |
 |---|---|---|---|
-| light (<15 KB each) | 22 | 189,452 B | 47,269 B |
-| medium (15-60 KB) | 12 | 352,755 B | 70,884 B |
+| light (<15 KB each) | 30 | 267,526 B | 66,543 B |
+| medium (15-60 KB) | 17 | 440,107 B | 88,804 B |
 | heavy (>=60 KB) | 3 | 525,375 B | 103,307 B |
-| shared imports (11 files) | - | 93,499 B | 26,136 B |
-| **all 37 + shared** | **37** | **1,067,582 B** | **247,596 B** |
+| shared imports | 13 | 108,293 B | 31,102 B |
+| **all 50 + shared** | **50** | **1,341,301 B** | **258,654 B** |
 
 So the entire 37-format breadth is about 242 KiB gzipped, and the heavy three (Dicom, Elf, MachO)
 are 42 % of that on their own: shipping the light and medium tiers plus lazy-loading binaries costs
@@ -247,9 +250,9 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| parseable via a reader this repo generates and load-gates | 54 | 24.7% |
-| an upstream spec exists but we do not generate it yet | 16 | 7.3% |
-| **no spec matched - real gap** | 149 | 68.0% |
+| parseable via a reader this repo generates and load-gates | **69** | 31.5%% |
+| an upstream spec exists but the pinned compiler does not ship it | 1 | 0.5%% |
+| **no spec matched - real gap** | **149** | 68.0% |
 
 Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
 MKV/WebM/EBML, FLAC, MP3 audio frames, tar, 7z, bzip2/bzip3, xz, zstd, cab, ar/arc/arj, deb, CHM,

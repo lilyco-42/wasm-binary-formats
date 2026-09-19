@@ -1,5 +1,6 @@
 // Measures what a Kaitai .ksy costs once it becomes a JavaScript reader, grouped by format
 // family. Run after the compiler: node tools/kaitai/measure.mjs <generated-dir> [out.json]
+import { gzipSync } from 'node:zlib';
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,8 @@ const present = new Set(readdirSync(generatedDir).filter((name) => name.endsWith
 const rows = specs.map((spec) => {
   const file = `${className(spec.id)}.js`;
   const size = present.has(file) ? statSync(join(generatedDir, file)).size : -1;
-  return { ...spec, className: className(spec.id), file, size };
+  const gzSize = size >= 0 ? gzipSync(readFileSync(join(generatedDir, file))).length : -1;
+  return { ...spec, className: className(spec.id), file, size, gzSize };
 });
 
 const missing = rows.filter((row) => row.size < 0).map((row) => row.className);
@@ -38,6 +40,19 @@ for (const row of rows) {
   bucket.files.push(`${row.className}=${row.size}`);
 }
 const importBytes = sharedImports.reduce((sum, item) => sum + item.size, 0);
+
+const tiers = { light: [], medium: [], heavy: [] };
+for (const row of rows) {
+  if (row.size < 0) continue;
+  tiers[row.size < 15000 ? 'light' : row.size < 60000 ? 'medium' : 'heavy'].push(row);
+}
+const tierSummary = Object.fromEntries(Object.entries(tiers).map(([name, group]) => [name, {
+  formats: group.length,
+  bytes: group.reduce((sum, row) => sum + row.size, 0),
+  gzBytes: group.reduce((sum, row) => sum + row.gzSize, 0),
+}]));
+tierSummary.sharedGzBytes = sharedImports.reduce((sum, item) => sum + gzipSync(readFileSync(join(generatedDir, item.file))).length, 0);
+tierSummary.totalGzBytes = Object.values(tierSummary).reduce((sum, v) => sum + (typeof v === 'object' ? v.gzBytes : 0), 0);
 const formatBytes = rows.reduce((sum, row) => sum + Math.max(row.size, 0), 0);
 
 const summary = {
@@ -49,6 +64,7 @@ const summary = {
   sharedImportFiles: sharedImports.length,
   bytesForRequestedFormats: formatBytes,
   bytesForSharedImports: importBytes,
+  tiers: tierSummary,
   meanBytesPerFormat: rows.length - missing.length ? Math.round(formatBytes / (rows.length - missing.length)) : 0,
   largest: rows.filter((r) => r.size > 0).sort((a, b) => b.size - a.size).slice(0, 5).map((r) => `${r.className}=${r.size}`),
   smallest: rows.filter((r) => r.size > 0).sort((a, b) => a.size - b.size).slice(0, 5).map((r) => `${r.className}=${r.size}`),

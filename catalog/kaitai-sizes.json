@@ -1,13 +1,32 @@
 {
   "compiler": "kaitai-struct-compiler 0.11",
   "target": "javascript",
-  "specsRequested": 37,
-  "specsGenerated": 37,
+  "specsRequested": 50,
+  "specsGenerated": 50,
   "missing": [],
-  "sharedImportFiles": 11,
-  "bytesForRequestedFormats": 1067582,
-  "bytesForSharedImports": 93499,
-  "meanBytesPerFormat": 28854,
+  "sharedImportFiles": 13,
+  "bytesForRequestedFormats": 1233008,
+  "bytesForSharedImports": 108293,
+  "tiers": {
+    "light": {
+      "formats": 30,
+      "bytes": 267526,
+      "gzBytes": 66543
+    },
+    "medium": {
+      "formats": 17,
+      "bytes": 440107,
+      "gzBytes": 88804
+    },
+    "heavy": {
+      "formats": 3,
+      "bytes": 525375,
+      "gzBytes": 103307
+    },
+    "sharedGzBytes": 31102,
+    "totalGzBytes": 258654
+  },
+  "meanBytesPerFormat": 24660,
   "largest": [
     "Dicom=347766",
     "MachO=92584",
@@ -18,26 +37,26 @@
   "smallest": [
     "Ipv4Packet=4165",
     "Ico=4367",
+    "Lzh=4498",
     "DosMz=4572",
-    "CpioOldLe=4603",
-    "GptPartitionTable=4664"
+    "CpioOldLe=4603"
   ],
   "byCategory": {
-    "image": {
-      "formats": 8,
-      "bytes": 440090
-    },
     "archive": {
-      "formats": 6,
-      "bytes": 85933
+      "formats": 7,
+      "bytes": 90431
+    },
+    "common": {
+      "formats": 1,
+      "bytes": 11858
+    },
+    "database": {
+      "formats": 1,
+      "bytes": 13475
     },
     "executable": {
-      "formats": 7,
-      "bytes": 289667
-    },
-    "serialization": {
-      "formats": 4,
-      "bytes": 54514
+      "formats": 8,
+      "bytes": 306134
     },
     "filesystem": {
       "formats": 4,
@@ -47,282 +66,435 @@
       "formats": 1,
       "bytes": 52968
     },
-    "media": {
-      "formats": 4,
-      "bytes": 70569
-    },
-    "database": {
-      "formats": 1,
-      "bytes": 13475
+    "image": {
+      "formats": 9,
+      "bytes": 455301
     },
     "log": {
       "formats": 1,
       "bytes": 9437
     },
-    "network": {
+    "macos": {
       "formats": 1,
-      "bytes": 4165
+      "bytes": 15646
+    },
+    "media": {
+      "formats": 7,
+      "bytes": 94956
+    },
+    "network": {
+      "formats": 2,
+      "bytes": 18193
+    },
+    "serialization": {
+      "formats": 6,
+      "bytes": 88220
+    },
+    "windows": {
+      "formats": 2,
+      "bytes": 29625
     }
   },
   "rows": [
     {
-      "category": "image",
-      "id": "png",
-      "className": "Png",
-      "file": "Png.js",
-      "size": 22672
-    },
-    {
-      "category": "image",
-      "id": "gif",
-      "className": "Gif",
-      "file": "Gif.js",
-      "size": 13680
-    },
-    {
-      "category": "image",
-      "id": "bmp",
-      "className": "Bmp",
-      "file": "Bmp.js",
-      "size": 28163
-    },
-    {
-      "category": "image",
-      "id": "ico",
-      "className": "Ico",
-      "file": "Ico.js",
-      "size": 4367
-    },
-    {
-      "category": "image",
-      "id": "tga",
-      "className": "Tga",
-      "file": "Tga.js",
-      "size": 6577
-    },
-    {
-      "category": "image",
-      "id": "pcx",
-      "className": "Pcx",
-      "file": "Pcx.js",
-      "size": 5856
-    },
-    {
-      "category": "image",
-      "id": "jpeg",
-      "className": "Jpeg",
-      "file": "Jpeg.js",
-      "size": 11009
-    },
-    {
-      "category": "image",
-      "id": "dicom",
-      "className": "Dicom",
-      "file": "Dicom.js",
-      "size": 347766
-    },
-    {
       "category": "archive",
-      "id": "zip",
-      "className": "Zip",
-      "file": "Zip.js",
-      "size": 19610
+      "id": "cpio_old_le",
+      "className": "CpioOldLe",
+      "file": "CpioOldLe.js",
+      "size": 4603,
+      "gzSize": 1150
     },
     {
       "category": "archive",
       "id": "gzip",
       "className": "Gzip",
       "file": "Gzip.js",
-      "size": 6961
+      "size": 6961,
+      "gzSize": 2271
     },
     {
       "category": "archive",
-      "id": "cpio_old_le",
-      "className": "CpioOldLe",
-      "file": "CpioOldLe.js",
-      "size": 4603
+      "id": "lzh",
+      "className": "Lzh",
+      "file": "Lzh.js",
+      "size": 4498,
+      "gzSize": 1285
     },
     {
       "category": "archive",
       "id": "rar",
       "className": "Rar",
       "file": "Rar.js",
-      "size": 8942
-    },
-    {
-      "category": "archive",
-      "id": "xar",
-      "className": "Xar",
-      "file": "Xar.js",
-      "size": 7303
+      "size": 8942,
+      "gzSize": 2745
     },
     {
       "category": "archive",
       "id": "rpm",
       "className": "Rpm",
       "file": "Rpm.js",
-      "size": 38514
+      "size": 38514,
+      "gzSize": 8589
     },
     {
-      "category": "executable",
-      "id": "elf",
-      "className": "Elf",
-      "file": "Elf.js",
-      "size": 85025
+      "category": "archive",
+      "id": "xar",
+      "className": "Xar",
+      "file": "Xar.js",
+      "size": 7303,
+      "gzSize": 2186
     },
     {
-      "category": "executable",
-      "id": "microsoft_pe",
-      "className": "MicrosoftPe",
-      "file": "MicrosoftPe.js",
-      "size": 20907
+      "category": "archive",
+      "id": "zip",
+      "className": "Zip",
+      "file": "Zip.js",
+      "size": 19610,
+      "gzSize": 4149
     },
     {
-      "category": "executable",
-      "id": "mach_o",
-      "className": "MachO",
-      "file": "MachO.js",
-      "size": 92584
-    },
-    {
-      "category": "executable",
-      "id": "java_class",
-      "className": "JavaClass",
-      "file": "JavaClass.js",
-      "size": 33222
-    },
-    {
-      "category": "executable",
-      "id": "dex",
-      "className": "Dex",
-      "file": "Dex.js",
-      "size": 41508
-    },
-    {
-      "category": "executable",
-      "id": "swf",
-      "className": "Swf",
-      "file": "Swf.js",
-      "size": 11849
-    },
-    {
-      "category": "executable",
-      "id": "dos_mz",
-      "className": "DosMz",
-      "file": "DosMz.js",
-      "size": 4572
-    },
-    {
-      "category": "serialization",
-      "id": "bson",
-      "className": "Bson",
-      "file": "Bson.js",
-      "size": 13557
-    },
-    {
-      "category": "serialization",
-      "id": "msgpack",
-      "className": "Msgpack",
-      "file": "Msgpack.js",
-      "size": 13202
-    },
-    {
-      "category": "serialization",
-      "id": "google_protobuf",
-      "className": "GoogleProtobuf",
-      "file": "GoogleProtobuf.js",
-      "size": 6124
-    },
-    {
-      "category": "serialization",
-      "id": "php_serialized_value",
-      "className": "PhpSerializedValue",
-      "file": "PhpSerializedValue.js",
-      "size": 21631
-    },
-    {
-      "category": "filesystem",
-      "id": "ext2",
-      "className": "Ext2",
-      "file": "Ext2.js",
-      "size": 12085
-    },
-    {
-      "category": "filesystem",
-      "id": "vfat",
-      "className": "Vfat",
-      "file": "Vfat.js",
-      "size": 16072
-    },
-    {
-      "category": "filesystem",
-      "id": "gpt_partition_table",
-      "className": "GptPartitionTable",
-      "file": "GptPartitionTable.js",
-      "size": 4664
-    },
-    {
-      "category": "filesystem",
-      "id": "iso9660",
-      "className": "Iso9660",
-      "file": "Iso9660.js",
-      "size": 13943
-    },
-    {
-      "category": "font",
-      "id": "ttf",
-      "className": "Ttf",
-      "file": "Ttf.js",
-      "size": 52968
-    },
-    {
-      "category": "media",
-      "id": "ogg",
-      "className": "Ogg",
-      "file": "Ogg.js",
-      "size": 5466
-    },
-    {
-      "category": "media",
-      "id": "wav",
-      "className": "Wav",
-      "file": "Wav.js",
-      "size": 33543
-    },
-    {
-      "category": "media",
-      "id": "avi",
-      "className": "Avi",
-      "file": "Avi.js",
-      "size": 7615
-    },
-    {
-      "category": "media",
-      "id": "quicktime_mov",
-      "className": "QuicktimeMov",
-      "file": "QuicktimeMov.js",
-      "size": 23945
+      "category": "common",
+      "id": "riff",
+      "className": "Riff",
+      "file": "Riff.js",
+      "size": 11858,
+      "gzSize": 2254
     },
     {
       "category": "database",
       "id": "sqlite3",
       "className": "Sqlite3",
       "file": "Sqlite3.js",
-      "size": 13475
+      "size": 13475,
+      "gzSize": 3026
+    },
+    {
+      "category": "executable",
+      "id": "dex",
+      "className": "Dex",
+      "file": "Dex.js",
+      "size": 41508,
+      "gzSize": 7263
+    },
+    {
+      "category": "executable",
+      "id": "dos_mz",
+      "className": "DosMz",
+      "file": "DosMz.js",
+      "size": 4572,
+      "gzSize": 1384
+    },
+    {
+      "category": "executable",
+      "id": "elf",
+      "className": "Elf",
+      "file": "Elf.js",
+      "size": 85025,
+      "gzSize": 13835
+    },
+    {
+      "category": "executable",
+      "id": "java_class",
+      "className": "JavaClass",
+      "file": "JavaClass.js",
+      "size": 33222,
+      "gzSize": 4508
+    },
+    {
+      "category": "executable",
+      "id": "mach_o",
+      "className": "MachO",
+      "file": "MachO.js",
+      "size": 92584,
+      "gzSize": 12242
+    },
+    {
+      "category": "executable",
+      "id": "microsoft_pe",
+      "className": "MicrosoftPe",
+      "file": "MicrosoftPe.js",
+      "size": 20907,
+      "gzSize": 3944
+    },
+    {
+      "category": "executable",
+      "id": "python_pyc_27",
+      "className": "PythonPyc27",
+      "file": "PythonPyc27.js",
+      "size": 16467,
+      "gzSize": 3901
+    },
+    {
+      "category": "executable",
+      "id": "swf",
+      "className": "Swf",
+      "file": "Swf.js",
+      "size": 11849,
+      "gzSize": 2839
+    },
+    {
+      "category": "filesystem",
+      "id": "ext2",
+      "className": "Ext2",
+      "file": "Ext2.js",
+      "size": 12085,
+      "gzSize": 2330
+    },
+    {
+      "category": "filesystem",
+      "id": "gpt_partition_table",
+      "className": "GptPartitionTable",
+      "file": "GptPartitionTable.js",
+      "size": 4664,
+      "gzSize": 1205
+    },
+    {
+      "category": "filesystem",
+      "id": "iso9660",
+      "className": "Iso9660",
+      "file": "Iso9660.js",
+      "size": 13943,
+      "gzSize": 2525
+    },
+    {
+      "category": "filesystem",
+      "id": "vfat",
+      "className": "Vfat",
+      "file": "Vfat.js",
+      "size": 16072,
+      "gzSize": 3782
+    },
+    {
+      "category": "font",
+      "id": "ttf",
+      "className": "Ttf",
+      "file": "Ttf.js",
+      "size": 52968,
+      "gzSize": 9686
+    },
+    {
+      "category": "image",
+      "id": "bmp",
+      "className": "Bmp",
+      "file": "Bmp.js",
+      "size": 28163,
+      "gzSize": 6316
+    },
+    {
+      "category": "image",
+      "id": "dicom",
+      "className": "Dicom",
+      "file": "Dicom.js",
+      "size": 347766,
+      "gzSize": 77230
+    },
+    {
+      "category": "image",
+      "id": "gif",
+      "className": "Gif",
+      "file": "Gif.js",
+      "size": 13680,
+      "gzSize": 2682
+    },
+    {
+      "category": "image",
+      "id": "ico",
+      "className": "Ico",
+      "file": "Ico.js",
+      "size": 4367,
+      "gzSize": 1453
+    },
+    {
+      "category": "image",
+      "id": "jpeg",
+      "className": "Jpeg",
+      "file": "Jpeg.js",
+      "size": 11009,
+      "gzSize": 2687
+    },
+    {
+      "category": "image",
+      "id": "pcx",
+      "className": "Pcx",
+      "file": "Pcx.js",
+      "size": 5856,
+      "gzSize": 1956
+    },
+    {
+      "category": "image",
+      "id": "png",
+      "className": "Png",
+      "file": "Png.js",
+      "size": 22672,
+      "gzSize": 4184
+    },
+    {
+      "category": "image",
+      "id": "tga",
+      "className": "Tga",
+      "file": "Tga.js",
+      "size": 6577,
+      "gzSize": 2017
+    },
+    {
+      "category": "image",
+      "id": "wmf",
+      "className": "Wmf",
+      "file": "Wmf.js",
+      "size": 15211,
+      "gzSize": 3494
     },
     {
       "category": "log",
       "id": "systemd_journal",
       "className": "SystemdJournal",
       "file": "SystemdJournal.js",
-      "size": 9437
+      "size": 9437,
+      "gzSize": 2201
+    },
+    {
+      "category": "macos",
+      "id": "ds_store",
+      "className": "DsStore",
+      "file": "DsStore.js",
+      "size": 15646,
+      "gzSize": 2980
+    },
+    {
+      "category": "media",
+      "id": "au",
+      "className": "Au",
+      "file": "Au.js",
+      "size": 5647,
+      "gzSize": 2242
+    },
+    {
+      "category": "media",
+      "id": "avi",
+      "className": "Avi",
+      "file": "Avi.js",
+      "size": 7615,
+      "gzSize": 1904
+    },
+    {
+      "category": "media",
+      "id": "id3v2_3",
+      "className": "Id3v23",
+      "file": "Id3v23.js",
+      "size": 7581,
+      "gzSize": 1561
+    },
+    {
+      "category": "media",
+      "id": "ogg",
+      "className": "Ogg",
+      "file": "Ogg.js",
+      "size": 5466,
+      "gzSize": 1989
+    },
+    {
+      "category": "media",
+      "id": "quicktime_mov",
+      "className": "QuicktimeMov",
+      "file": "QuicktimeMov.js",
+      "size": 23945,
+      "gzSize": 6236
+    },
+    {
+      "category": "media",
+      "id": "standard_midi_file",
+      "className": "StandardMidiFile",
+      "file": "StandardMidiFile.js",
+      "size": 11159,
+      "gzSize": 2381
+    },
+    {
+      "category": "media",
+      "id": "wav",
+      "className": "Wav",
+      "file": "Wav.js",
+      "size": 33543,
+      "gzSize": 8308
     },
     {
       "category": "network",
       "id": "ipv4_packet",
       "className": "Ipv4Packet",
       "file": "Ipv4Packet.js",
-      "size": 4165
+      "size": 4165,
+      "gzSize": 1047
+    },
+    {
+      "category": "network",
+      "id": "pcap",
+      "className": "Pcap",
+      "file": "Pcap.js",
+      "size": 14028,
+      "gzSize": 4689
+    },
+    {
+      "category": "serialization",
+      "id": "bson",
+      "className": "Bson",
+      "file": "Bson.js",
+      "size": 13557,
+      "gzSize": 3337
+    },
+    {
+      "category": "serialization",
+      "id": "google_protobuf",
+      "className": "GoogleProtobuf",
+      "file": "GoogleProtobuf.js",
+      "size": 6124,
+      "gzSize": 2235
+    },
+    {
+      "category": "serialization",
+      "id": "microsoft_cfb",
+      "className": "MicrosoftCfb",
+      "file": "MicrosoftCfb.js",
+      "size": 9525,
+      "gzSize": 2174
+    },
+    {
+      "category": "serialization",
+      "id": "msgpack",
+      "className": "Msgpack",
+      "file": "Msgpack.js",
+      "size": 13202,
+      "gzSize": 2100
+    },
+    {
+      "category": "serialization",
+      "id": "php_serialized_value",
+      "className": "PhpSerializedValue",
+      "file": "PhpSerializedValue.js",
+      "size": 21631,
+      "gzSize": 3919
+    },
+    {
+      "category": "serialization",
+      "id": "python_pickle",
+      "className": "PythonPickle",
+      "file": "PythonPickle.js",
+      "size": 24181,
+      "gzSize": 4303
+    },
+    {
+      "category": "windows",
+      "id": "regf",
+      "className": "Regf",
+      "file": "Regf.js",
+      "size": 15847,
+      "gzSize": 3242
+    },
+    {
+      "category": "windows",
+      "id": "windows_lnk_file",
+      "className": "WindowsLnkFile",
+      "file": "WindowsLnkFile.js",
+      "size": 13778,
+      "gzSize": 2688
     }
   ]
 }

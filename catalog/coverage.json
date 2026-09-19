@@ -4,10 +4,10 @@
     "labels": 353,
     "binaryLabels": 219,
     "textLabels": 134,
-    "specGenerated": 55,
-    "specAvailable": 17,
-    "binaryGenerated": 54,
-    "binarySpecAvailable": 16,
+    "specGenerated": 71,
+    "specAvailable": 1,
+    "binaryGenerated": 69,
+    "binarySpecAvailable": 1,
     "gaps": 149,
     "implementedHere": [
       "parse:pe-header",
@@ -321,8 +321,8 @@
       "kaitaiSpecs": [
         "au"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "asf",
@@ -641,8 +641,8 @@
       "kaitaiSpecs": [
         "microsoft_cfb"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "chm",
@@ -1078,8 +1078,8 @@
       "kaitaiSpecs": [
         "ds_store"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "dwg",
@@ -2045,8 +2045,8 @@
       "kaitaiSpecs": [
         "lzh"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "license",
@@ -2096,8 +2096,8 @@
       "kaitaiSpecs": [
         "windows_lnk_file"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "lock",
@@ -2277,8 +2277,8 @@
       "kaitaiSpecs": [
         "standard_midi_file"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "mkv",
@@ -2315,8 +2315,8 @@
       "kaitaiSpecs": [
         "id3v2_3"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "mp4",
@@ -2368,8 +2368,8 @@
       "kaitaiSpecs": [
         "microsoft_cfb"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "msix",
@@ -2640,8 +2640,8 @@
       "kaitaiSpecs": [
         "microsoft_cfb"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "one",
@@ -2759,8 +2759,8 @@
       "kaitaiSpecs": [
         "pcap"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "pdb",
@@ -2866,8 +2866,8 @@
       "kaitaiSpecs": [
         "python_pickle"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "png",
@@ -3071,8 +3071,8 @@
       "kaitaiSpecs": [
         "python_pyc_27"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "pythonpar",
@@ -3199,8 +3199,8 @@
       "kaitaiSpecs": [
         "riff"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "rlib",
@@ -4016,8 +4016,8 @@
       "kaitaiSpecs": [
         "microsoft_cfb"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "vtt",
@@ -4143,8 +4143,8 @@
       "kaitaiSpecs": [
         "regf"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "wma",
@@ -4169,8 +4169,8 @@
       "kaitaiSpecs": [
         "wmf"
       ],
-      "generatedHere": false,
-      "status": "spec-available"
+      "generatedHere": true,
+      "status": "spec-generated"
     },
     {
       "label": "wmv",
