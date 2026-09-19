@@ -76,7 +76,9 @@ fn walks_a_webp_written_by_pillow() {
     let fields: Vec<&str> = last.split('\t').collect();
     assert_eq!(fields[0], "VP8L", "lossless webp payload chunk: {lines:?}");
     assert_eq!(
-        fields[2].parse::<i64>().unwrap() + 8 + (fields[1].parse::<i64>().unwrap() & 1),
+        fields[2].parse::<i64>().unwrap()
+            + fields[1].parse::<i64>().unwrap()
+            + (fields[1].parse::<i64>().unwrap() & 1),
         webp.len() as i64,
         "the walk ends exactly at the end of the file: {lines:?}"
     );
