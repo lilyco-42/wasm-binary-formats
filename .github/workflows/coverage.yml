@@ -42,9 +42,10 @@ jobs:
         run: |
           node -e '
           const { summary } = JSON.parse(require("fs").readFileSync("catalog/coverage.json", "utf8"));
+          const coveredOf = (s) => s.selfFields + s.selfContainer + s.binaryGenerated + s.binarySpecAvailable;
           if (summary.labels < 350) { console.error("magika KB shrank unexpectedly"); process.exit(1) }
-          if (summary.binaryGenerated < 54) { console.error("generated coverage regressed"); process.exit(1) }
-          if (summary.binaryLabels !== summary.binaryGenerated + summary.binarySpecAvailable + summary.gaps) {
+          if (coveredOf(summary) < 70) { console.error("total coverage regressed"); process.exit(1) }
+          if (summary.binaryLabels !== coveredOf(summary) + summary.gaps) {
             console.error("buckets do not add up"); process.exit(1)
           }
           console.log(JSON.stringify(summary, null, 2));

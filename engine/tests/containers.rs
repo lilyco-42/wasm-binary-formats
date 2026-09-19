@@ -61,6 +61,48 @@ fn walks_riff_chunks_written_by_python() {
     );
 }
 
+/// Both files come from other people's implementations: the TIFF from Pillow (which reports
+/// ImageWidth=3 and ImageHeight=2 for it) and the tar from GNU tar 1.35 (whose -tv listing shows
+/// one regular member of 210 bytes). Asserting against those is a cross-implementation check rather
+/// than this repo agreeing with itself.
+#[test]
+fn reads_a_tiff_written_by_pillow() {
+    let tiff = fixture("tiny.tif");
+    assert_eq!(
+        parse(&tiff),
+        FORMAT_TIFF,
+        "Pillow writes classic little-endian TIFF"
+    );
+    let lines = entries();
+    assert!(
+        lines.iter().any(|line| line.starts_with("ifd0	256	")),
+        "ImageWidth tag: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line.starts_with("ifd0	257	")),
+        "ImageHeight tag: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line.starts_with("ifd0	273	")),
+        "StripOffsets tag: {lines:?}"
+    );
+    assert!(
+        lines.len() >= 8,
+        "Pillow writes at least eight tags, saw {lines:?}"
+    );
+}
+
+#[test]
+fn lists_a_tar_written_by_gnu_tar() {
+    let tar = fixture("gnu.tar");
+    assert_eq!(parse(&tar), FORMAT_TAR);
+    let lines = entries();
+    assert!(
+        lines.iter().any(|line| line.starts_with("tiny.tif	210	0")),
+        "GNU tar member: {lines:?}"
+    );
+}
+
 #[test]
 fn reads_an_ar_member_table() {
     let mut bytes = b"!<arch>\n".to_vec();

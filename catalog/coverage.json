@@ -4,11 +4,13 @@
     "labels": 353,
     "binaryLabels": 219,
     "textLabels": 134,
-    "specGenerated": 71,
-    "specAvailable": 1,
-    "binaryGenerated": 69,
-    "binarySpecAvailable": 1,
-    "gaps": 149,
+    "specGenerated": 53,
+    "specAvailable": 0,
+    "binaryGenerated": 51,
+    "selfFields": 13,
+    "selfContainer": 9,
+    "binarySpecAvailable": 0,
+    "gaps": 146,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,8 +21,8 @@
     "gapByGroup": {
       "video": 7,
       "unknown": 59,
-      "image": 15,
-      "archive": 22,
+      "image": 14,
+      "archive": 20,
       "code": 5,
       "document": 11,
       "application": 12,
@@ -43,6 +45,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -55,6 +58,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -67,6 +71,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -79,6 +84,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -91,6 +97,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -103,6 +110,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -115,6 +123,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -125,6 +134,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -137,6 +147,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -149,6 +160,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -161,6 +173,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -173,6 +186,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -185,6 +199,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -199,7 +214,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "applebplist",
@@ -212,6 +228,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -222,6 +239,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -234,6 +252,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -244,6 +263,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -254,7 +274,8 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "arc",
@@ -266,6 +287,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -276,6 +298,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -286,6 +309,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -298,6 +322,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -308,6 +333,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -322,6 +348,7 @@
         "au"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -334,6 +361,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -348,6 +376,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -361,6 +390,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -371,6 +401,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -383,6 +414,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -397,7 +429,8 @@
         "avi"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "avif",
@@ -410,6 +443,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -422,6 +456,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -434,6 +469,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -446,6 +482,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -458,6 +495,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -470,6 +508,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -482,6 +521,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -494,6 +534,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -508,6 +549,7 @@
         "bmp"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -520,6 +562,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -532,6 +575,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -545,6 +589,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -558,6 +603,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -572,6 +618,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -584,6 +631,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -596,6 +644,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -608,6 +657,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -618,6 +668,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -630,6 +681,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -642,6 +694,7 @@
         "microsoft_cfb"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -654,6 +707,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -669,6 +723,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -681,6 +736,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -698,6 +754,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -711,6 +768,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -723,6 +781,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -733,6 +792,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -747,7 +807,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "cpp",
@@ -764,6 +825,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -778,6 +840,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -792,6 +855,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -805,6 +869,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -817,6 +882,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -829,6 +895,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -841,6 +908,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -851,6 +919,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -863,6 +932,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -889,7 +959,8 @@
         "dex"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "dey",
@@ -899,6 +970,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -913,6 +985,7 @@
         "dicom"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -926,6 +999,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -936,6 +1010,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -946,6 +1021,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -960,7 +1036,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "dm",
@@ -972,6 +1049,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -984,6 +1062,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -996,6 +1075,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1008,6 +1088,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1020,6 +1101,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1030,6 +1112,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1045,6 +1128,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1055,6 +1139,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1067,6 +1152,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1079,6 +1165,7 @@
         "ds_store"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1091,6 +1178,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1103,6 +1191,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1117,6 +1206,7 @@
         "mach_o"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1127,6 +1217,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1141,7 +1232,8 @@
         "elf"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "elixir",
@@ -1153,6 +1245,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1165,6 +1258,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1177,6 +1271,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1187,6 +1282,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1201,6 +1297,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1213,6 +1310,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1226,6 +1324,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1238,6 +1337,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1252,7 +1352,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "exp",
@@ -1262,6 +1363,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1274,6 +1376,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1284,6 +1387,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1296,6 +1400,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1311,6 +1416,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1323,6 +1429,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1333,6 +1440,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1345,6 +1453,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1359,6 +1468,7 @@
         "gif"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1369,6 +1479,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1379,6 +1490,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1391,6 +1503,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1403,6 +1516,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1415,6 +1529,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1427,6 +1542,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1439,6 +1555,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1456,7 +1573,8 @@
         "gzip"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "h",
@@ -1468,6 +1586,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1481,6 +1600,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1494,6 +1614,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1507,6 +1628,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1519,6 +1641,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1534,6 +1657,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1546,6 +1670,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1558,6 +1683,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1573,6 +1699,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1585,6 +1712,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1595,6 +1723,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1610,6 +1739,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1620,6 +1750,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1632,6 +1763,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1644,6 +1776,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1656,6 +1789,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1670,6 +1804,7 @@
         "ico"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1682,6 +1817,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1692,6 +1828,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1704,6 +1841,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1716,6 +1854,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1728,6 +1867,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1738,6 +1878,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1750,6 +1891,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1764,6 +1906,7 @@
         "iso9660"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1779,7 +1922,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "java",
@@ -1791,6 +1935,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1805,6 +1950,7 @@
         "java_class"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1819,6 +1965,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1833,6 +1980,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1845,6 +1993,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1857,6 +2006,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1869,6 +2019,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1884,6 +2035,7 @@
         "jpeg"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1896,6 +2048,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1906,6 +2059,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1919,6 +2073,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1933,6 +2088,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1945,6 +2101,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1957,6 +2114,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -1971,6 +2129,7 @@
         "elf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -1984,6 +2143,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -1996,6 +2156,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2009,6 +2170,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2021,6 +2183,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2031,6 +2194,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2046,6 +2210,7 @@
         "lzh"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2056,6 +2221,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2071,6 +2237,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2083,6 +2250,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2097,6 +2265,7 @@
         "windows_lnk_file"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2109,6 +2278,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2121,6 +2291,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2133,6 +2304,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2145,6 +2317,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2157,6 +2330,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2167,6 +2341,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2180,6 +2355,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2192,6 +2368,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2204,6 +2381,7 @@
         "mach_o"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2216,6 +2394,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2226,6 +2405,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2239,6 +2419,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2252,6 +2433,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2264,6 +2446,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2278,6 +2461,7 @@
         "standard_midi_file"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2290,6 +2474,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2302,6 +2487,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2316,6 +2502,7 @@
         "id3v2_3"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2330,6 +2517,7 @@
         "quicktime_mov"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2345,6 +2533,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2355,6 +2544,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2369,6 +2559,7 @@
         "microsoft_cfb"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2383,6 +2574,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2395,6 +2587,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2407,6 +2600,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2419,6 +2613,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2431,6 +2626,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2441,6 +2637,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2453,6 +2650,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2467,6 +2665,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2479,6 +2678,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2493,6 +2693,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2507,6 +2708,7 @@
         "elf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2520,6 +2722,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2533,6 +2736,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2547,7 +2751,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "odex",
@@ -2561,6 +2766,7 @@
         "dex"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2573,6 +2779,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2587,6 +2794,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2601,6 +2809,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2615,6 +2824,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2629,6 +2839,7 @@
         "ogg"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2641,6 +2852,7 @@
         "microsoft_cfb"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2653,6 +2865,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2665,6 +2878,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2677,6 +2891,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2689,6 +2904,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2699,6 +2915,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2709,6 +2926,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2722,6 +2940,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2735,6 +2954,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2745,6 +2965,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2760,6 +2981,7 @@
         "pcap"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2772,6 +2994,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2784,6 +3007,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2799,7 +3023,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "pem",
@@ -2813,6 +3038,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2825,6 +3051,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2838,6 +3065,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2852,6 +3080,7 @@
         "php_serialized_value"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2867,6 +3096,7 @@
         "python_pickle"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2881,6 +3111,7 @@
         "png"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2893,6 +3124,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2905,6 +3137,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2917,6 +3150,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2929,6 +3163,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2944,6 +3179,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -2954,6 +3190,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -2968,6 +3205,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2980,6 +3218,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -2992,6 +3231,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3007,6 +3247,7 @@
         "google_protobuf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3019,6 +3260,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3032,6 +3274,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3044,6 +3287,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3057,6 +3301,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3072,6 +3317,7 @@
         "python_pyc_27"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3084,6 +3330,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3096,6 +3343,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3110,6 +3358,7 @@
         "quicktime_mov"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3122,6 +3371,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3132,6 +3382,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3142,6 +3393,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3152,6 +3404,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3166,6 +3419,7 @@
         "rar"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3178,6 +3432,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3188,6 +3443,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3200,7 +3456,8 @@
         "riff"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "rlib",
@@ -3214,6 +3471,7 @@
         "elf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3226,6 +3484,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3240,6 +3499,7 @@
         "rpm"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3252,6 +3512,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3264,6 +3525,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3276,6 +3538,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3288,6 +3551,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3300,6 +3564,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3312,6 +3577,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3325,6 +3591,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3339,7 +3606,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "scriptwsf",
@@ -3349,6 +3617,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3361,6 +3630,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3373,6 +3643,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3385,6 +3656,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3397,6 +3669,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3409,6 +3682,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3421,6 +3695,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3433,6 +3708,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3447,6 +3723,7 @@
         "elf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3459,6 +3736,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3471,6 +3749,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3486,7 +3765,8 @@
         "sqlite3"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "squashfs",
@@ -3496,6 +3776,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3508,6 +3789,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3520,6 +3802,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3532,6 +3815,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3544,6 +3828,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3554,6 +3839,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3566,6 +3852,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3580,7 +3867,8 @@
         "swf"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "swift",
@@ -3592,6 +3880,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3602,6 +3891,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3612,6 +3902,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3626,7 +3917,8 @@
         "microsoft_pe"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "tar",
@@ -3638,7 +3930,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "tcl",
@@ -3650,6 +3943,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3664,6 +3958,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3678,6 +3973,7 @@
         "tga"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -3688,6 +3984,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3701,7 +3998,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "tmdx",
@@ -3714,6 +4012,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3726,6 +4025,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3738,6 +4038,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3748,6 +4049,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3760,6 +4062,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3774,6 +4077,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3787,6 +4091,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3799,6 +4104,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3811,6 +4117,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3823,6 +4130,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3835,6 +4143,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3847,6 +4156,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3861,6 +4171,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3871,6 +4182,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3881,6 +4193,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3893,6 +4206,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3903,6 +4217,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3917,6 +4232,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3929,6 +4245,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3941,6 +4258,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3951,6 +4269,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -3963,6 +4282,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3978,6 +4298,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -3988,6 +4309,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4000,6 +4322,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4017,6 +4340,7 @@
         "microsoft_cfb"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4030,6 +4354,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4042,6 +4367,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4054,6 +4380,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4066,6 +4393,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4080,7 +4408,8 @@
         "wav"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "webm",
@@ -4092,6 +4421,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4106,7 +4436,8 @@
         "webp"
       ],
       "generatedHere": false,
-      "status": "spec-available"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "webtemplate",
@@ -4116,6 +4447,7 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4130,6 +4462,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4144,6 +4477,7 @@
         "regf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4156,6 +4490,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4170,6 +4505,7 @@
         "wmf"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4182,6 +4518,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4194,6 +4531,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4206,6 +4544,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4221,6 +4560,7 @@
         "xar"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4233,6 +4573,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4245,6 +4586,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4257,6 +4599,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4272,6 +4615,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4284,6 +4628,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4298,6 +4643,7 @@
         "zip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4310,6 +4656,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4322,6 +4669,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     },
     {
@@ -4335,6 +4683,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4348,6 +4697,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4360,6 +4710,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "text"
     },
     {
@@ -4374,7 +4725,8 @@
         "zip"
       ],
       "generatedHere": true,
-      "status": "spec-generated"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "zlibstream",
@@ -4386,6 +4738,7 @@
         "gzip"
       ],
       "generatedHere": true,
+      "selfLevel": "",
       "status": "spec-generated"
     },
     {
@@ -4398,6 +4751,7 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
+      "selfLevel": "",
       "status": "gap"
     }
   ]

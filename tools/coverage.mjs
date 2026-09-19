@@ -24,6 +24,16 @@ const implemented = JSON.parse(readFileSync('catalog/formats.json', 'utf8')).mod
 
 // Only unambiguous equivalences. A label with no entry here is reported as a gap, never as covered,
 // so the list can be audited instead of trusted.
+// What this repo's own Rust engine reads, and at what level. "container" means the framing is
+// parsed (member names, sizes, chunk or tag lists) without claiming the document's semantics: a zip
+// reader does not parse a .docx. "fields" means named header fields are decoded.
+const SELF = {
+  tar: ['container'], ar: ['container'], deb: [], riff: ['container'], wav: ['container'], avi: ['container'],
+  webp: ['container'], tiff: ['fields'], pebin: ['fields'], exe: ['fields'], dll: ['fields'], sys: ['fields'],
+  ocx: ['fields'], cpl: ['fields'], scr: ['fields'], dex: ['fields'], elf: ['fields'], swf: ['fields'],
+  zip: ['container'], jar: ['container'], apk: ['container'], gzip: ['fields'], sqlite: ['fields'],
+};
+
 const ALIAS = {
   pebin: ['microsoft_pe'], exe: ['microsoft_pe'], dll: ['microsoft_pe'], sys: ['microsoft_pe'], ocx: ['microsoft_pe'], cpl: ['microsoft_pe'], scr: ['microsoft_pe'],
   elf: ['elf'], so: ['elf'], ko: ['elf'], rlib: ['elf'], object: ['elf'],
@@ -52,7 +62,11 @@ const rows = Object.entries(kb).map(([label, meta]) => {
     extensions: meta.extensions ?? [],
     kaitaiSpecs: matched,
     generatedHere: isGenerated,
-    status: isGenerated ? 'spec-generated' : (matched.length ? 'spec-available' : (meta.is_text ? 'text' : 'gap')),
+    selfLevel: (SELF[label] ?? [''])[0],
+    status: (SELF[label] ?? [''])[0] ? `self-${(SELF[label] ?? [''])[0]}`
+      : isGenerated ? 'spec-generated'
+      : matched.length ? 'spec-available'
+      : meta.is_text ? 'text' : 'gap',
   };
 });
 
@@ -67,6 +81,8 @@ const summary = {
   specGenerated: by('spec-generated').length,
   specAvailable: by('spec-available').length,
   binaryGenerated: byBinary('spec-generated').length,
+  selfFields: binary.filter((r) => r.status === 'self-fields').length,
+  selfContainer: binary.filter((r) => r.status === 'self-container').length,
   binarySpecAvailable: byBinary('spec-available').length,
   gaps: byBinary('gap').length,
   implementedHere: implemented,

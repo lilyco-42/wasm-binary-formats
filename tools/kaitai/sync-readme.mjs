@@ -37,12 +37,16 @@ const tierTable = [
 ].join('\n');
 
 const share = (n) => `${((100 * n) / cov.binaryLabels).toFixed(1)}%`;
+const covered = cov.selfFields + cov.selfContainer + cov.binaryGenerated + cov.binarySpecAvailable;
 const coverageTable = [
   '| state | binary labels | share |',
   '|---|---|---|',
-  `| parseable via a reader this repo generates and load-gates | **${cov.binaryGenerated}** | ${share(cov.binaryGenerated)} |`,
-  `| an upstream spec exists but the pinned compiler does not ship it | ${cov.binarySpecAvailable} | ${share(cov.binarySpecAvailable)} |`,
-  `| **no spec matched - real gap** | **${cov.gaps}** | ${share(cov.gaps)} |`,
+  `| own Rust reader, named header fields decoded | ${cov.selfFields} | ${share(cov.selfFields)} |`,
+  `| own Rust reader, container framing only | ${cov.selfContainer} | ${share(cov.selfContainer)} |`,
+  `| generated Kaitai reader, load-gated in CI | ${cov.binaryGenerated} | ${share(cov.binaryGenerated)} |`,
+  `| an upstream spec exists but the pinned compiler lacks it | ${cov.binarySpecAvailable} | ${share(cov.binarySpecAvailable)} |`,
+  `| **no parser at all - real gap** | **${cov.gaps}** | ${share(cov.gaps)} |`,
+  `| **covered, any level** | **${covered}** | ${share(covered)} |`,
 ].join('\n');
 
 let doc = readFileSync('README.md', 'utf8');

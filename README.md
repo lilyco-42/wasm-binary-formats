@@ -250,16 +250,20 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| parseable via a reader this repo generates and load-gates | **69** | 31.5% |
-| an upstream spec exists but the pinned compiler does not ship it | 1 | 0.5% |
-| **no spec matched - real gap** | **149** | 68.0% |
+| own Rust reader, named header fields decoded | 13 | 5.9% |
+| own Rust reader, container framing only | 9 | 4.1% |
+| generated Kaitai reader, load-gated in CI | 51 | 23.3% |
+| an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
+| **no parser at all - real gap** | **146** | 66.7% |
+| **covered, any level** | **73** | 33.3% |
 
 Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
 MKV/WebM/EBML, FLAC, MP3 audio frames, tar, 7z, bzip2/bzip3, xz, zstd, cab, ar/arc/arj, deb, CHM,
 COFF, Arrow/Parquet/Avro, ONNX, DMG, WIM, VHD, HFS, SquashFS, NTFS, EXFAT.
 
-So the honest answer to the objective is **no, not yet**: 54 of 219 binary labels have a working
-reader path here, 149 do not. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 73 of 219 binary labels have a parser
+that runs here (13 field-level, 9 container-level from our own Rust engine, 51 generated from Kaitai
+specs and load-gated in CI), 146 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
