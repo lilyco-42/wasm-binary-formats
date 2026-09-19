@@ -341,6 +341,30 @@ builds the wasm target and runs both test layers on CI.
   and `cab` stays a recorded gap. Revisit with a second cabinet (a larger one, and one from another
   writer) before coding against either interpretation.
 
+### Where the breadth work stands, and what is deliberately not attempted
+
+Coverage is scored against magika's 219 binary labels: **84 covered** (25 field-level and 18
+container-level from this repo's own readers, 41 generated and mostly load-gated), **135 with no
+parser**. Three things follow from measuring rather than assuming, and are recorded so the next pass
+does not re-derive them:
+
+* Ready to build, producers verified on this machine: ASF/WMV/WMA and FLV. ffmpeg 9 writes both here
+  (a 6 906-byte `.asf` and a 1 772-byte `.flv`), and neither has a Kaitai spec in the pinned bundle,
+  so each needs one new framing reader plus a fixture and its own assertions.
+* Refused rather than guessed: **CAB** - `makecab` produces a cabinet whose *file* table decodes
+  exactly as documented and matches `expand -D`, but whose folder area is 8 bytes where `CFFOLDER` is
+  specified as 16, so one sample contradicts the layout and no reader was written. **PAM (P7)** ends
+  its header with the token `ENDHDR` instead of a fixed count of integers, so the Netpbm reader
+  rejects it rather than reporting a geometry from the wrong offsets. **IPv4** is still unresolved:
+  the generated reader over-reads the hand-built 24-byte packet by four bytes, and until that is
+  explained the format is not claimed.
+* Blocked on somebody else: `wasm` has no producer on this machine (no toolchain runs locally, and
+  the scoop and Git installations contain no `.wasm` to read), and 28 generated readers still have
+  no fixture because nothing here writes rpm, xar, ext2, GPT, ISO 9660, registry hives or
+  `.DS_Store`. And the licence question that gates shipping - what kaitai.io permits for *generated*
+  code - has no written answer upstream, so the 41 generated readers stay feasibility evidence, not
+  product capability.
+
 ## Prior art worth copying instead of rebuilding
 
 | Project | Stars | Why it matters here |
