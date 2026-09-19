@@ -237,6 +237,28 @@ are 42 % of that on their own: shipping the light and medium tiers plus lazy-loa
 ~117 KiB gzipped. Scaling to all 189 upstream specs is arithmetic, not measurement - at the observed
 mean it is ~5.2 MB raw, so the tiering decision matters more than the spec count.
 
+## Coverage against a cited definition of "common"
+
+"所有常见格式都能解析" needs someone else's enumeration, not ours. `tools/coverage.mjs` compares
+what this repo can do against **google/magika `content_types_kb.min.json`** (Apache-2.0, 353 labels:
+353 total, 219 binary, 134 text) and Kaitai's live spec tree, and writes
+`catalog/coverage.json`. `.github/workflows/coverage.yml` rebuilds it on push and weekly, fails if
+the committed matrix disagrees with upstream, and asserts the buckets add up.
+
+| state | binary labels | share |
+|---|---|---|
+| parseable via a reader this repo generates and load-gates | 54 | 24.7% |
+| an upstream spec exists but we do not generate it yet | 16 | 7.3% |
+| **no spec matched - real gap** | 149 | 68.0% |
+
+Top gap groups by count: unknown 59, archive 22, image 15, application 12, document 11, video 7. Concretely named gaps include PDF, TIFF, WebP, AVIF, HEIF,
+MKV/WebM/EBML, FLAC, MP3 audio frames, tar, 7z, bzip2/bzip3, xz, zstd, cab, ar/arc/arj, deb, CHM,
+COFF, Arrow/Parquet/Avro, ONNX, DMG, WIM, VHD, HFS, SquashFS, NTFS, EXFAT.
+
+So the honest answer to the objective is **no, not yet**: 54 of 219 binary labels have a working
+reader path here, 149 do not. The buckets are deliberately separate from "identified" - the Tika
+signature table covers 353 types for naming a file, which is not the same as parsing it.
+
 ## Reproduce
 
 ```bash

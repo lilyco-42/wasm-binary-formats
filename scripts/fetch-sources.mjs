@@ -11,6 +11,9 @@ const SOURCES = {
   'catalog/Apktool-README.md': 'https://raw.githubusercontent.com/iBotPeaches/Apktool/master/README.md',
   // Resolved through the API because the readme's filename and default branch differ
   // per repository, and guessing them produced a 404.
+  'catalog/magika-kb.json': 'https://raw.githubusercontent.com/google/magika/main/python/src/magika/config/content_types_kb.min.json',
+  // The full upstream spec list, so "no spec exists" is a checked fact rather than an assumption.
+  'catalog/kaitai-specs.json': 'https://api.github.com/repos/kaitai-io/kaitai_struct_formats/git/trees/master?recursive=1',
   'catalog/v86-README.md': 'https://api.github.com/repos/copy/v86/readme',
 };
 

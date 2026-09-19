@@ -1,0 +1,51 @@
+name: Coverage matrix
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# "Can it parse all common formats?" is only answerable against someone else's enumeration. This
+# job rebuilds that comparison from magika's content-type KB and Kaitai's live spec tree, and fails
+# if the numbers move without the committed matrix moving with them.
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Re-fetch the enumerations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/fetch-sources.mjs
+
+      - name: Rebuild the catalogue the matrix reads
+        run: node scripts/build-catalog.mjs
+
+      - name: Rebuild the matrix
+        run: node tools/coverage.mjs
+
+      - name: The committed matrix must match what upstream says today
+        run: |
+          git diff --exit-code catalog/coverage.json || {
+            echo "catalog/coverage.json is stale against upstream magika/kaitai; regenerate and commit"; exit 1; }
+
+      - name: Assert the floor and report the gap honestly
+        run: |
+          node -e '
+          const { summary } = JSON.parse(require("fs").readFileSync("catalog/coverage.json", "utf8"));
+          if (summary.labels < 350) { console.error("magika KB shrank unexpectedly"); process.exit(1) }
+          if (summary.binaryGenerated < 54) { console.error("generated coverage regressed"); process.exit(1) }
+          if (summary.binaryLabels !== summary.binaryGenerated + summary.binarySpecAvailable + summary.gaps) {
+            console.error("buckets do not add up"); process.exit(1)
+          }
+          console.log(JSON.stringify(summary, null, 2));
+          '

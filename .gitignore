@@ -1,6 +1,8 @@
 catalog/tika.xml
 catalog/arch.h
 catalog/*-README.md
+catalog/magika-kb.json
+catalog/kaitai-specs.json
 node_modules/
 *.log
 engine/target/

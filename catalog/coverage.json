@@ -1,0 +1,4404 @@
+{
+  "summary": {
+    "source": "google/magika content_types_kb.min.json (Apache-2.0)",
+    "labels": 353,
+    "binaryLabels": 219,
+    "textLabels": 134,
+    "specGenerated": 55,
+    "specAvailable": 17,
+    "binaryGenerated": 54,
+    "binarySpecAvailable": 16,
+    "gaps": 149,
+    "implementedHere": [
+      "parse:pe-header",
+      "parse:dex-header",
+      "parse:axml-string-pool",
+      "unpack:zip+deflate",
+      "run:apk-web-assets"
+    ],
+    "gapByGroup": {
+      "video": 7,
+      "unknown": 59,
+      "image": 15,
+      "archive": 22,
+      "code": 5,
+      "document": 11,
+      "application": 12,
+      "executable": 6,
+      "text": 2,
+      "inode": 3,
+      "audio": 2,
+      "font": 4,
+      "undefined": 1
+    }
+  },
+  "rows": [
+    {
+      "label": "3gp",
+      "group": "video",
+      "mime": "video/3gpp",
+      "isText": false,
+      "extensions": [
+        "3gp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "3ds",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "3ds"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "3dsx",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "3dsx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "3dsm",
+      "group": "image",
+      "mime": "application/x-3ds",
+      "isText": false,
+      "extensions": [
+        "3ds"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "3mf",
+      "group": "image",
+      "mime": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+      "isText": false,
+      "extensions": [
+        "3mf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "abnf",
+      "group": "unknown",
+      "mime": "text/plain",
+      "isText": false,
+      "extensions": [
+        "abnf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ace",
+      "group": "archive",
+      "mime": "application/x-ace-compressed",
+      "isText": false,
+      "extensions": [
+        "ace"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ada",
+      "group": "code",
+      "mime": "text/x-ada",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "aff",
+      "group": "unknown",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "aff"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ai",
+      "group": "document",
+      "mime": "application/pdf",
+      "isText": false,
+      "extensions": [
+        "ai"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "aidl",
+      "group": "unknown",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "aidl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "algol68",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "a68"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ani",
+      "group": "unknown",
+      "mime": "application/x-navi-animation",
+      "isText": false,
+      "extensions": [
+        "ani"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "apk",
+      "group": "executable",
+      "mime": "application/vnd.android.package-archive",
+      "isText": false,
+      "extensions": [
+        "apk"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "applebplist",
+      "group": "application",
+      "mime": "application/x-bplist",
+      "isText": false,
+      "extensions": [
+        "bplist",
+        "plist"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "appledouble",
+      "group": "unknown",
+      "mime": "multipart/appledouble",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "appleplist",
+      "group": "application",
+      "mime": "application/x-plist",
+      "isText": true,
+      "extensions": [
+        "plist"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "applesingle",
+      "group": "unknown",
+      "mime": "application/applefile",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ar",
+      "group": "archive",
+      "mime": "application/x-archive",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "arc",
+      "group": "archive",
+      "mime": "application/x-arc",
+      "isText": false,
+      "extensions": [
+        "arc"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "arj",
+      "group": "archive",
+      "mime": "application/arj",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "arrow",
+      "group": "unknown",
+      "mime": "vnd.apache.arrow.file",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "asc",
+      "group": "text",
+      "mime": "application/pgp-signature",
+      "isText": true,
+      "extensions": [
+        "asc"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "asd",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "au",
+      "group": "audio",
+      "mime": "audio/basic",
+      "isText": false,
+      "extensions": [
+        "au"
+      ],
+      "kaitaiSpecs": [
+        "au"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "asf",
+      "group": "application",
+      "mime": "video/x-ms-wma",
+      "isText": false,
+      "extensions": [
+        "asf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "asm",
+      "group": "code",
+      "mime": "text/x-asm",
+      "isText": true,
+      "extensions": [
+        "s",
+        "S",
+        "asm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "asp",
+      "group": "code",
+      "mime": "text/html",
+      "isText": true,
+      "extensions": [
+        "aspx",
+        "asp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "autohotkey",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "autoit",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "au3"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "avi",
+      "group": "video",
+      "mime": "video/x-msvideo",
+      "isText": false,
+      "extensions": [
+        "avi"
+      ],
+      "kaitaiSpecs": [
+        "avi"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "avif",
+      "group": "video",
+      "mime": "image/avif",
+      "isText": false,
+      "extensions": [
+        "avif",
+        "avifs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "avro",
+      "group": "unknown",
+      "mime": "application/x-avro-binary",
+      "isText": false,
+      "extensions": [
+        "avro"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "awk",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "awk"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ax",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "ax"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "batch",
+      "group": "code",
+      "mime": "text/x-msdos-batch",
+      "isText": true,
+      "extensions": [
+        "bat"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "bazel",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "bzl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "bcad",
+      "group": "document",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "bdf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "bib",
+      "group": "text",
+      "mime": "text/x-bibtex",
+      "isText": true,
+      "extensions": [
+        "bib"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "bmp",
+      "group": "image",
+      "mime": "image/bmp",
+      "isText": false,
+      "extensions": [
+        "bmp"
+      ],
+      "kaitaiSpecs": [
+        "bmp"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "bpg",
+      "group": "image",
+      "mime": "image/bpg",
+      "isText": false,
+      "extensions": [
+        "bpg"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "bpl",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "bpl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "brainfuck",
+      "group": "code",
+      "mime": "text/x-brainfuck",
+      "isText": true,
+      "extensions": [
+        "b",
+        "bf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "brf",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": false,
+      "extensions": [
+        "brf",
+        "bfm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "bzip",
+      "group": "archive",
+      "mime": "application/x-bzip2",
+      "isText": false,
+      "extensions": [
+        "bz2",
+        "tbz2",
+        "tar.bz2"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "bzip3",
+      "group": "archive",
+      "mime": "application/x-bzip3",
+      "isText": false,
+      "extensions": [
+        "bz3"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "c",
+      "group": "code",
+      "mime": "text/x-c",
+      "isText": true,
+      "extensions": [
+        "c"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "cab",
+      "group": "archive",
+      "mime": "application/vnd.ms-cab-compressed",
+      "isText": false,
+      "extensions": [
+        "cab"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "cad",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "cat",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "cat"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "cdf",
+      "group": "archive",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "chm",
+      "group": "application",
+      "mime": "application/chm",
+      "isText": false,
+      "extensions": [
+        "chm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "clojure",
+      "group": "code",
+      "mime": "text/x-clojure",
+      "isText": true,
+      "extensions": [
+        "clj",
+        "cljs",
+        "cljc",
+        "cljr"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "cmake",
+      "group": "code",
+      "mime": "text/x-cmake",
+      "isText": true,
+      "extensions": [
+        "cmake"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "cobol",
+      "group": "code",
+      "mime": "text/x-cobol",
+      "isText": true,
+      "extensions": [
+        "cbl",
+        "cob",
+        "cpy",
+        "CBL",
+        "COB",
+        "CPY"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "coff",
+      "group": "executable",
+      "mime": "application/x-coff",
+      "isText": false,
+      "extensions": [
+        "obj",
+        "o"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "coffeescript",
+      "group": "code",
+      "mime": "text/coffeescript",
+      "isText": true,
+      "extensions": [
+        "coffee"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "com",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "cpl",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "cpl"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "cpp",
+      "group": "code",
+      "mime": "text/x-c",
+      "isText": true,
+      "extensions": [
+        "cc",
+        "cpp",
+        "cxx",
+        "c++",
+        "cppm",
+        "ixx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "crt",
+      "group": "text",
+      "mime": "application/x-x509-ca-cert",
+      "isText": false,
+      "extensions": [
+        "der",
+        "cer",
+        "crt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "crx",
+      "group": "executable",
+      "mime": "application/x-chrome-extension",
+      "isText": false,
+      "extensions": [
+        "crx"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "cs",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "cs",
+        "csx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "csproj",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "csproj"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "css",
+      "group": "code",
+      "mime": "text/css",
+      "isText": true,
+      "extensions": [
+        "css"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "csv",
+      "group": "code",
+      "mime": "text/csv",
+      "isText": true,
+      "extensions": [
+        "csv"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ctl",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dart",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "dart"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "deb",
+      "group": "archive",
+      "mime": "application/vnd.debian.binary-package",
+      "isText": false,
+      "extensions": [
+        "deb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dex",
+      "group": "executable",
+      "mime": "application/x-android-dex",
+      "isText": false,
+      "extensions": [
+        "dex"
+      ],
+      "kaitaiSpecs": [
+        "dex"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "dey",
+      "group": "executable",
+      "mime": "application/x-android-dey",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dicom",
+      "group": "image",
+      "mime": "application/dicom",
+      "isText": false,
+      "extensions": [
+        "dcm"
+      ],
+      "kaitaiSpecs": [
+        "dicom"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "diff",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "diff",
+        "patch"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "directory",
+      "group": "inode",
+      "mime": "inode/directory",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "django",
+      "group": "code",
+      "mime": "text/x-django",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dll",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "dll"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "dm",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "dm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "dmigd",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "dm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "dmg",
+      "group": "archive",
+      "mime": "application/x-apple-diskimage",
+      "isText": false,
+      "extensions": [
+        "dmg"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dmscript",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "s"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "doc",
+      "group": "document",
+      "mime": "application/msword",
+      "isText": false,
+      "extensions": [
+        "doc"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dockerfile",
+      "group": "code",
+      "mime": "text/x-dockerfile",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "docx",
+      "group": "document",
+      "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "isText": false,
+      "extensions": [
+        "docx",
+        "docm"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "dosmbr",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dotx",
+      "group": "document",
+      "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+      "isText": false,
+      "extensions": [
+        "dotx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dsstore",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "ds_store"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "dwg",
+      "group": "image",
+      "mime": "image/x-dwg",
+      "isText": false,
+      "extensions": [
+        "dwg"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "dxf",
+      "group": "image",
+      "mime": "image/vnd.dxf",
+      "isText": true,
+      "extensions": [
+        "dxf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "dylib",
+      "group": "executable",
+      "mime": "application/x-mach-o",
+      "isText": false,
+      "extensions": [
+        "dylib"
+      ],
+      "kaitaiSpecs": [
+        "mach_o"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "ebml",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "elf",
+      "group": "executable",
+      "mime": "application/x-executable-elf",
+      "isText": false,
+      "extensions": [
+        "elf"
+      ],
+      "kaitaiSpecs": [
+        "elf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "elixir",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "exs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "emf",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "emf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "eml",
+      "group": "text",
+      "mime": "message/rfc822",
+      "isText": true,
+      "extensions": [
+        "eml"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "empty",
+      "group": "inode",
+      "mime": "inode/x-empty",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "epub",
+      "group": "document",
+      "mime": "application/epub+zip",
+      "isText": false,
+      "extensions": [
+        "epub"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "erb",
+      "group": "code",
+      "mime": "text/x-ruby",
+      "isText": true,
+      "extensions": [
+        "erb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "erlang",
+      "group": "code",
+      "mime": "text/x-erlang",
+      "isText": true,
+      "extensions": [
+        "erl",
+        "hrl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ese",
+      "group": "unknown",
+      "mime": "application/x-ms-ese",
+      "isText": false,
+      "extensions": [
+        "dat"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "exe",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "exe"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "exp",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "flac",
+      "group": "audio",
+      "mime": "audio/flac",
+      "isText": false,
+      "extensions": [
+        "flac"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "flutter",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "flv",
+      "group": "video",
+      "mime": "video/x-flv",
+      "isText": false,
+      "extensions": [
+        "flv"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "fortran",
+      "group": "document",
+      "mime": "text/x-fortran",
+      "isText": true,
+      "extensions": [
+        "f90",
+        "f95",
+        "f03",
+        "F90"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "fpx",
+      "group": "image",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "fpx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "gemfile",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gemspec",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "gemspec"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gif",
+      "group": "image",
+      "mime": "image/gif",
+      "isText": false,
+      "extensions": [
+        "gif"
+      ],
+      "kaitaiSpecs": [
+        "gif"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "gitattributes",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gitmodules",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gleam",
+      "group": "code",
+      "mime": "",
+      "isText": true,
+      "extensions": [
+        "gleam"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "go",
+      "group": "code",
+      "mime": "text/x-golang",
+      "isText": true,
+      "extensions": [
+        "go"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gpx",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "gpx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "gradle",
+      "group": "code",
+      "mime": "text/x-groovy",
+      "isText": true,
+      "extensions": [
+        "gradle"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "groovy",
+      "group": "code",
+      "mime": "text/x-groovy",
+      "isText": true,
+      "extensions": [
+        "groovy"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "gzip",
+      "group": "archive",
+      "mime": "application/gzip",
+      "isText": false,
+      "extensions": [
+        "gz",
+        "gzip",
+        "tgz",
+        "tar.gz"
+      ],
+      "kaitaiSpecs": [
+        "gzip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "h",
+      "group": "code",
+      "mime": "text/x-c",
+      "isText": true,
+      "extensions": [
+        "h"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "h5",
+      "group": "archive",
+      "mime": "application/x-hdf5",
+      "isText": false,
+      "extensions": [
+        "h5",
+        "hdf5"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "handlebars",
+      "group": "code",
+      "mime": "text/x-handlebars-template",
+      "isText": true,
+      "extensions": [
+        "hbs",
+        "handlebars"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "haskell",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "hs",
+        "lhs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "hcl",
+      "group": "code",
+      "mime": "text/x-hcl",
+      "isText": true,
+      "extensions": [
+        "hcl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "heif",
+      "group": "image",
+      "mime": "image/heic",
+      "isText": false,
+      "extensions": [
+        "heif",
+        "heifs",
+        "heic",
+        "heics"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "hfs",
+      "group": "unknown",
+      "mime": "application/x-hfs",
+      "isText": false,
+      "extensions": [
+        "hfs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "hlp",
+      "group": "application",
+      "mime": "application/winhlp",
+      "isText": false,
+      "extensions": [
+        "hlp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "hpp",
+      "group": "code",
+      "mime": "text/x-h",
+      "isText": true,
+      "extensions": [
+        "hh",
+        "hpp",
+        "hxx",
+        "h++"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "hta",
+      "group": "code",
+      "mime": "application/hta",
+      "isText": false,
+      "extensions": [
+        "hta"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "htaccess",
+      "group": "code",
+      "mime": "text/x-apache-conf",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "html",
+      "group": "code",
+      "mime": "text/html",
+      "isText": true,
+      "extensions": [
+        "html",
+        "htm",
+        "xhtml",
+        "xht"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "hve",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "hwp",
+      "group": "document",
+      "mime": "application/x-hwp",
+      "isText": false,
+      "extensions": [
+        "hwp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "icc",
+      "group": "unknown",
+      "mime": "application/vnd.iccprofile",
+      "isText": false,
+      "extensions": [
+        "icc"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "icns",
+      "group": "image",
+      "mime": "image/x-icns",
+      "isText": false,
+      "extensions": [
+        "icns"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ico",
+      "group": "image",
+      "mime": "image/vnd.microsoft.icon",
+      "isText": false,
+      "extensions": [
+        "ico"
+      ],
+      "kaitaiSpecs": [
+        "ico"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "ics",
+      "group": "application",
+      "mime": "text/calendar",
+      "isText": true,
+      "extensions": [
+        "ics"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ignorefile",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "img",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "img"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ini",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "ini"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "internetshortcut",
+      "group": "application",
+      "mime": "application/x-mswinurl",
+      "isText": true,
+      "extensions": [
+        "url"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "iosapp",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ipynb",
+      "group": "code",
+      "mime": "application/json",
+      "isText": true,
+      "extensions": [
+        "ipynb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "iso",
+      "group": "archive",
+      "mime": "application/x-iso9660-image",
+      "isText": false,
+      "extensions": [
+        "iso"
+      ],
+      "kaitaiSpecs": [
+        "iso9660"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "jar",
+      "group": "archive",
+      "mime": "application/java-archive",
+      "isText": false,
+      "extensions": [
+        "jar",
+        "klib"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "java",
+      "group": "code",
+      "mime": "text/x-java",
+      "isText": true,
+      "extensions": [
+        "java"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "javabytecode",
+      "group": "executable",
+      "mime": "application/x-java-applet",
+      "isText": false,
+      "extensions": [
+        "class"
+      ],
+      "kaitaiSpecs": [
+        "java_class"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "javascript",
+      "group": "code",
+      "mime": "application/javascript",
+      "isText": true,
+      "extensions": [
+        "js",
+        "mjs",
+        "cjs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jinja",
+      "group": "code",
+      "mime": "text/x-jinja2-template",
+      "isText": true,
+      "extensions": [
+        "jinja",
+        "jinja2",
+        "j2"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jng",
+      "group": "image",
+      "mime": "image/jng",
+      "isText": false,
+      "extensions": [
+        "jng"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "jnlp",
+      "group": "code",
+      "mime": "application/x-java-jnlp-file",
+      "isText": true,
+      "extensions": [
+        "jnlp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jp2",
+      "group": "image",
+      "mime": "image/jpeg2000",
+      "isText": false,
+      "extensions": [
+        "jp2"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "jpeg",
+      "group": "image",
+      "mime": "image/jpeg",
+      "isText": false,
+      "extensions": [
+        "jpg",
+        "jpeg"
+      ],
+      "kaitaiSpecs": [
+        "jpeg"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "json",
+      "group": "code",
+      "mime": "application/json",
+      "isText": true,
+      "extensions": [
+        "json"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jsonc",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "jsonl",
+      "group": "code",
+      "mime": "application/json",
+      "isText": true,
+      "extensions": [
+        "jsonl",
+        "jsonld"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jsx",
+      "group": "code",
+      "mime": "application/javascript",
+      "isText": true,
+      "extensions": [
+        "jsx",
+        "mjsx",
+        "cjsx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "julia",
+      "group": "code",
+      "mime": "text/x-julia",
+      "isText": true,
+      "extensions": [
+        "jl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "jxl",
+      "group": "image",
+      "mime": "image/jxl",
+      "isText": false,
+      "extensions": [
+        "jxl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ko",
+      "group": "executable",
+      "mime": "application/x-executable-elf",
+      "isText": false,
+      "extensions": [
+        "ko"
+      ],
+      "kaitaiSpecs": [
+        "elf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "kotlin",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "kt",
+        "kts"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ks",
+      "group": "unknown",
+      "mime": "",
+      "isText": true,
+      "extensions": [
+        "ks"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "latex",
+      "group": "text",
+      "mime": "text/x-tex",
+      "isText": true,
+      "extensions": [
+        "tex",
+        "sty"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "latexaux",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "aux"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "less",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "lha",
+      "group": "archive",
+      "mime": "application/x-lha",
+      "isText": false,
+      "extensions": [
+        "lha",
+        "lzh"
+      ],
+      "kaitaiSpecs": [
+        "lzh"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "license",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "lisp",
+      "group": "code",
+      "mime": "text/x-lisp",
+      "isText": true,
+      "extensions": [
+        "lisp",
+        "lsp",
+        "l",
+        "cl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "litcs",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "litcoffee"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "lnk",
+      "group": "application",
+      "mime": "application/x-ms-shortcut",
+      "isText": false,
+      "extensions": [
+        "lnk"
+      ],
+      "kaitaiSpecs": [
+        "windows_lnk_file"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "lock",
+      "group": "application",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "lock"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "lrz",
+      "group": "unknown",
+      "mime": "application/x-lrzip",
+      "isText": false,
+      "extensions": [
+        "lrz"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "lua",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "lua"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "lz",
+      "group": "archive",
+      "mime": "application/x-lzip",
+      "isText": false,
+      "extensions": [
+        "lz"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "lz4",
+      "group": "archive",
+      "mime": "application/x-lz4",
+      "isText": false,
+      "extensions": [
+        "lz4"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "lzx",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "m3u",
+      "group": "application",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "m3u8",
+        "m3u"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "m4",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "m4"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "macho",
+      "group": "executable",
+      "mime": "application/x-mach-o",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "mach_o"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "maff",
+      "group": "unknown",
+      "mime": "application/x-maff",
+      "isText": false,
+      "extensions": [
+        "maff"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "makefile",
+      "group": "code",
+      "mime": "text/x-makefile",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "markdown",
+      "group": "text",
+      "mime": "text/markdown",
+      "isText": true,
+      "extensions": [
+        "md",
+        "markdown"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "matlab",
+      "group": "code",
+      "mime": "text/x-matlab",
+      "isText": true,
+      "extensions": [
+        "m",
+        "matlab"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "mht",
+      "group": "code",
+      "mime": "application/x-mimearchive",
+      "isText": true,
+      "extensions": [
+        "mht"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "midi",
+      "group": "audio",
+      "mime": "audio/midi",
+      "isText": false,
+      "extensions": [
+        "mid"
+      ],
+      "kaitaiSpecs": [
+        "standard_midi_file"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "mkv",
+      "group": "video",
+      "mime": "video/x-matroska",
+      "isText": false,
+      "extensions": [
+        "mkv"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "mp2",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "mp2"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "mp3",
+      "group": "audio",
+      "mime": "audio/mpeg",
+      "isText": false,
+      "extensions": [
+        "mp3"
+      ],
+      "kaitaiSpecs": [
+        "id3v2_3"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "mp4",
+      "group": "video",
+      "mime": "video/mp4",
+      "isText": false,
+      "extensions": [
+        "mp4"
+      ],
+      "kaitaiSpecs": [
+        "quicktime_mov"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "mpegts",
+      "group": "video",
+      "mime": "video/MP2T",
+      "isText": false,
+      "extensions": [
+        "ts",
+        "tsv",
+        "tsa",
+        "m2t"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "mscompress",
+      "group": "archive",
+      "mime": "application/x-ms-compress-szdd",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "msi",
+      "group": "archive",
+      "mime": "application/x-msi",
+      "isText": false,
+      "extensions": [
+        "msi"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "msix",
+      "group": "application",
+      "mime": "application/msix",
+      "isText": false,
+      "extensions": [
+        "msix"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "mst",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "mst"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "mui",
+      "group": "application",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "mui"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "mum",
+      "group": "application",
+      "mime": "text/xml",
+      "isText": true,
+      "extensions": [
+        "mum"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "mun",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "mun"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "nim",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "npy",
+      "group": "archive",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "npy"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "npz",
+      "group": "archive",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "npz"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "null",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "null"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "nupkg",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "nupkg"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "object",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "o"
+      ],
+      "kaitaiSpecs": [
+        "elf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "objectivec",
+      "group": "code",
+      "mime": "text/x-objcsrc",
+      "isText": true,
+      "extensions": [
+        "m",
+        "mm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ocaml",
+      "group": "code",
+      "mime": "text-ocaml",
+      "isText": true,
+      "extensions": [
+        "ml",
+        "mli"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ocx",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "ocx"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "odex",
+      "group": "executable",
+      "mime": "application/x-executable-elf",
+      "isText": false,
+      "extensions": [
+        "odex"
+      ],
+      "kaitaiSpecs": [
+        "dex"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "odin",
+      "group": "code",
+      "mime": "",
+      "isText": true,
+      "extensions": [
+        "odin"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "odp",
+      "group": "document",
+      "mime": "application/vnd.oasis.opendocument.presentation",
+      "isText": false,
+      "extensions": [
+        "odp"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "ods",
+      "group": "document",
+      "mime": "application/vnd.oasis.opendocument.spreadsheet",
+      "isText": false,
+      "extensions": [
+        "ods"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "odt",
+      "group": "document",
+      "mime": "application/vnd.oasis.opendocument.text",
+      "isText": false,
+      "extensions": [
+        "odt"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "ogg",
+      "group": "audio",
+      "mime": "audio/ogg",
+      "isText": false,
+      "extensions": [
+        "ogg"
+      ],
+      "kaitaiSpecs": [
+        "ogg"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "ole",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "one",
+      "group": "document",
+      "mime": "application/msonenote",
+      "isText": false,
+      "extensions": [
+        "one"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "onnx",
+      "group": "archive",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "onnx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "ooxml",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "otf",
+      "group": "font",
+      "mime": "font/otf",
+      "isText": false,
+      "extensions": [
+        "otf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "outlook",
+      "group": "application",
+      "mime": "application/vnd.ms-outlook",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "palmos",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "parquet",
+      "group": "unknown",
+      "mime": "application/vnd.apache.parquet",
+      "isText": false,
+      "extensions": [
+        "pqt",
+        "parquet"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pascal",
+      "group": "code",
+      "mime": "text/x-pascal",
+      "isText": true,
+      "extensions": [
+        "pas",
+        "pp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "pbm",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pcap",
+      "group": "application",
+      "mime": "application/vnd.tcpdump.pcap",
+      "isText": false,
+      "extensions": [
+        "pcap",
+        "pcapng"
+      ],
+      "kaitaiSpecs": [
+        "pcap"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "pdb",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "pdb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pdf",
+      "group": "document",
+      "mime": "application/pdf",
+      "isText": false,
+      "extensions": [
+        "pdf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pebin",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "exe",
+        "dll"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "pem",
+      "group": "application",
+      "mime": "application/x-pem-file",
+      "isText": true,
+      "extensions": [
+        "pem",
+        "pub",
+        "gpg"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "perl",
+      "group": "code",
+      "mime": "text/x-perl",
+      "isText": true,
+      "extensions": [
+        "pl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "pgp",
+      "group": "unknown",
+      "mime": "application/pgp-keys",
+      "isText": false,
+      "extensions": [
+        "gpg",
+        "pgp"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "php",
+      "group": "code",
+      "mime": "text/x-php",
+      "isText": true,
+      "extensions": [
+        "php"
+      ],
+      "kaitaiSpecs": [
+        "php_serialized_value"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "pickle",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "pickle",
+        "pkl"
+      ],
+      "kaitaiSpecs": [
+        "python_pickle"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "png",
+      "group": "image",
+      "mime": "image/png",
+      "isText": false,
+      "extensions": [
+        "png"
+      ],
+      "kaitaiSpecs": [
+        "png"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "po",
+      "group": "application",
+      "mime": "text/gettext-translation",
+      "isText": true,
+      "extensions": [
+        "po"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "postscript",
+      "group": "document",
+      "mime": "application/postscript",
+      "isText": false,
+      "extensions": [
+        "ps"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "powershell",
+      "group": "code",
+      "mime": "application/x-powershell",
+      "isText": true,
+      "extensions": [
+        "ps1"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ppt",
+      "group": "document",
+      "mime": "application/vnd.ms-powerpoint",
+      "isText": false,
+      "extensions": [
+        "ppt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pptx",
+      "group": "document",
+      "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "isText": false,
+      "extensions": [
+        "pptx",
+        "pptm"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "printfox",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "prolog",
+      "group": "code",
+      "mime": "text/x-prolog",
+      "isText": true,
+      "extensions": [
+        "pl",
+        "pro",
+        "P"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "proteindb",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": true,
+      "extensions": [
+        "pdb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "proto",
+      "group": "code",
+      "mime": "text/x-proto",
+      "isText": true,
+      "extensions": [
+        "proto"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "protobuf",
+      "group": "unknown",
+      "mime": "application/protobuf",
+      "isText": false,
+      "extensions": [
+        "protobuf",
+        "pb"
+      ],
+      "kaitaiSpecs": [
+        "google_protobuf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "psd",
+      "group": "image",
+      "mime": "image/vnd.adobe.photoshop",
+      "isText": false,
+      "extensions": [
+        "psd"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pytorch",
+      "group": "application",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "pt",
+        "pth"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "pub",
+      "group": "unknown",
+      "mime": "application/x-mspublisher",
+      "isText": false,
+      "extensions": [
+        "pub"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "python",
+      "group": "code",
+      "mime": "text/x-python",
+      "isText": true,
+      "extensions": [
+        "py",
+        "pyi"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "pythonbytecode",
+      "group": "executable",
+      "mime": "application/x-bytecode.python",
+      "isText": false,
+      "extensions": [
+        "pyc",
+        "pyo"
+      ],
+      "kaitaiSpecs": [
+        "python_pyc_27"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "pythonpar",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "par"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "qoi",
+      "group": "image",
+      "mime": "image/x-qoi",
+      "isText": false,
+      "extensions": [
+        "qoi"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "qt",
+      "group": "video",
+      "mime": "video/quicktime",
+      "isText": false,
+      "extensions": [
+        "mov"
+      ],
+      "kaitaiSpecs": [
+        "quicktime_mov"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "r",
+      "group": "code",
+      "mime": "text/x-R",
+      "isText": true,
+      "extensions": [
+        "R"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "randomascii",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "randombytes",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "randomtxt",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "rar",
+      "group": "archive",
+      "mime": "application/vnd.rar",
+      "isText": false,
+      "extensions": [
+        "rar"
+      ],
+      "kaitaiSpecs": [
+        "rar"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "rdf",
+      "group": "text",
+      "mime": "application/rdf+xml",
+      "isText": true,
+      "extensions": [
+        "rdf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "rdp",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "riff",
+      "group": "unknown",
+      "mime": "application/x-riff",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "riff"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "rlib",
+      "group": "archive",
+      "mime": "application/x-archive",
+      "isText": false,
+      "extensions": [
+        "rlib"
+      ],
+      "kaitaiSpecs": [
+        "elf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "rll",
+      "group": "executable",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "rll"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "rpm",
+      "group": "archive",
+      "mime": "application/x-rpm",
+      "isText": false,
+      "extensions": [
+        "rpm"
+      ],
+      "kaitaiSpecs": [
+        "rpm"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "rst",
+      "group": "text",
+      "mime": "text/x-rst",
+      "isText": true,
+      "extensions": [
+        "rst"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "rtf",
+      "group": "text",
+      "mime": "text/rtf",
+      "isText": true,
+      "extensions": [
+        "rtf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ruby",
+      "group": "code",
+      "mime": "application/x-ruby",
+      "isText": true,
+      "extensions": [
+        "rb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "rust",
+      "group": "code",
+      "mime": "application/x-rust",
+      "isText": true,
+      "extensions": [
+        "rs"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "rzip",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "rz"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "scala",
+      "group": "code",
+      "mime": "application/x-scala",
+      "isText": true,
+      "extensions": [
+        "scala"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "scheme",
+      "group": "code",
+      "mime": "text/x-scheme",
+      "isText": false,
+      "extensions": [
+        "scm",
+        "ss"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "scr",
+      "group": "executable",
+      "mime": "application/x-dosexec",
+      "isText": false,
+      "extensions": [
+        "scr"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "scriptwsf",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "scss",
+      "group": "code",
+      "mime": "text/x-scss",
+      "isText": true,
+      "extensions": [
+        "scss"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sevenzip",
+      "group": "archive",
+      "mime": "application/x-7z-compressed",
+      "isText": false,
+      "extensions": [
+        "7z"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "sgml",
+      "group": "text",
+      "mime": "application/sgml",
+      "isText": true,
+      "extensions": [
+        "sgml"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sh3d",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "sh3d"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "shell",
+      "group": "code",
+      "mime": "text/x-shellscript",
+      "isText": true,
+      "extensions": [
+        "sh"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "smali",
+      "group": "code",
+      "mime": "application/x-smali",
+      "isText": true,
+      "extensions": [
+        "smali"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "snap",
+      "group": "archive",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [
+        "snap"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "so",
+      "group": "executable",
+      "mime": "application/x-executable-elf",
+      "isText": false,
+      "extensions": [
+        "so"
+      ],
+      "kaitaiSpecs": [
+        "elf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "solidity",
+      "group": "code",
+      "mime": "",
+      "isText": true,
+      "extensions": [
+        "sol"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sql",
+      "group": "code",
+      "mime": "application/x-sql",
+      "isText": true,
+      "extensions": [
+        "sql"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sqlite",
+      "group": "application",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "sqlite",
+        "sqlite3"
+      ],
+      "kaitaiSpecs": [
+        "sqlite3"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "squashfs",
+      "group": "archive",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "srt",
+      "group": "application",
+      "mime": "text/srt",
+      "isText": true,
+      "extensions": [
+        "srt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "stlbinary",
+      "group": "image",
+      "mime": "application/sla",
+      "isText": false,
+      "extensions": [
+        "stl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "stltext",
+      "group": "image",
+      "mime": "application/sla",
+      "isText": true,
+      "extensions": [
+        "stl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sum",
+      "group": "application",
+      "mime": "",
+      "isText": true,
+      "extensions": [
+        "sum"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "svd",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "svg",
+      "group": "image",
+      "mime": "image/svg+xml",
+      "isText": true,
+      "extensions": [
+        "svg"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "swf",
+      "group": "executable",
+      "mime": "application/x-shockwave-flash",
+      "isText": false,
+      "extensions": [
+        "swf"
+      ],
+      "kaitaiSpecs": [
+        "swf"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "swift",
+      "group": "code",
+      "mime": "text/x-swift",
+      "isText": true,
+      "extensions": [
+        "swift"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "symlink",
+      "group": "inode",
+      "mime": "inode/symlink",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "symlinktext",
+      "group": "application",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "sys",
+      "group": "executable",
+      "mime": "application/x-windows-driver",
+      "isText": false,
+      "extensions": [
+        "sys"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_pe"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "tar",
+      "group": "archive",
+      "mime": "application/x-tar",
+      "isText": false,
+      "extensions": [
+        "tar"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "tcl",
+      "group": "code",
+      "mime": "application/x-tcl",
+      "isText": true,
+      "extensions": [
+        "tcl"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "textproto",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "textproto",
+        "textpb",
+        "pbtxt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "tga",
+      "group": "image",
+      "mime": "image/x-tga",
+      "isText": false,
+      "extensions": [
+        "tga"
+      ],
+      "kaitaiSpecs": [
+        "tga"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "thumbsdb",
+      "group": "application",
+      "mime": "image/vnd.ms-thumb",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "tiff",
+      "group": "image",
+      "mime": "image/tiff",
+      "isText": false,
+      "extensions": [
+        "tiff",
+        "tif"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "tmdx",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "tmdx",
+        "tmvx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "toml",
+      "group": "text",
+      "mime": "application/toml",
+      "isText": true,
+      "extensions": [
+        "toml"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "torrent",
+      "group": "application",
+      "mime": "application/x-bittorrent",
+      "isText": false,
+      "extensions": [
+        "torrent"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "troff",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "tsv",
+      "group": "code",
+      "mime": "text/tsv",
+      "isText": true,
+      "extensions": [
+        "tsv"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "tsx",
+      "group": "code",
+      "mime": "text/x-typescript",
+      "isText": true,
+      "extensions": [
+        "tsx",
+        "mtsx",
+        "ctsx"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "ttf",
+      "group": "font",
+      "mime": "font/sfnt",
+      "isText": false,
+      "extensions": [
+        "ttf",
+        "ttc"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "twig",
+      "group": "code",
+      "mime": "text/x-twig",
+      "isText": true,
+      "extensions": [
+        "twig"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "txt",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "txt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "txtascii",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "txt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "txtutf16",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "txt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "txtutf8",
+      "group": "text",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [
+        "txt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "typescript",
+      "group": "code",
+      "mime": "application/typescript",
+      "isText": true,
+      "extensions": [
+        "ts",
+        "mts",
+        "cts"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "udf",
+      "group": "unknown",
+      "mime": "application/x-udf-image",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "undefined",
+      "group": "undefined",
+      "mime": "application/undefined",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "unixcompress",
+      "group": "unknown",
+      "mime": "application/x-compress",
+      "isText": false,
+      "extensions": [
+        "z"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "unknown",
+      "group": "unknown",
+      "mime": "application/octet-stream",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "vba",
+      "group": "code",
+      "mime": "text/vbscript",
+      "isText": true,
+      "extensions": [
+        "vbs",
+        "vba",
+        "vb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "vbe",
+      "group": "code",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "vbe"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "vcard",
+      "group": "unknown",
+      "mime": "text/vcard",
+      "isText": false,
+      "extensions": [
+        "vcard"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "vcs",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "vcxproj",
+      "group": "code",
+      "mime": "application/xml",
+      "isText": true,
+      "extensions": [
+        "vcxproj"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "verilog",
+      "group": "code",
+      "mime": "text/x-verilog",
+      "isText": true,
+      "extensions": [
+        "v",
+        "verilog",
+        "vlg",
+        "vh"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "vhd",
+      "group": "unknown",
+      "mime": "application/x-vhd",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "vhdl",
+      "group": "code",
+      "mime": "text/x-vhdl",
+      "isText": true,
+      "extensions": [
+        "vhd"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "visio",
+      "group": "document",
+      "mime": "application/vnd.ms-visio.drawing.main+xml",
+      "isText": false,
+      "extensions": [
+        "vsd",
+        "vsdm",
+        "vsdx",
+        "vdw"
+      ],
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "vtt",
+      "group": "text",
+      "mime": "text/vtt",
+      "isText": true,
+      "extensions": [
+        "vtt",
+        "webvtt"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "vue",
+      "group": "code",
+      "mime": "application/javascript",
+      "isText": true,
+      "extensions": [
+        "vue"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "wad",
+      "group": "archive",
+      "mime": "application/wad",
+      "isText": false,
+      "extensions": [
+        "wad"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "wasm",
+      "group": "executable",
+      "mime": "application/wasm",
+      "isText": false,
+      "extensions": [
+        "wasm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "wav",
+      "group": "audio",
+      "mime": "audio/x-wav",
+      "isText": false,
+      "extensions": [
+        "wav"
+      ],
+      "kaitaiSpecs": [
+        "wav"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "webm",
+      "group": "video",
+      "mime": "video/webm",
+      "isText": false,
+      "extensions": [
+        "webm"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "webp",
+      "group": "image",
+      "mime": "image/webp",
+      "isText": false,
+      "extensions": [
+        "webp"
+      ],
+      "kaitaiSpecs": [
+        "webp"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "webtemplate",
+      "group": "code",
+      "mime": "text/plain",
+      "isText": true,
+      "extensions": [],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "wim",
+      "group": "unknown",
+      "mime": "application/x-ms-wim",
+      "isText": false,
+      "extensions": [
+        "wim",
+        "swm",
+        "esd"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "winregistry",
+      "group": "application",
+      "mime": "text/x-ms-regedit",
+      "isText": true,
+      "extensions": [
+        "reg"
+      ],
+      "kaitaiSpecs": [
+        "regf"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "wma",
+      "group": "audio",
+      "mime": "audio/x-ms-wma",
+      "isText": false,
+      "extensions": [
+        "wma"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "wmf",
+      "group": "image",
+      "mime": "image/wmf",
+      "isText": false,
+      "extensions": [
+        "wmf"
+      ],
+      "kaitaiSpecs": [
+        "wmf"
+      ],
+      "generatedHere": false,
+      "status": "spec-available"
+    },
+    {
+      "label": "wmv",
+      "group": "video",
+      "mime": "video/x-ms-wmv",
+      "isText": false,
+      "extensions": [
+        "wmv"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "woff",
+      "group": "font",
+      "mime": "font/woff",
+      "isText": false,
+      "extensions": [
+        "woff"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "woff2",
+      "group": "font",
+      "mime": "font/woff2",
+      "isText": false,
+      "extensions": [
+        "woff2"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "xar",
+      "group": "archive",
+      "mime": "application/x-xar",
+      "isText": false,
+      "extensions": [
+        "pkg",
+        "xar"
+      ],
+      "kaitaiSpecs": [
+        "xar"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "xcf",
+      "group": "image",
+      "mime": "image/x-xcf",
+      "isText": false,
+      "extensions": [
+        "xcf"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "xls",
+      "group": "document",
+      "mime": "application/vnd.ms-excel",
+      "isText": false,
+      "extensions": [
+        "xls"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "xlsb",
+      "group": "document",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "isText": false,
+      "extensions": [
+        "xlsb"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "xlsx",
+      "group": "document",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "isText": false,
+      "extensions": [
+        "xlsx",
+        "xlsm"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "xml",
+      "group": "code",
+      "mime": "text/xml",
+      "isText": true,
+      "extensions": [
+        "xml"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "xpi",
+      "group": "archive",
+      "mime": "application/zip",
+      "isText": false,
+      "extensions": [
+        "xpi"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "xsd",
+      "group": "unknown",
+      "mime": "",
+      "isText": false,
+      "extensions": [
+        "xsd"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "xz",
+      "group": "archive",
+      "mime": "application/x-xz",
+      "isText": false,
+      "extensions": [
+        "xz"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    },
+    {
+      "label": "yaml",
+      "group": "code",
+      "mime": "application/x-yaml",
+      "isText": true,
+      "extensions": [
+        "yml",
+        "yaml"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "yara",
+      "group": "code",
+      "mime": "text/x-yara",
+      "isText": true,
+      "extensions": [
+        "yar",
+        "yara"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "zig",
+      "group": "code",
+      "mime": "text/zig",
+      "isText": true,
+      "extensions": [
+        "zig"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "text"
+    },
+    {
+      "label": "zip",
+      "group": "archive",
+      "mime": "application/zip",
+      "isText": false,
+      "extensions": [
+        "zip"
+      ],
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "zlibstream",
+      "group": "application",
+      "mime": "application/zlib",
+      "isText": false,
+      "extensions": [],
+      "kaitaiSpecs": [
+        "gzip"
+      ],
+      "generatedHere": true,
+      "status": "spec-generated"
+    },
+    {
+      "label": "zst",
+      "group": "archive",
+      "mime": "application/zstd",
+      "isText": false,
+      "extensions": [
+        "zst"
+      ],
+      "kaitaiSpecs": [],
+      "generatedHere": false,
+      "status": "gap"
+    }
+  ]
+}
