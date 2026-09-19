@@ -14,6 +14,32 @@ const SOURCES = {
   'catalog/v86-README.md': 'https://api.github.com/repos/copy/v86/readme',
 };
 
+// Handler modules are enumerated from the source trees themselves rather than from prose, so
+// every row in the catalogue traces back to a file that exists upstream today.
+const LISTINGS = {
+  'catalog/dfvfs-vfs.json': 'https://api.github.com/repos/log2timeline/dfvfs/contents/dfvfs/vfs',
+  'catalog/dfvfs-volume.json': 'https://api.github.com/repos/log2timeline/dfvfs/contents/dfvfs/volume',
+  'catalog/dfvfs-compression.json': 'https://api.github.com/repos/log2timeline/dfvfs/contents/dfvfs/compression',
+  'catalog/dfvfs-encryption.json': 'https://api.github.com/repos/log2timeline/dfvfs/contents/dfvfs/encryption',
+  'catalog/tika-standard-modules.json': 'https://api.github.com/repos/apache/tika/contents/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules',
+  'catalog/tika-extended-modules.json': 'https://api.github.com/repos/apache/tika/contents/tika-parsers/tika-parsers-extended',
+  'catalog/tika-ml-modules.json': 'https://api.github.com/repos/apache/tika/contents/tika-parsers/tika-parsers-ml',
+};
+
+for (const [path, url] of Object.entries(LISTINGS)) {
+  const headers = { 'user-agent': 'wasm-binary-formats source fetch', accept: 'application/vnd.github+json' };
+  if (process.env.GITHUB_TOKEN) headers.authorization = `bearer ${process.env.GITHUB_TOKEN}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    console.error(`${path}: HTTP ${res.status} from ${url}`);
+    process.exitCode = 1;
+    continue;
+  }
+  const body = await res.text();
+  writeFileSync(path, body);
+  console.log(`${path}: ${JSON.parse(body).length} entries`);
+}
+
 for (const [path, url] of Object.entries(SOURCES)) {
   const headers = { 'user-agent': 'wasm-binary-formats source fetch', accept: 'application/vnd.github.raw+json' };
   if (process.env.GITHUB_TOKEN && url.startsWith('https://api.github.com/')) headers.authorization = `bearer ${process.env.GITHUB_TOKEN}`;

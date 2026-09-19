@@ -35,6 +35,26 @@ const apkLayers = [
   { layer: 'assets/ and res/raw/', note: 'web assets for Cordova/Capacitor shells' },
 ];
 
+// Handler modules enumerated out of the upstream source trees (see fetch-sources.mjs), so every
+// row names a file that exists today rather than a format somebody remembers.
+const listing = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const fileNames = (path) => listing(path).filter((e) => e.type === 'file').map((e) => e.name);
+const dirNames = (path) => listing(path).filter((e) => e.type === 'dir').map((e) => e.name);
+const keep = (names, re, suffix) => names
+  .filter((name) => re.test(name) && !name.startsWith('test_') && name !== '__init__.py')
+  .map((name) => name.slice(0, name.length - suffix.length))
+  .sort();
+
+const fileSystems = keep(fileNames('catalog/dfvfs-vfs.json'), /_file_system[.]py$/, '_file_system.py');
+const volumeSystems = keep(fileNames('catalog/dfvfs-volume.json'), /_volume_system[.]py$/, '_volume_system.py');
+const compressors = keep(fileNames('catalog/dfvfs-compression.json'), /compressor[.]py$/, '.py');
+const encrypters = keep(fileNames('catalog/dfvfs-encryption.json'), /(crypter|encryptor|decrypter)[.]py$/, '.py');
+const tikaModules = [
+  ...dirNames('catalog/tika-standard-modules.json'),
+  ...dirNames('catalog/tika-extended-modules.json'),
+  ...dirNames('catalog/tika-ml-modules.json'),
+].filter((name) => /^tika-parser-/.test(name) && !name.endsWith('-package') && !name.includes('integration-test')).sort();
+
 const identify = mimeTypes.map((type) => ({
   module: `identify:${type}`,
   tier: 'identify',
@@ -52,19 +72,59 @@ const unpack = [
     module: `decompress:${f.toLowerCase()}`, tier: 'unpack', family: 'compression',
     source: 'libarchive archive.h ARCHIVE_FILTER_* (BSD-2)', status: 'catalogued',
   })),
+  ...fileSystems.map((f) => ({
+    module: `filesystem:${f}`, tier: 'unpack', family: 'filesystem',
+    source: 'log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)', status: 'catalogued',
+  })),
+  ...volumeSystems.map((v) => ({
+    module: `volume:${v}`, tier: 'unpack', family: 'partition',
+    source: 'log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)', status: 'catalogued',
+  })),
+  ...compressors.map((c) => ({
+    module: `compress-dfvfs:${c}`, tier: 'unpack', family: 'compression',
+    source: 'log2timeline/dfvfs dfvfs/compression/*_compressor.py (Apache-2.0)', status: 'catalogued',
+  })),
+  {
+    module: 'unpack:zip+deflate', tier: 'unpack', family: 'archive',
+    source: 'this repo: engine/src/lib.rs, tested against test/fixtures/lab-fixture.apk',
+    status: 'implemented',
+  },
 ];
 
-const parse = liefFormats.map((f) => ({
-  module: `parse:${f.toLowerCase()}`, tier: 'parse', family: 'executable',
-  source: 'LIEF README supported formats (Apache-2.0)', status: 'catalogued',
-})).concat(apkLayers.map((l) => ({
-  module: `apk-layer:${l.layer}`, tier: 'parse', family: 'android-package',
-  source: `Apktool README (${l.note}) (Apache-2.0)`, status: 'catalogued',
-})));
+const parse = [
+  ...encrypters.map((c) => ({
+    module: `crypto:${c}`, tier: 'parse', family: 'encryption',
+    source: 'log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)', status: 'catalogued',
+  })),
+  ...tikaModules.map((m) => ({
+    module: `parser-module:${m}`, tier: 'parse', family: 'document',
+    source: 'apache/tika tika-parsers module directories (Apache-2.0)', status: 'catalogued',
+  })),
+  ...liefFormats.map((f) => ({
+    module: `parse:${f.toLowerCase()}`, tier: 'parse', family: 'executable',
+    source: 'LIEF README supported formats (Apache-2.0)', status: 'catalogued',
+  })).concat(apkLayers.map((l) => ({
+    module: `apk-layer:${l.layer}`, tier: 'parse', family: 'android-package',
+    source: `Apktool README (${l.note}) (Apache-2.0)`, status: 'catalogued',
+  }))),
+  {
+    module: 'parse:pe-header', tier: 'parse', family: 'executable',
+    source: 'this repo: engine/src/pe.rs, offsets cross-checked against a shipped System32 exe',
+    status: 'implemented',
+  },
+  {
+    module: 'parse:dex-header', tier: 'parse', family: 'android-package',
+    source: 'this repo: engine/src/dex.rs', status: 'implemented',
+  },
+  {
+    module: 'parse:axml-string-pool', tier: 'parse', family: 'android-package',
+    source: 'this repo: engine/src/axml.rs', status: 'implemented',
+  },
+];
 
 const execute = [
-  { module: 'run:x86-pe', tier: 'execute', family: 'executable', source: 'copy/v86 (BSD-2) x86 emulator + x86-to-wasm JIT', status: 'catalogued' },
-  { module: 'run:apk-web-assets', tier: 'execute', family: 'android-package', source: 'this repo: Service Worker sandbox over unpacked assets/', status: 'catalogued' },
+  { module: 'run:x86-pe', tier: 'execute', family: 'executable', source: 'copy/v86 (BSD-2) x86 emulator + x86-to-wasm JIT; blocked by the Windows image licence, see README', status: 'catalogued' },
+  { module: 'run:apk-web-assets', tier: 'execute', family: 'android-package', source: 'this repo: demo/index.html opaque-origin iframe over unpacked assets/', status: 'implemented' },
 ];
 
 const modules = [...parse, ...unpack, ...execute, ...identify];
@@ -76,6 +136,7 @@ writeFileSync('catalog/formats.json', JSON.stringify({
     total: modules.length,
     byTier,
     actionableWithoutSignatureTables: actionable,
+    implementedHere: modules.filter((m) => m.status === 'implemented').length,
     byFamily: modules.reduce((acc, m) => ({ ...acc, [m.family]: (acc[m.family] ?? 0) + 1 }), {}),
   },
   licenceNotes: [

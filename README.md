@@ -12,12 +12,33 @@ are not.
 | Tier | Meaning | Count today | Where the count comes from |
 |---|---|---|---|
 | `identify` | read magic bytes / declare a type | 1688 | Apache Tika `tika-mimetypes.xml` (Apache-2.0) |
-| `unpack` | list entries and extract files, plus decompressors | 47 | libarchive `archive.h` `ARCHIVE_FORMAT_*` / `ARCHIVE_FILTER_*` (BSD-2) |
-| `parse` | structured parsing of executables and package layers | 12 | LIEF supported formats (Apache-2.0) + Apktool's decoded layers (Apache-2.0) |
-| `execute` | actually run the thing | 2 | v86 x86 emulator (BSD-2) for `.exe`; a sandbox for APK `assets/` |
+| `unpack` | list entries, extract files, walk filesystems and volumes | 87 | libarchive `archive.h` (BSD-2) + dfVFS `dfvfs/vfs`, `dfvfs/volume`, `dfvfs/compression` (Apache-2.0) |
+| `parse` | structured parsing of executables, package layers and parser modules | 49 | LIEF formats + Apktool layers + Tika `tika-parser-*` module directories + dfVFS encryption handlers |
+| `execute` | actually run the thing | 2 | v86 x86 emulator (BSD-2) for `.exe`; this repo's opaque-origin sandbox for APK `assets/` |
 
-**Actionable today: 61 formats.** The 1688 identification rows are a signature table, not 1688
-modules — counting them to reach "200" would be padding, so this file says 61 instead.
+**Actionable today: 138. Implemented and tested in wasm here: 5** (`unpack:zip+deflate`,
+`parse:pe-header`, `parse:dex-header`, `parse:axml-string-pool`, `run:apk-web-assets`) - the
+`implementedHere` field in `catalog/formats.json` carries that number and CI refuses to let it drop.
+
+The 1688 identification rows are a signature table, not 1688 modules — counting them to reach "200"
+would be padding, so this file states 138 instead. The sibling
+[wasm-pixel-kernels](https://github.com/lilyco-42/wasm-pixel-kernels) repo adds 65 more wasm modules
+that are each numerically tested against an independent reference, which is the honest way to read
+a module count: 70 shipped and tested, not 1826 catalogued.
+
+## Path from 138 to 200 actionable, still all from citable enumerations
+
+1. Media containers and metadata (mp4, mkv, avi, webm, flac, ogg, mp3, id3, exif, xmp, icc):
+   enumerate from MediaInfo's format list — the only source that would add ~50 real handlers at once.
+2. Documents beyond the Tika module names (pdf object level, docx/xlsx/pptx parts, odt, rtf, epub):
+   Tika's *parser* modules are counted, their per-format handlers are not.
+3. Package wrappers (deb, rpm, xapk, apks, crx, snap, flatpak, vsix): each is an archive plus one
+   metadata file, cheap once `unpack:zip+deflate` and `unpack:tar` exist.
+4. Filesystems dfVFS reaches through TSK rather than implementing itself — those should be counted
+   as libyal/tsk modules, not as work here.
+
+Each is a fetch-and-enumerate step like the five sources already wired into
+`scripts/fetch-sources.mjs`; nothing on that list is invented later from memory.
 
 ## What is implemented, not just counted
 
@@ -32,8 +53,13 @@ modules — counting them to reach "200" would be padding, so this file says 61 
   the canonical 224/240 for the magic, while a legal-but-smaller 216 (96 standard bytes plus 15
   directories, which real PE32 images use) is honoured — forcing the canonical size would shift
   the section table by eight bytes.
+* `engine/src/dex.rs` and `engine/src/axml.rs` — the two formats that live *inside* the unpacked
+  APK: the `classes.dex` header (version, checksum, `file_size`, endian tag, the id-table counts)
+  and the `AndroidManifest.xml` string pool in both its UTF-16 and UTF-8 forms. Attribute-level
+  manifest decoding is deliberately not attempted: it needs the resource ID table from
+  `resources.arsc`, and guessing at it would print a package name that is wrong some of the time.
 * `demo/index.html` — unpacks an APK client-side and runs `assets/**.html` in an opaque-origin
-  sandbox with relative references rewritten to `blob:` URLs; `.exe`/`.dll` get the PE panel.
+  sandbox with relative references rewritten to `data:` URLs; `.exe`/`.dll` get the PE panel.
   Live at <https://lilyco-42.github.io/wasm-binary-formats/>.
 * `test/fixtures/lab-fixture.apk` — a hand-written, deterministic APK-shaped archive (8 entries,
   mixed stored/deflated, `AndroidManifest.xml` starting with the real res chunk type 0x0003).

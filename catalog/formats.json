@@ -1,20 +1,24 @@
 {
   "summary": {
-    "total": 1749,
+    "total": 1826,
     "byTier": {
-      "parse": 12,
-      "unpack": 47,
+      "parse": 49,
+      "unpack": 87,
       "execute": 2,
       "identify": 1688
     },
-    "actionableWithoutSignatureTables": 61,
+    "actionableWithoutSignatureTables": 138,
+    "implementedHere": 5,
     "byFamily": {
-      "executable": 15,
-      "android-package": 6,
-      "archive": 42,
-      "compression": 14,
+      "encryption": 5,
+      "document": 206,
+      "executable": 16,
+      "android-package": 8,
+      "archive": 43,
+      "compression": 18,
+      "filesystem": 28,
+      "partition": 7,
       "other": 1160,
-      "document": 177,
       "font": 1,
       "av": 223,
       "image": 111
@@ -26,6 +30,244 @@
     "file/file (libmagic) is BSD but its Magdir database is 359 files; it duplicates Tika coverage for identification."
   ],
   "modules": [
+    {
+      "module": "crypto:aes_decrypter",
+      "tier": "parse",
+      "family": "encryption",
+      "source": "log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "crypto:blowfish_decrypter",
+      "tier": "parse",
+      "family": "encryption",
+      "source": "log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "crypto:decrypter",
+      "tier": "parse",
+      "family": "encryption",
+      "source": "log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "crypto:des3_decrypter",
+      "tier": "parse",
+      "family": "encryption",
+      "source": "log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "crypto:rc4_decrypter",
+      "tier": "parse",
+      "family": "encryption",
+      "source": "log2timeline/dfvfs dfvfs/encryption/*.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-apple-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-audiovideo-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-cad-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-code-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-crypto-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-datauri-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-digest-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-font-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-html-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-image-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-jdbc-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-mail-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-mail-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-microsoft-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-miscoffice-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-news-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-nlp-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-ocr-encode-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-ocr-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-pdf-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-pkg-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-scientific-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-sqlite3-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-tess4j-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-text-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-webarchive-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-xml-module",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-xmp-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "parser-module:tika-parser-zip-commons",
+      "tier": "parse",
+      "family": "document",
+      "source": "apache/tika tika-parsers module directories (Apache-2.0)",
+      "status": "catalogued"
+    },
     {
       "module": "parse:elf",
       "tier": "parse",
@@ -109,6 +351,27 @@
       "family": "android-package",
       "source": "Apktool README (web assets for Cordova/Capacitor shells) (Apache-2.0)",
       "status": "catalogued"
+    },
+    {
+      "module": "parse:pe-header",
+      "tier": "parse",
+      "family": "executable",
+      "source": "this repo: engine/src/pe.rs, offsets cross-checked against a shipped System32 exe",
+      "status": "implemented"
+    },
+    {
+      "module": "parse:dex-header",
+      "tier": "parse",
+      "family": "android-package",
+      "source": "this repo: engine/src/dex.rs",
+      "status": "implemented"
+    },
+    {
+      "module": "parse:axml-string-pool",
+      "tier": "parse",
+      "family": "android-package",
+      "source": "this repo: engine/src/axml.rs",
+      "status": "implemented"
     },
     {
       "module": "unpack:7zip",
@@ -440,18 +703,298 @@
       "status": "catalogued"
     },
     {
+      "module": "filesystem:apfs",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:apfs_container",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:apm",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:bde",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:compressed_stream",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:cpio",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:cs",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:data_range",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:encoded_stream",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:encrypted_stream",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:ext",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:fake",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:fat",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:gpt",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:gzip",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:hfs",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:luksde",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:lvm",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:ntfs",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:os",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:root_only",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:sqlite_blob",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:tar",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:tsk",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:tsk_partition",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:vshadow",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:xfs",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "filesystem:zip",
+      "tier": "unpack",
+      "family": "filesystem",
+      "source": "log2timeline/dfvfs dfvfs/vfs/*_file_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:apfs",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:apm",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:cs",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:gpt",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:lvm",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:tsk",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "volume:vshadow",
+      "tier": "unpack",
+      "family": "partition",
+      "source": "log2timeline/dfvfs dfvfs/volume/*_volume_system.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "compress-dfvfs:bzip2_decompressor",
+      "tier": "unpack",
+      "family": "compression",
+      "source": "log2timeline/dfvfs dfvfs/compression/*_compressor.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "compress-dfvfs:decompressor",
+      "tier": "unpack",
+      "family": "compression",
+      "source": "log2timeline/dfvfs dfvfs/compression/*_compressor.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "compress-dfvfs:xz_decompressor",
+      "tier": "unpack",
+      "family": "compression",
+      "source": "log2timeline/dfvfs dfvfs/compression/*_compressor.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "compress-dfvfs:zlib_decompressor",
+      "tier": "unpack",
+      "family": "compression",
+      "source": "log2timeline/dfvfs dfvfs/compression/*_compressor.py (Apache-2.0)",
+      "status": "catalogued"
+    },
+    {
+      "module": "unpack:zip+deflate",
+      "tier": "unpack",
+      "family": "archive",
+      "source": "this repo: engine/src/lib.rs, tested against test/fixtures/lab-fixture.apk",
+      "status": "implemented"
+    },
+    {
       "module": "run:x86-pe",
       "tier": "execute",
       "family": "executable",
-      "source": "copy/v86 (BSD-2) x86 emulator + x86-to-wasm JIT",
+      "source": "copy/v86 (BSD-2) x86 emulator + x86-to-wasm JIT; blocked by the Windows image licence, see README",
       "status": "catalogued"
     },
     {
       "module": "run:apk-web-assets",
       "tier": "execute",
       "family": "android-package",
-      "source": "this repo: Service Worker sandbox over unpacked assets/",
-      "status": "catalogued"
+      "source": "this repo: demo/index.html opaque-origin iframe over unpacked assets/",
+      "status": "implemented"
     },
     {
       "module": "identify:application/activemessage",
