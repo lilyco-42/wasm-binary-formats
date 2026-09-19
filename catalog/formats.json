@@ -8,7 +8,7 @@
       "identify": 1688
     },
     "actionableWithoutSignatureTables": 138,
-    "implementedHere": 5,
+    "implementedHere": 3,
     "byFamily": {
       "encryption": 5,
       "document": 206,
@@ -364,13 +364,15 @@
       "tier": "parse",
       "family": "android-package",
       "source": "this repo: engine/src/dex.rs",
-      "status": "draft: reverted from main",
+      "status": "draft: reverted from main, see the README"
+    },
     {
       "module": "parse:axml-string-pool",
       "tier": "parse",
       "family": "android-package",
       "source": "this repo: engine/src/axml.rs",
-      "status": "draft: reverted from main",
+      "status": "draft: reverted from main, see the README"
+    },
     {
       "module": "unpack:7zip",
       "tier": "unpack",
