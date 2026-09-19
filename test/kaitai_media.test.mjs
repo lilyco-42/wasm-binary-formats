@@ -97,11 +97,13 @@ test('Pcx: the header Pillow wrote comes back field for field', () => {
   assert.equal(pcx.hdr.bitsPerPixel, 8);
   assert.equal(pcx.hdr.numPlanes, 1);
   // A 7x5 image is indexed 0..6 and 0..4: the window corners are inclusive, which is the classic
-  // off-by-one trap in this header.
+  // off-by-one trap in this header. (The failure message picks scalars because a generated reader
+  // is full of `_root` back-references, so stringifying it throws inside the assertion itself.)
+  const window = [pcx.hdr.imgXMin, pcx.hdr.imgYMin, pcx.hdr.imgXMax, pcx.hdr.imgYMax];
   assert.deepEqual(
-    [pcx.hdr.imgXMin, pcx.hdr.imgYMin, pcx.hdr.imgXMax, pcx.hdr.imgYMax],
+    window,
     [0, 0, 6, 4],
-    `the picture window: ${JSON.stringify(pcx.hdr)}`
+    `the picture window is ${window} for a 7x5 image`
   );
   assert.equal(pcx.hdr.hdpi, 100, 'Pillow writes 100 dpi for both axes');
   assert.equal(pcx.hdr.vdpi, 100);
