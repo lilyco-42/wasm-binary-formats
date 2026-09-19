@@ -263,12 +263,12 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 28 | 12.8% |
+| own Rust reader, named header fields decoded | 29 | 13.2% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **127** | 58.0% |
-| **covered, any level** | **92** | 42.0% |
+| **no parser at all - real gap** | **126** | 57.5% |
+| **covered, any level** | **93** | 42.5% |
 
 Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
@@ -276,9 +276,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `ttf`/`otf`/
 `woff`/`woff2` - the last four because no font writer runs here, not because the table format is hard.
 
-So the honest answer to the objective is **no, not yet**: 92 of 219 binary labels have a parser
-that runs here (28 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 127 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 93 of 219 binary labels have a parser
+that runs here (29 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 126 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -370,8 +370,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **92 covered** (28 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **127 with no
+Coverage is scored against magika's 219 binary labels: **93 covered** (29 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **126 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -389,6 +389,12 @@ does not re-derive them:
   its own (a 188-byte grid, then PAT to PMT to elementary stream), and earns **field** level because
   the streams come out of those tables: one program, its PMT on PID 4096, PCR and the only video
   stream both PID 256 under stream type 0x02 - which is what ffprobe reads from the same file.
+  `wasm` had stood as "no producer on this machine" for rounds; the producer was the CI build all
+  along - `engine.yml` now compiles the wasm target before `cargo test`, and the section walk runs
+  over that module (`code_matches_functions`, one code body per declared function, is the check that
+  the boundaries are real; the JS test compares the export count with what the host engine reports for
+  the same bytes). Same lesson as the PDF writer: look at what already exists before recording a
+  format as unproducible.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
