@@ -34,11 +34,11 @@ code{background:#f4f6f8;padding:1px 5px;border-radius:4px;font-size:13px}
 <body>
 <div class="wrap">
   <h1>APK 解包与网页资源运行</h1>
-  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。文件不上传，解包在 WebAssembly 内完成。</p>
+  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。<code>.exe</code> / <code>.dll</code> 会走 PE 头解析，只读不运行。文件不上传，解包与解析都在 WebAssembly 内完成。</p>
 
   <div class="bar">
-    <button class="primary" id="pick">选择 APK / ZIP</button>
-    <input type="file" id="file" accept=".apk,.zip,.jar,.apk7,application/zip" hidden>
+    <button class="primary" id="pick">选择 APK / ZIP / EXE</button>
+    <input type="file" id="file" accept=".apk,.zip,.jar,.apk7,.exe,.dll,application/zip" hidden>
     <label class="chk"><input type="checkbox" id="allowjs" checked> 允许运行网页内的脚本</label>
     <span id="name" style="color:var(--dim);font-size:13px"></span>
   </div>
@@ -63,15 +63,28 @@ const ex = await (async () => {
 })();
 
 function readAt(fn, ...args) {
-  const cap = 1 << 20;
-  const ptr = ex.alloc(cap);
-  const written = fn(...args, ptr, cap);
-  const text = new TextDecoder().decode(new Uint8Array(ex.memory.buffer.slice(ptr, ptr + Math.max(written, 0))));
-  ex.dealloc(ptr, cap);
-  return { written, text };
+  // copy_str returns the full length, so a value larger than the buffer means truncation.
+  let cap = 4096;
+  for (;;) {
+    const ptr = ex.alloc(cap);
+    const written = fn(...args, ptr, cap);
+    const keep = Math.max(Math.min(written, cap), 0);
+    const text = new TextDecoder().decode(new Uint8Array(ex.memory.buffer.slice(ptr, ptr + keep)));
+    ex.dealloc(ptr, cap);
+    if (written < 0 || written <= cap || cap >= 1 << 24) return { written, text };
+    cap *= 8;
+  }
+}
+
+const blobs = new Set();
+
+function releaseBlobs() {
+  for (const url of blobs) URL.revokeObjectURL(url);
+  blobs.clear();
 }
 
 function extract(index, size) {
+  if (size > LIMITS.bytes) throw new Error(`条目声明 ${(size / 1048576).toFixed(0)} MB，超过上限`);
   const cap = Math.max(size, 1) + 16;
   const ptr = ex.alloc(cap);
   const written = ex.extract(index, ptr, cap);
@@ -82,6 +95,23 @@ function extract(index, size) {
 }
 
 let entries = [];
+
+// Declared sizes come from the archive itself, so treat them as hostile: a small file can
+// claim a huge expansion, and the browser only finds out when it starts decompressing.
+const LIMITS = { bytes: 512 * 1024 * 1024, ratio: 200, count: 5000 };
+
+function refusedReason() {
+  if (entries.length > LIMITS.count) return `${entries.length} 个条目，超过 ${LIMITS.count} 个上限`;
+  let total = 0;
+  let worst = 0;
+  for (const entry of entries) {
+    total += entry.size;
+    if (entry.compressed > 0) worst = Math.max(worst, entry.size / entry.compressed);
+  }
+  if (total > LIMITS.bytes) return `声明解压后共 ${(total / 1048576).toFixed(0)} MB，超过 ${(LIMITS.bytes / 1048576).toFixed(0)} MB 上限`;
+  if (worst > LIMITS.ratio) return `最大压缩比 ${worst.toFixed(0)}×，超过 ${LIMITS.ratio}×（zip 炸弹特征）`;
+  return '';
+}
 
 function render() {
   listEl.textContent = '';
@@ -101,13 +131,23 @@ function render() {
 }
 
 function blobFor(bytes, type) {
-  return URL.createObjectURL(new Blob([bytes], { type }));
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  blobs.add(url);
+  return url;
 }
 
 function show(index) {
   const entry = entries[index];
   const bytes = extract(index, entry.size);
   viewerEl.textContent = '';
+  // Blob URLs are created by this (host) origin, so leaving them alive past their useful
+  // life only widens the window in which someone can open one as a first-party document.
+  releaseBlobs();
+
+  if (/\.(exe|dll|ocx|scr|cpl|sys|efi)$/i.test(entry.name)) {
+    showPe(bytes, entry.name);
+    return;
+  }
 
   if (entry.name.toLowerCase().endsWith('.html') || entry.name.toLowerCase().endsWith('.htm')) {
     // Rewrite relative references to blob: URLs built from sibling entries, so a
@@ -123,7 +163,13 @@ function show(index) {
       return `${attr}=${quote}${blobFor(extract(found, sibling.size), mimeFor(sibling.name))}${quote}`;
     });
     const frame = document.createElement('iframe');
-    frame.setAttribute('sandbox', document.getElementById('allowjs').value === 'checked' || document.getElementById('allowjs').checked ? 'allow-scripts' : '');
+    frame.setAttribute('sandbox', document.getElementById('allowjs').checked ? 'allow-scripts' : '');
+    // A srcdoc document resolves anything left un-rewritten against this page's URL, and a
+    // blob: URL was minted by this origin, so both facts need to stay visible to the user.
+    frame.setAttribute('referrerpolicy', 'no-referrer');
+    try {
+      frame.csp = "default-src 'none'; script-src blob:; style-src blob: 'unsafe-inline'; img-src blob: data:; font-src blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'";
+    } catch { /* the csp attribute is Chrome-only; sandbox is the layer that always applies */ }
     frame.srcdoc = text;
     viewerEl.append(frame);
     report(`${entry.name} · 已在隔离 iframe 中运行`);
@@ -158,6 +204,52 @@ function mimeFor(name) {
     jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', woff: 'font/woff', woff2: 'font/woff2', txt: 'text/plain' }[ext] ?? 'application/octet-stream';
 }
 
+// Only the values Microsoft's PE format docs list unambiguously; anything else prints as a
+// number rather than a guess.
+const MACHINES = { 0x014c: 'i386', 0x8664: 'amd64', 0x01c0: 'arm', 0xaa64: 'arm64' };
+const SUBSYSTEMS = { 1: 'native (no subsystem)', 2: 'Windows GUI', 3: 'Windows console' };
+
+function showPe(bytes, label) {
+  const ptr = ex.alloc(bytes.length);
+  new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  const rc = ex.parse_pe(ptr, bytes.length);
+  const characteristics = rc === 0 ? ex.pe_characteristics() : 0;
+  const info = rc === 0 ? {
+    machine: ex.pe_machine(), magic: ex.pe_magic(), entry: ex.pe_entry_rva(),
+    base: ex.pe_image_base(), subsystem: ex.pe_subsystem(), cli: ex.pe_cli_rva(),
+    listing: readAt(ex.pe_sections).text,
+  } : null;
+  ex.dealloc(ptr, bytes.length);
+
+  viewerEl.textContent = '';
+  if (rc !== 0) {
+    report(`${label}：不是可识别的 PE（${readAt(ex.last_error).text || `code ${rc}`}）`);
+    return;
+  }
+  const rows = [
+    ['架构', `${MACHINES[info.machine] ?? '未知'} (0x${info.machine.toString(16)})`],
+    ['可选头', info.magic === 0x20b ? 'PE32+ (64 位)' : 'PE32 (32 位)'],
+    ['入口 RVA', `0x${info.entry.toString(16)}`],
+    ['镜像基址', `0x${(info.base >>> 0).toString(16)}`],
+    ['子系统', `${SUBSYSTEMS[info.subsystem] ?? '未知'} (${info.subsystem})`],
+    ['类型', characteristics & 0x2000 ? 'DLL (IMAGE_FILE_DLL)' : 'EXE'],
+    ['.NET', info.cli ? `是，COM descriptor RVA 0x${info.cli.toString(16)}` : '否'],
+    ['节', info.listing ? info.listing.split('\n').map((line) => line.split('\t')[0]).join(' · ') : '（无）'],
+  ];
+  const dl = document.createElement('dl');
+  dl.style.cssText = 'display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:0';
+  for (const [key, value] of rows) {
+    const dt = document.createElement('dt'); dt.textContent = key;
+    const dd = document.createElement('dd'); dd.style.margin = '0'; dd.textContent = value;
+    dl.append(dt, dd);
+  }
+  const warn = document.createElement('p');
+  warn.className = 'note';
+  warn.textContent = '这里只读头，不运行。网页里跑 Win32 技术上做得到：v86 是 BSD-2 的全 x86 PC 模拟器，自带 x86→wasm JIT，托管版 libv86.js 里 SharedArrayBuffer 出现 0 次，因此不需要 COOP/COEP。真正拦路的是许可与体积——跑 Windows 要一张专有磁盘镜像，免镜像的那条路（BoxedWine）是 GPL-2.0，链进产品即受传染，而 v86 只到 32 位、没有现代 .NET。引擎本身 2.1 MB 起，再叠几十 MB 客户机镜像，和这个约 200 KB 的演示不在一个量级。要运行请用原生版本。';
+  viewerEl.append(dl, warn);
+  report(`${label} · PE 头已解析 · ${bytes.length} 字节`);
+}
+
 document.getElementById('pick').addEventListener('click', () => document.getElementById('file').click());
 document.getElementById('allowjs').addEventListener('change', () => report('下次点击条目时生效'));
 
@@ -166,7 +258,14 @@ document.getElementById('file').addEventListener('change', async (event) => {
   if (!file) return;
   document.getElementById('name').textContent = `${file.name} · ${(file.size / 1048576).toFixed(2)} MB`;
   report('读取中…');
+  entries = [];
+  render();
+  releaseBlobs();
   const bytes = new Uint8Array(await file.arrayBuffer());
+
+  // An .exe arriving on its own takes the PE path instead of the archive path.
+  if (bytes.length > 1 && bytes[0] === 0x4d && bytes[1] === 0x5a) { showPe(bytes, file.name); return }
+
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
   const rc = ex.open(ptr, bytes.length);
@@ -174,9 +273,11 @@ document.getElementById('file').addEventListener('change', async (event) => {
   if (rc !== 0) { report(`无法打开：${readAt(ex.last_error).text}`); return }
 
   entries = Array.from({ length: ex.count() }, (_, index) => {
-    const [name, size] = readAt(ex.entry, index).text.split('\t');
-    return { name, size: Number(size) };
+    const [name, size, compressed] = readAt(ex.entry, index).text.split('\t');
+    return { name, size: Number(size), compressed: Number(compressed) };
   });
+  const refusal = refusedReason();
+  if (refusal) { entries = []; render(); report(`已拒绝：${refusal}`); return }
   render();
   const webAssets = entries.filter((e) => /\.html?$/i.test(e.name));
   report(`${entries.length} 个条目；${webAssets.length ? `发现 ${webAssets.length} 个网页资源，点它即可运行` : '没有 .html 资源（原生 APK 通常如此）'}`);
