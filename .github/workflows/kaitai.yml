@@ -29,8 +29,16 @@ jobs:
           node-version: "22"
 
       - name: Fetch the compiler release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -sSfL -o ksc.zip "https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/${KSC_VERSION}/kaitai-struct-compiler-${KSC_VERSION}.zip"
+          # The asset host reset a plain curl mid-TLS once, so try the authenticated API first
+          # and keep a retrying direct download as the fallback. Either way the checksum decides.
+          gh release download "${KSC_VERSION}" -R kaitai-io/kaitai_struct_compiler \
+            -p "kaitai-struct-compiler-${KSC_VERSION}.zip" -D . \
+            || curl -sSfL --retry 5 --retry-all-errors -o ksc.zip \
+                 "https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/${KSC_VERSION}/kaitai-struct-compiler-${KSC_VERSION}.zip"
+          mv "kaitai-struct-compiler-${KSC_VERSION}.zip" ksc.zip 2>/dev/null || true
           echo "${KSC_SHA256}  ksc.zip" | sha256sum -c -
           unzip -q ksc.zip
           ls "kaitai-struct-compiler-${KSC_VERSION}/formats/image/png.ksy"
