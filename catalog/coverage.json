@@ -7,10 +7,10 @@
     "specGenerated": 50,
     "specAvailable": 0,
     "binaryGenerated": 48,
-    "selfFields": 23,
+    "selfFields": 24,
     "selfContainer": 11,
     "binarySpecAvailable": 0,
-    "gaps": 137,
+    "gaps": 136,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -20,7 +20,7 @@
     ],
     "gapByGroup": {
       "video": 4,
-      "unknown": 59,
+      "unknown": 58,
       "image": 14,
       "archive": 16,
       "code": 5,
@@ -2965,8 +2965,8 @@
       "extensions": [],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "pcap",

@@ -28,6 +28,7 @@ pub const FORMAT_TIFF: i32 = 4;
 pub const FORMAT_BMFF: i32 = 10;
 pub const FORMAT_EBML: i32 = 11;
 pub const FORMAT_PDF: i32 = 16;
+pub const FORMAT_NETPBM: i32 = 19;
 
 thread_local! {
     static RESULT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -680,10 +681,88 @@ fn digits(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
     Some((text.parse::<i64>().unwrap_or(0), end))
 }
 
+/// Netpbm: the family that spells its geometry in ASCII at the front of the file. P1..P6 are read;
+/// P7 (portable anymap) is not, because its header ends with the token `ENDHDR` rather than a fixed
+/// number of integers, and reading it with this loop would return a geometry nobody asked for.
+fn read_netpbm(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 8 || bytes[0] != b'P' {
+        return None;
+    }
+    let digit = bytes[1];
+    if !(b'1'..=b'6').contains(&digit) {
+        return None;
+    }
+    // P1/P4 are bitmaps and carry no maximum sample value, so their header is two numbers.
+    let ascii = matches!(digit, b'1' | b'2' | b'3');
+    let need = if matches!(digit, b'1' | b'4') { 2 } else { 3 };
+    let mut at = 2usize;
+    let mut tokens: Vec<i64> = Vec::new();
+    while (tokens.len()) < need {
+        loop {
+            let byte = *bytes.get(at)?;
+            if byte == b'#' {
+                while at < bytes.len() && bytes[at] != b'\n' {
+                    at += 1;
+                }
+                continue;
+            }
+            if byte.is_ascii_whitespace() {
+                at += 1;
+                continue;
+            }
+            break;
+        }
+        let start = at;
+        while at < bytes.len() && bytes[at].is_ascii_digit() {
+            at += 1;
+        }
+        if start == at {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&bytes[start..at]);
+        tokens.push(text.parse().ok()?);
+    }
+    // One whitespace character separates the last header number from the sample area.
+    let header = at as i64 + 1;
+    let width = *tokens.first()?;
+    let height = *tokens.get(1)?;
+    let maxval = if need == 3 { *tokens.get(2)? } else { 1 };
+    if width <= 0 || height <= 0 || maxval <= 0 {
+        return None;
+    }
+    let sample = if maxval > 255 { 2 } else { 1 };
+    let payload = match digit {
+        b'1' | b'2' | b'3' => -1,
+        b'4' => (width + 7) / 8 * height,
+        b'5' => sample * width * height,
+        _ => sample * 3 * width * height,
+    };
+    let complete = if payload < 0 {
+        1
+    } else {
+        i64::from(header + payload <= bytes.len() as i64)
+    };
+    Some(vec![
+        format!(
+            "netpbm\tP{}\t{}",
+            char::from(digit),
+            if ascii { "ascii" } else { "binary" }
+        ),
+        format!("width\t{width}"),
+        format!("height\t{height}"),
+        format!("maxval\t{maxval}"),
+        format!("header_bytes\t{header}"),
+        format!("payload_bytes\t{payload}"),
+        format!("complete\t{complete}"),
+    ])
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
-    if bytes.len() < 12 {
+    // Eight bytes is the shortest header any reader below can use (a Netpbm bitmap is seven), and
+    // each reader bounds-checks itself, so there is nothing to gain by rejecting earlier.
+    if bytes.len() < 8 {
         return reject("too small to identify a container", -1);
     }
     if let Some(lines) = read_tar(bytes) {
@@ -707,8 +786,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_pdf(bytes) {
         return accept(FORMAT_PDF, lines);
     }
+    if let Some(lines) = read_netpbm(bytes) {
+        return accept(FORMAT_NETPBM, lines);
+    }
     reject(
-        "not a tar, ar, RIFF, TIFF, EBML, PDF or ISO base media container",
+        "not a tar, ar, RIFF, TIFF, EBML, PDF, Netpbm or ISO base media container",
         -2,
     )
 }
