@@ -119,8 +119,8 @@ fn classify(archive: &mut Archive, names: &[String]) -> Option<(i32, String, Opt
         return None;
     }
     let part = ["word/", "xl/", "ppt/"]
-        .iter()
-        .find_map(|prefix| names.iter().find(|name| name.starts_with(**prefix)))
+        .into_iter()
+        .find_map(|prefix| names.iter().find(|name| name.starts_with(prefix)))
         .cloned()?;
     let code = if part.starts_with("word/") {
         DOC_DOCX
@@ -143,9 +143,9 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return reject("a zip, but not an OOXML, OpenDocument or EPUB package", -2);
     };
     let main_size = main
-        .as_ref()
+        .as_deref()
         .and_then(|name| archive.by_name(name).ok())
-        .map_or(0, |entry| i64::from(entry.size()));
+        .map_or(0, |entry| entry.size().min(i64::MAX as u64) as i64);
     let has_manifest = i64::from(
         names.iter().any(|name| name == "[Content_Types].xml")
             || names.iter().any(|name| name == "META-INF/manifest.xml")
