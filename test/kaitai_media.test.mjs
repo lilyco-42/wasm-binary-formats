@@ -107,10 +107,11 @@ test('Pcx: the header Pillow wrote comes back field for field', () => {
   );
   assert.equal(pcx.hdr.hdpi, 100, 'Pillow writes 100 dpi for both axes');
   assert.equal(pcx.hdr.vdpi, 100);
-  // The spec only walks the trailing 769-byte VGA palette when `version == 3`, so a version 5 file
-  // - which is exactly the kind that has that palette - leaves it unread. Asserting the absence
-  // keeps the gap visible: PCX's credit here is the fixed header, not its colour table.
-  assert.equal(pcx.palette256, undefined, 'the conditional palette is not parsed for version 5');
+  // The VGA palette trailer really is walked for this file (the spec's condition matched), so the
+  // cheap thing to assert is its length. Never hand a parsed reader object to assert.equal: the
+  // object graph is full of `_parent`/`_root`/`_io` back-references, and Node's failure diff
+  // inspects it without a depth limit - that cost 37 s for this one line locally.
+  assert.equal(pcx.palette256.colors.length, 256, 'the trailing VGA palette');
   assert.equal(pcx._io.size, 920);
 });
 
