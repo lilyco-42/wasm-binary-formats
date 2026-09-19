@@ -31,7 +31,8 @@ const LISTINGS = {
 
 for (const [path, url] of Object.entries(LISTINGS)) {
   const headers = { 'user-agent': 'wasm-binary-formats source fetch', accept: 'application/vnd.github+json' };
-  if (process.env.GITHUB_TOKEN) headers.authorization = `bearer ${process.env.GITHUB_TOKEN}`;
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token) headers.authorization = `bearer ${token}`;
   const res = await fetch(url, { headers });
   if (!res.ok) {
     console.error(`${path}: HTTP ${res.status} from ${url}`);
@@ -45,7 +46,8 @@ for (const [path, url] of Object.entries(LISTINGS)) {
 
 for (const [path, url] of Object.entries(SOURCES)) {
   const headers = { 'user-agent': 'wasm-binary-formats source fetch', accept: 'application/vnd.github.raw+json' };
-  if (process.env.GITHUB_TOKEN && url.startsWith('https://api.github.com/')) headers.authorization = `bearer ${process.env.GITHUB_TOKEN}`;
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token && url.startsWith('https://api.github.com/')) headers.authorization = `bearer ${token}`;
   const res = await fetch(url, { headers });
   if (!res.ok) {
     console.error(`${path}: HTTP ${res.status} from ${url}`);

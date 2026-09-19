@@ -24,7 +24,7 @@ jobs:
 
       - name: Re-fetch the enumerations
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/fetch-sources.mjs
 
       - name: Rebuild the catalogue the matrix reads
