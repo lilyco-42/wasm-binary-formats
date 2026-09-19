@@ -880,8 +880,12 @@ fn array_refs(bytes: &[u8], span: (usize, usize), key: &[u8]) -> Option<Vec<i64>
 /// box does not have to start at the origin.
 fn media_size(bytes: &[u8], span: (usize, usize)) -> (Option<f64>, Option<f64>) {
     let miss = (None, None);
-    let at = key_at(bytes, span, b"/MediaBox")?;
-    let open = find_in(bytes, at, span.1, b"[")?;
+    let Some(at) = key_at(bytes, span, b"/MediaBox") else {
+        return miss;
+    };
+    let Some(open) = find_in(bytes, at, span.1, b"[") else {
+        return miss;
+    };
     let close = find_in(bytes, open + 1, span.1, b"]").unwrap_or(span.1);
     let mut numbers = [0f64; 4];
     let mut taken = 0usize;
