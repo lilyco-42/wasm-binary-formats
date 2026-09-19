@@ -21,7 +21,8 @@ fn entries() -> Vec<String> {
 }
 
 fn octal(size: i64) -> String {
-    format!("{:011o} ", size)
+    // The ar size field is ten bytes, not tar's twelve.
+    format!("{:<10}", size)
 }
 
 #[test]
