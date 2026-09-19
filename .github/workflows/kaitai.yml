@@ -1,0 +1,59 @@
+name: Kaitai feasibility
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Does a third-party format catalogue beat hand-writing one reader per format? This job answers
+# that with three real parsers generated from upstream .ksy specs, run against bytes this repo
+# wrote itself. The compiler is GPL and is only ever executed here - nothing it produces is
+# redistributed from this workflow, and none of it is linked into a shipped product.
+jobs:
+  kaitai:
+    runs-on: ubuntu-latest
+    env:
+      KSC_VERSION: "0.11"
+      KSC_SHA256: ff89389d9dc9e770d78a24af328763cb1f8e7b31ce7766c9edf10669a060f2a2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fetch the compiler release
+        run: |
+          curl -sSfL -o ksc.zip "https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/${KSC_VERSION}/kaitai-struct-compiler-${KSC_VERSION}.zip"
+          echo "${KSC_SHA256}  ksc.zip" | sha256sum -c -
+          unzip -q ksc.zip
+          ls "kaitai-struct-compiler-${KSC_VERSION}/formats/image/png.ksy"
+
+      - name: Generate JavaScript readers
+        run: |
+          mkdir -p generated/kaitai
+          "kaitai-struct-compiler-${KSC_VERSION}/bin/kaitai-struct-compiler" \
+            --target javascript \
+            --outdir generated/kaitai \
+            --import-path "kaitai-struct-compiler-${KSC_VERSION}/formats" \
+            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/png.ksy" \
+            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/gif.ksy" \
+            "kaitai-struct-compiler-${KSC_VERSION}/formats/image/bmp.ksy"
+          ls -l generated/kaitai
+
+      - name: Runtime from npm, exactly the version the compiler targets
+        run: npm install --no-save --omit=dev "kaitai-struct@${KSC_VERSION}"
+
+      - name: Parse fixtures written by this repo
+        run: node test/kaitai.test.mjs generated/kaitai
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaitai-generated-js
+          path: generated/kaitai
