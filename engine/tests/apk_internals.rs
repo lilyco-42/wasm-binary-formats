@@ -15,7 +15,7 @@ fn dex_header(version: &[u8; 3]) -> Vec<u8> {
     let mut bytes = vec![0u8; 0x70];
     bytes[0..4].copy_from_slice(b"dex\n");
     bytes[4..7].copy_from_slice(version);
-    put_u32(&mut bytes, 0x08, 0xdead_beef);
+    put_u32(&mut bytes, 0x08, CHECKSUM);
     put_u32(&mut bytes, 0x20, 0x400); // file_size
     put_u32(&mut bytes, 0x24, 0x70); // header_size
     put_u32(&mut bytes, 0x28, 0x1234_5678); // endian_tag
@@ -32,7 +32,7 @@ fn reads_a_dex_header() {
     let bytes = dex_header(b"039");
     assert_eq!(dex::parse(&bytes), 0);
     assert_eq!(dex::version(), "039");
-    assert_eq!(dex::checksum(), 0xdead_beef as i32 as u32 as i64);
+    assert_eq!(dex::checksum(), CHECKSUM as i64);
     assert_eq!(dex::header_size(), 0x70);
     assert_eq!(dex::file_size(), 0x400);
     assert_eq!(dex::map_off(), 0x300);
