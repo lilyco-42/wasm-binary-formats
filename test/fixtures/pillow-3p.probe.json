@@ -1,0 +1,40 @@
+{
+  "bytes": 3743,
+  "count": [
+    3
+  ],
+  "detail": "three pages appended with save_all",
+  "fixture": "pillow-3p.pdf",
+  "header": "%PDF-1.4",
+  "kids_first_array": [
+    2,
+    5,
+    8
+  ],
+  "mediaboxes": [
+    [
+      0.0,
+      0.0,
+      5.0,
+      3.0
+    ],
+    [
+      0.0,
+      0.0,
+      7.0,
+      4.0
+    ],
+    [
+      0.0,
+      0.0,
+      2.0,
+      9.0
+    ]
+  ],
+  "objects": 12,
+  "producer": "Pillow PDF driver",
+  "root_object": 10,
+  "startxref": 3404,
+  "written_by": null,
+  "xref_stream": false
+}

@@ -1,0 +1,26 @@
+{
+  "bytes": 7725,
+  "count": [
+    1
+  ],
+  "detail": "default sheet, one page",
+  "fixture": "chromium.pdf",
+  "header": "%PDF-1.4",
+  "kids_first_array": [
+    2
+  ],
+  "mediaboxes": [
+    [
+      0.0,
+      0.0,
+      612.0,
+      792.0
+    ]
+  ],
+  "objects": 27,
+  "producer": "Chromium headless print-to-pdf",
+  "root_object": 13,
+  "startxref": 7088,
+  "written_by": "Skia/PDF m153",
+  "xref_stream": false
+}

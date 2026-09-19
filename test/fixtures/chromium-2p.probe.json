@@ -1,0 +1,33 @@
+{
+  "bytes": 12666,
+  "count": [
+    2
+  ],
+  "detail": "@page size A4, two sheets",
+  "fixture": "chromium-2p.pdf",
+  "header": "%PDF-1.4",
+  "kids_first_array": [
+    2,
+    7
+  ],
+  "mediaboxes": [
+    [
+      0.0,
+      0.0,
+      594.95996,
+      841.91998
+    ],
+    [
+      0.0,
+      0.0,
+      594.95996,
+      841.91998
+    ]
+  ],
+  "objects": 37,
+  "producer": "Chromium headless print-to-pdf",
+  "root_object": 19,
+  "startxref": 11828,
+  "written_by": "Skia/PDF m153",
+  "xref_stream": false
+}

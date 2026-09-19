@@ -14,7 +14,9 @@
 //!         entries (tag, type, count, value), then u32 next IFD offset
 //!   PDF   "%PDF-x.y" header, `startxref` offset near the end of the file, then a classic `xref`
 //!         table of 20-byte rows and a `trailer` dictionary (PDF 1.5 xref streams are reported as
-//!         unsupported rather than walked)
+//!         unsupported rather than walked). The trailer's `/Root` is resolved through the table to
+//!         the catalog, and the catalog's `/Pages` to the page tree, so page counts and page sizes
+//!         come out of the objects rather than the dictionary text.
 
 use crate::scan::Le;
 use std::cell::RefCell;
@@ -502,15 +504,17 @@ fn float(bytes: &[u8]) -> f64 {
 }
 
 /// Classic-cross-reference PDFs: the header version, the entry point the file advertises, the xref
-/// rows with the offsets they claim, and the object references in the trailer dictionary. PDF 1.5
-/// xref and object streams are recognised and reported as unsupported rather than guessed at,
-/// because their offsets live in a compressed stream this reader does not decode.
+/// rows with the offsets they claim, the object references in the trailer dictionary, and the page
+/// tree reached through them. PDF 1.5 xref and object streams are recognised and reported as
+/// unsupported rather than guessed at, because their offsets live in a compressed stream this
+/// reader does not decode.
 fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
     if bytes.len() < 64 || &bytes[0..5] != b"%PDF-" {
         return None;
     }
     let version = String::from_utf8_lossy(bytes.get(5..8)?).into_owned();
     let mut entries = vec![format!("pdf\t{version}")];
+    let mut offsets: Vec<(i64, i64)> = Vec::new();
     // Writers put `startxref` in the last few bytes, so only the tail is searched: a hostile file
     // cannot make this scan the whole buffer for a nine-byte needle.
     let tail = bytes.len().saturating_sub(1024);
@@ -555,6 +559,10 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
             break 'table;
         }
         for index in 0..count {
+            if entries.len() >= 4096 {
+                entries.push("truncated\trows".to_owned());
+                break 'table;
+            }
             let record = cursor + index as usize * 20;
             let Some(body) = bytes.get(record..record + 20) else {
                 break 'table;
@@ -565,6 +573,7 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
             rows += 1;
             if kind == 'n' {
                 live += 1;
+                offsets.push((first + index, row_offset));
                 let at = row_offset as usize;
                 let head = bytes.get(at..at + 12).unwrap_or(b"");
                 let label = format!("{} ", first + index);
@@ -605,6 +614,7 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
         .min(bytes.len());
     let mut scan = dict;
     let mut name = String::new();
+    let mut refs: Vec<(String, i64)> = Vec::new();
     let mut guard = 0usize;
     while scan < stop && guard < 8192 {
         guard += 1;
@@ -634,6 +644,9 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
                 match reference {
                     Some((generation, at)) => {
                         entries.push(format!("ref\t{name}\t{number}\t{generation}"));
+                        if refs.len() < 64 {
+                            refs.push((name.clone(), number));
+                        }
                         scan = at + 1;
                     }
                     None => scan = after,
@@ -642,15 +655,295 @@ fn read_pdf(bytes: &[u8]) -> Option<Vec<String>> {
             _ => scan += 1,
         }
     }
+    // Each trailer reference is followed through the table: the row's offset has to land on an
+    // object header that repeats that object number, which is what makes the resolved page tree
+    // below more than a text search for the word `/MediaBox`.
+    let mut root = None;
+    for (name, number) in &refs {
+        let resolved = object_offset(bytes, &offsets, *number);
+        let mut matches = 0i64;
+        if let Some(at) = resolved {
+            let head: &[u8] = match bytes.get(at..) {
+                Some(rest) => &rest[..rest.len().min(12)],
+                None => b"",
+            };
+            let label = format!("{number} ");
+            let open = find(bytes, at, b" obj").is_some_and(|pos| pos - at <= 12);
+            matches = i64::from(String::from_utf8_lossy(head).starts_with(&label) && open);
+        }
+        entries.push(format!(
+            "resolves\t{name}\t{number}\t{}\t{matches}",
+            resolved.map_or(-1, |at| at as i64)
+        ));
+        if name == "Root" && matches == 1 {
+            root = Some(*number);
+        }
+    }
+    // From here on every step is optional: a file whose trailer points at nothing still said true
+    // things about its header, its table and its references, so the walk stops and the rows already
+    // collected are returned rather than dropping the identification.
+    let Some(catalog) = root else {
+        return Some(entries);
+    };
+    let Some(catalog_at) = object_offset(bytes, &offsets, catalog) else {
+        return Some(entries);
+    };
+    let Some(catalog_span) = dict_span(bytes, catalog_at) else {
+        return Some(entries);
+    };
+    let pages = dict_ref(bytes, catalog_span, b"/Pages");
+    entries.push(format!(
+        "catalog\t{catalog}\tpages\t{}",
+        pages.unwrap_or(-1)
+    ));
+    let Some(pages) = pages else {
+        return Some(entries);
+    };
+    let Some(pages_at) = object_offset(bytes, &offsets, pages) else {
+        return Some(entries);
+    };
+    let Some(pages_span) = dict_span(bytes, pages_at) else {
+        return Some(entries);
+    };
+    let kids = array_refs(bytes, pages_span, b"/Kids").unwrap_or_default();
+    entries.push(format!(
+        "pages\t{pages}\tcount\t{}\tkids\t{}",
+        dict_number(bytes, pages_span, b"/Count").unwrap_or(-1),
+        kids.len()
+    ));
+    let mut tree = PdfTree {
+        rows: Vec::new(),
+        leaves: 0,
+        visited: 0,
+        truncated: false,
+    };
+    for kid in &kids {
+        walk_pages(bytes, &offsets, *kid, 1, &mut tree);
+    }
+    entries.append(&mut tree.rows);
+    entries.push(format!(
+        "leaves\t{}\tvisited\t{}\ttruncated\t{}",
+        tree.leaves,
+        tree.visited,
+        i64::from(tree.truncated)
+    ));
     Some(entries)
+}
+
+/// Where the page-tree walk stands: how many leaves it turned into `page` rows, how many objects it
+/// opened, and whether either cap was hit.
+struct PdfTree {
+    rows: Vec<String>,
+    leaves: i64,
+    visited: i64,
+    truncated: bool,
+}
+
+const PDF_NODES: i64 = 1024;
+const PDF_ROWS: usize = 4096;
+const PDF_DEPTH: i32 = 32;
+
+/// A node is a page when its dictionary has no `/Kids`: `/Kids` is what makes a node a branch of
+/// the tree, and leaves are the only objects that carry a `/MediaBox` worth reporting.
+fn walk_pages(bytes: &[u8], offsets: &[(i64, i64)], object: i64, depth: i32, tree: &mut PdfTree) {
+    if tree.visited >= PDF_NODES || tree.rows.len() >= PDF_ROWS {
+        tree.truncated = true;
+        return;
+    }
+    tree.visited += 1;
+    let Some(at) = object_offset(bytes, offsets, object) else {
+        tree.rows.push(format!("unresolved\t{object}"));
+        return;
+    };
+    let Some(span) = dict_span(bytes, at) else {
+        tree.rows.push(format!("unresolved\t{object}"));
+        return;
+    };
+    let Some(kids) = array_refs(bytes, span, b"/Kids") else {
+        let (width, height) = media_size(bytes, span);
+        tree.rows.push(format!(
+            "page\t{object}\tmedia\t{}\t{}",
+            points(width),
+            points(height)
+        ));
+        tree.leaves += 1;
+        return;
+    };
+    if depth > PDF_DEPTH {
+        tree.truncated = true;
+        return;
+    }
+    tree.rows
+        .push(format!("branch\t{object}\tkids\t{}", kids.len()));
+    for kid in &kids {
+        walk_pages(bytes, offsets, *kid, depth + 1, tree);
+    }
+}
+
+/// Byte offset a live cross-reference row claims for `object`, when the row exists and the offset it
+/// names is inside the file.
+fn object_offset(bytes: &[u8], offsets: &[(i64, i64)], object: i64) -> Option<usize> {
+    offsets
+        .iter()
+        .find(|(listed, _)| *listed == object)
+        .and_then(|(_, at)| usize::try_from(*at).ok())
+        .filter(|at| *at < bytes.len())
+}
+
+/// The balanced `<< ... >>` that starts at or after `at`, as the byte range including both markers.
+/// Delimiters inside literal strings are not skipped, so a dictionary whose text contains `>>`
+/// closes early; that is why the page rows are only trusted once `resolves` says 1.
+fn dict_span(bytes: &[u8], at: usize) -> Option<(usize, usize)> {
+    let start = find(bytes, at, b"<<")?;
+    let mut depth = 0i32;
+    let mut scan = start;
+    while scan + 1 < bytes.len() {
+        if bytes[scan] == b'<' && bytes[scan + 1] == b'<' {
+            depth += 1;
+            scan += 2;
+        } else if bytes[scan] == b'>' && bytes[scan + 1] == b'>' {
+            depth -= 1;
+            if depth == 0 {
+                return Some((start, scan + 2));
+            }
+            scan += 2;
+        } else {
+            scan += 1;
+        }
+    }
+    None
+}
+
+/// Index just past `key` inside the dictionary, where the key is followed by a delimiter so that
+/// `/Count` cannot match the tail of `/CountX`.
+fn key_at(bytes: &[u8], span: (usize, usize), key: &[u8]) -> Option<usize> {
+    let mut from = span.0;
+    while from < span.1 {
+        let pos = find_in(bytes, from, span.1, key)?;
+        let after = pos + key.len();
+        if after >= span.1
+            || matches!(
+                bytes[after],
+                b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'<' | b'>' | b'[' | b']' | b'('
+            )
+        {
+            return Some(after);
+        }
+        from = pos + 1;
+    }
+    None
+}
+
+/// `number generation R` at `at`, as the referenced object number and the index past the `R`.
+fn reference_at(bytes: &[u8], span: (usize, usize), at: usize) -> Option<(i64, usize)> {
+    let (number, after) = digits(bytes, skip_white(bytes, at)?)?;
+    let (_generation, after) = digits(bytes, skip_white(bytes, after)?)?;
+    let at = skip_white(bytes, after)?;
+    if at >= span.1 || bytes[at] != b'R' {
+        return None;
+    }
+    Some((number, at + 1))
+}
+
+fn dict_ref(bytes: &[u8], span: (usize, usize), key: &[u8]) -> Option<i64> {
+    let at = key_at(bytes, span, key)?;
+    reference_at(bytes, span, at).map(|(number, _)| number)
+}
+
+fn dict_number(bytes: &[u8], span: (usize, usize), key: &[u8]) -> Option<i64> {
+    let at = key_at(bytes, span, key)?;
+    let (value, _) = digits(bytes, skip_white(bytes, at)?)?;
+    Some(value)
+}
+
+/// The object numbers listed in a `[/n g R ...]` array value, or `None` when the key has no array.
+fn array_refs(bytes: &[u8], span: (usize, usize), key: &[u8]) -> Option<Vec<i64>> {
+    let at = key_at(bytes, span, key)?;
+    let open = find_in(bytes, at, span.1, b"[")?;
+    let close = find_in(bytes, open + 1, span.1, b"]").unwrap_or(span.1);
+    let inner = (open + 1, close);
+    let mut refs = Vec::new();
+    let mut scan = open + 1;
+    while scan < close && refs.len() < 4096 {
+        match reference_at(bytes, inner, scan) {
+            Some((number, next)) => {
+                refs.push(number);
+                scan = next;
+            }
+            None => scan += 1,
+        }
+    }
+    Some(refs)
+}
+
+/// Width and height in points: the last two numbers of `/MediaBox` minus the first two, because a
+/// box does not have to start at the origin.
+fn media_size(bytes: &[u8], span: (usize, usize)) -> (Option<f64>, Option<f64>) {
+    let miss = (None, None);
+    let at = key_at(bytes, span, b"/MediaBox")?;
+    let open = find_in(bytes, at, span.1, b"[")?;
+    let close = find_in(bytes, open + 1, span.1, b"]").unwrap_or(span.1);
+    let mut numbers = [0f64; 4];
+    let mut taken = 0usize;
+    let mut scan = open + 1;
+    let mut guard = 0usize;
+    while scan < close && taken < 4 && guard < 4096 {
+        guard += 1;
+        match number_token(bytes, scan, close) {
+            Some((value, next)) => {
+                numbers[taken] = value;
+                taken += 1;
+                scan = next;
+            }
+            None => scan += 1,
+        }
+    }
+    if taken != 4 {
+        return miss;
+    }
+    (Some(numbers[2] - numbers[0]), Some(numbers[3] - numbers[1]))
+}
+
+/// A signed decimal token, which is how a page size is written when it is not whole.
+fn number_token(bytes: &[u8], at: usize, stop: usize) -> Option<(f64, usize)> {
+    let mut end = at;
+    if end < stop && matches!(bytes[end], b'-' | b'+') {
+        end += 1;
+    }
+    let digits_from = end;
+    while end < stop && bytes[end].is_ascii_digit() {
+        end += 1;
+    }
+    if end < stop && bytes[end] == b'.' {
+        end += 1;
+        while end < stop && bytes[end].is_ascii_digit() {
+            end += 1;
+        }
+    }
+    if end == digits_from {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&bytes[at..end]);
+    text.parse::<f64>().ok().map(|value| (value, end))
+}
+
+/// A point measure as the file wrote it, or a dash for a page the file gave no box for.
+fn points(value: Option<f64>) -> String {
+    value.map_or_else(|| "-".to_owned(), |number| number.to_string())
 }
 
 /// Index of the first occurrence of `needle` at or after `from`.
 fn find(bytes: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    if from > bytes.len() || needle.is_empty() || from + needle.len() > bytes.len() {
+    find_in(bytes, from, bytes.len(), needle)
+}
+
+/// `find` limited to `[from, stop)`, so a dictionary lookup cannot walk the rest of the file.
+fn find_in(bytes: &[u8], from: usize, stop: usize, needle: &[u8]) -> Option<usize> {
+    let stop = stop.min(bytes.len());
+    if from >= stop || needle.is_empty() || stop - from < needle.len() {
         return None;
     }
-    bytes[from..]
+    bytes[from..stop]
         .windows(needle.len())
         .position(|window| window == needle)
         .map(|offset| from + offset)

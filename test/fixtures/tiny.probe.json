@@ -1,0 +1,26 @@
+{
+  "bytes": 1504,
+  "count": [
+    1
+  ],
+  "detail": "single page, from make-media-fixtures.sh",
+  "fixture": "tiny.pdf",
+  "header": "%PDF-1.4",
+  "kids_first_array": [
+    2
+  ],
+  "mediaboxes": [
+    [
+      0.0,
+      0.0,
+      5.0,
+      3.0
+    ]
+  ],
+  "objects": 6,
+  "producer": "Pillow PDF driver",
+  "root_object": 4,
+  "startxref": 1289,
+  "written_by": null,
+  "xref_stream": false
+}
