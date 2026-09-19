@@ -59,8 +59,8 @@ fn walks_the_asf_objects_ffmpeg_wrote() {
             .iter()
             .filter(|entry| entry.starts_with("object\t"))
             .count(),
-        7,
-        "five children listed, then two top-level objects: {lines:#?}"
+        6,
+        "five header children plus the data object; the header object is row 0, not an object row: {lines:#?}"
     );
     assert!(
         lines.contains(&"walked\tend".to_string()),
