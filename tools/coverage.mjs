@@ -32,7 +32,6 @@ const SELF = {
   webp: ['container'], tiff: ['fields'], pebin: ['fields'], exe: ['fields'], dll: ['fields'], sys: ['fields'],
   ocx: ['fields'], cpl: ['fields'], scr: ['fields'], dex: ['fields'], elf: ['fields'], swf: ['fields'],
   zip: ['container'], jar: ['container'], apk: ['container'], gzip: ['fields'], sqlite: ['fields'],
-  xz: ['fields'], bzip: ['fields'], lz4: ['fields'], zst: ['container'], lzma: ['fields'],
 };
 
 const ALIAS = {
