@@ -166,8 +166,7 @@ the compiler emits parsers for 13 languages including JavaScript and Rust.
 `.github/workflows/kaitai.yml` proves the pipe end to end: it downloads compiler 0.11 by checksum,
 generates PNG/GIF/BMP readers, and parses fixtures this repo wrote itself - 4 tests, 0 failures.
 
-* Measured cost per generated JS reader: `Png=22672 B`, `Gif=13680 B`, `Bmp=28163 B`, mean 21.5 KB
-  before minification. 189 formats is megabytes of source, not hundreds of wasm blobs.
+
 * Licences: **compiler GPLv3+** (so it runs in CI and is never shipped), **JS runtime
   `kaitai-struct@0.11.0` Apache-2.0**, Python and Rust runtimes MIT. What kaitai.io does **not**
   state is the licence of generated code - that has to be settled in writing before a generated
@@ -178,6 +177,36 @@ generates PNG/GIF/BMP readers, and parses fixtures this repo wrote itself - 4 te
 * [ImHex-Patterns](https://github.com/WerWolv/ImHex-Patterns) holds 314 `.hexpat` format
   descriptions but is **GPL-2.0**: something to read, not to vendor. For identification,
   [google/magika](https://github.com/google/magika) (star 18622, Apache-2.0) is the permissive pick.
+
+
+### What that costs, by family
+
+Re-generated on CI from compiler 0.11 (the numbers below are the CI numbers, not a local run):
+
+| family | formats | generated JS | mean | heaviest |
+|---|---|---|---|---|
+| image | 8 | 440,090 B | 55,011 B | Dicom 347,766 B |
+| executable | 7 | 289,667 B | 41,381 B | MachO 92,584 B |
+| archive | 6 | 85,933 B | 14,322 B | Rpm 38,514 B |
+| media | 4 | 70,569 B | 17,642 B | Wav 33,543 B |
+| serialization | 4 | 54,514 B | 13,629 B | PhpSerializedValue 21,631 B |
+| font | 1 | 52,968 B | 52,968 B | Ttf 52,968 B |
+| filesystem | 4 | 46,764 B | 11,691 B | Vfat 16,072 B |
+| database | 1 | 13,475 B | 13,475 B | Sqlite3 13,475 B |
+| log | 1 | 9,437 B | 9,437 B | SystemdJournal 9,437 B |
+| network | 1 | 4,165 B | 4,165 B | Ipv4Packet 4,165 B |
+| **total** | **37** | **1,067,582 B** | 28,854 B | + 11 shared files, 93,499 B |
+
+**Three tiers, because the mean hides the tail.** 22 formats stay under 15 KB apiece (189 KB
+together) and can ship in one bundle; 12 land between 15 and 60 KB (353 KB); 3 are heavy enough
+to load on demand - `Dicom` alone is 347,766 B, a third of the whole 37-format set, with
+`MachO` 92,584 B and `Elf` 85,025 B behind it. The practical grouping is therefore: always-load
+core (images, archives, containers), lazy-load binaries, and consider dropping DICOM unless a
+medical use case is real.
+
+Scaling: at the measured mean of 28,854 B, all 189 upstream specs would be
+about 5.2 MB of unminified JavaScript - still not hundreds of wasm modules, and the heavy tail
+above is what makes the number shrink once tiered.
 
 ## Reproduce
 
