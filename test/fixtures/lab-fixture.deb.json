@@ -1,0 +1,20 @@
+{
+ "bytes": 566,
+ "members": [
+  {
+   "name": "debian-binary",
+   "padded": false,
+   "size": 4
+  },
+  {
+   "name": "control.tar.gz",
+   "padded": true,
+   "size": 221
+  },
+  {
+   "name": "data.tar.gz",
+   "padded": true,
+   "size": 151
+  }
+ ]
+}

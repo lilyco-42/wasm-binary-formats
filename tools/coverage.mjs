@@ -28,7 +28,7 @@ const implemented = JSON.parse(readFileSync('catalog/formats.json', 'utf8')).mod
 // parsed (member names, sizes, chunk or tag lists) without claiming the document's semantics: a zip
 // reader does not parse a .docx. "fields" means named header fields are decoded.
 const SELF = {
-  tar: ['container'], ar: ['container'], deb: [], riff: ['container'],
+  tar: ['container'], ar: ['container'], deb: ['container'], riff: ['container'],
   webp: ['container'], tiff: ['fields'], pebin: ['fields'], exe: ['fields'], dll: ['fields'], sys: ['fields'],
   ocx: ['fields'], cpl: ['fields'], scr: ['fields'], dex: ['fields'], elf: ['fields'], swf: ['fields'],
   zip: ['container'], jar: ['container'], apk: ['container'], gzip: ['fields'], sqlite: ['fields'],

@@ -987,6 +987,34 @@ fn read_cab(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+pub const FORMAT_DEB: i32 = 23;
+
+/// Debian binary package: an ar archive holding the three mandated members. The listing comes from
+/// `read_ar`, so what this adds is the check that this archive has the package shape - the version
+/// record first, then a control tarball and a data tarball - and nothing beyond the member names,
+/// sizes and modes the shared walk already reports.
+fn read_deb(bytes: &[u8]) -> Option<Vec<String>> {
+    let members = read_ar(bytes)?;
+    let names: Vec<&str> = members
+        .iter()
+        .filter_map(|line| line.split('\t').next())
+        .collect();
+    if names.first() != Some(&"debian-binary") {
+        return None;
+    }
+    let control = *names.iter().find(|name| name.starts_with("control.tar"))?;
+    let data = *names.iter().find(|name| name.starts_with("data.tar"))?;
+    let mut entries = vec![
+        format!("deb\t{}", members.len()),
+        format!("control\t{control}"),
+        format!("data\t{data}"),
+    ];
+    for line in &members {
+        entries.push(format!("member\t{line}"));
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
@@ -998,6 +1026,9 @@ pub fn parse(bytes: &[u8]) -> i32 {
     }
     if let Some(lines) = read_tar(bytes) {
         return accept(FORMAT_TAR, lines);
+    }
+    if let Some(lines) = read_deb(bytes) {
+        return accept(FORMAT_DEB, lines);
     }
     if let Some(lines) = read_ar(bytes) {
         return accept(FORMAT_AR, lines);

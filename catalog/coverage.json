@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 25,
-    "selfContainer": 21,
+    "selfContainer": 22,
     "binarySpecAvailable": 0,
-    "gaps": 132,
+    "gaps": 131,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -21,7 +21,7 @@
     "gapByGroup": {
       "unknown": 58,
       "image": 14,
-      "archive": 15,
+      "archive": 14,
       "code": 5,
       "document": 10,
       "application": 11,
@@ -945,7 +945,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "dex",
