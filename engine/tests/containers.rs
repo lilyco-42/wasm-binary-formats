@@ -61,6 +61,27 @@ fn walks_riff_chunks_written_by_python() {
     );
 }
 
+/// A WebP written by Pillow, re-read by Pillow, walked here: the chunk list must consume the file
+/// exactly, which is the property that makes the RIFF reader trustworthy rather than plausible.
+#[test]
+fn walks_a_webp_written_by_pillow() {
+    let webp = fixture("tiny.webp");
+    assert_eq!(parse(&webp), FORMAT_RIFF);
+    let lines = entries();
+    assert_eq!(
+        lines[0], "form	WEBP	38",
+        "declared size is the file size: {lines:?}"
+    );
+    let last = lines.last().expect("at least one chunk");
+    let fields: Vec<&str> = last.split('\t').collect();
+    assert_eq!(fields[0], "VP8L", "lossless webp payload chunk: {lines:?}");
+    assert_eq!(
+        fields[2].parse::<i64>().unwrap() + 8 + (fields[1].parse::<i64>().unwrap() & 1),
+        webp.len() as i64,
+        "the walk ends exactly at the end of the file: {lines:?}"
+    );
+}
+
 /// Both files come from other people's implementations: the TIFF from Pillow (which reports
 /// ImageWidth=3 and ImageHeight=2 for it) and the tar from GNU tar 1.35 (whose -tv listing shows
 /// one regular member of 210 bytes). Asserting against those is a cross-implementation check rather

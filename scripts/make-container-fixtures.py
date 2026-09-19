@@ -29,3 +29,26 @@ with wave.open(os.path.join(out, 'tiny.wav'), 'wb') as handle:
     handle.writeframes(bytes(range(0, 64)))
 
 print('wrote tiny.tar and tiny.wav')
+
+# Pillow writes the WebP and reads it back; the reader under test walks the same bytes.
+from PIL import Image  # noqa: E402
+
+Image.new('RGB', (5, 3), (200, 30, 90)).save(os.path.join(out, 'tiny.webp'), format='WEBP', lossless=True)
+print('wrote tiny.webp')
+
+# GNU tar and Pillow are the producers here on purpose: an independent writer means the reader
+# cannot agree with itself. gnu.tar wraps the TIFF so its member listing is also third-party output.
+import subprocess  # noqa: E402
+
+from PIL import Image  # noqa: E402
+
+tiff_path = os.path.join(out, 'tiny.tif')
+Image.new('RGB', (3, 2), (10, 120, 240)).save(tiff_path, compression='none', dpi=(72, 72))
+
+tar_path = os.path.join(out, 'gnu.tar')
+subprocess.run(
+    ['tar', '-cf', tar_path, '--format=ustar', '--owner=0', '--group=0', '--mtime=@1700000000',
+     '--directory', out, 'tiny.tif'],
+    check=True,
+)
+print('wrote tiny.tif and gnu.tar (GNU tar)')
