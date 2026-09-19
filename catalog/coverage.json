@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 29,
+    "selfFields": 31,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 126,
+    "gaps": 124,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -28,7 +28,7 @@
       "executable": 5,
       "text": 2,
       "inode": 3,
-      "font": 4,
+      "font": 2,
       "undefined": 1
     }
   },
@@ -4090,8 +4090,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "twig",
@@ -4530,8 +4530,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "woff2",

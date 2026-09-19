@@ -1,0 +1,56 @@
+{
+  "ascender": 800,
+  "bytes": 636,
+  "descender": -200,
+  "detail": "two-glyph font compiled from scratch by scripts/make-font-fixtures.py",
+  "fixture": "tiny.ttf",
+  "nameRecords": 4,
+  "numGlyphs": 2,
+  "numTables": 10,
+  "sfntVersion": "00010000",
+  "tables": {
+    "OS/2": [
+      296,
+      96
+    ],
+    "cmap": [
+      400,
+      52
+    ],
+    "glyf": [
+      460,
+      26
+    ],
+    "head": [
+      172,
+      54
+    ],
+    "hhea": [
+      228,
+      36
+    ],
+    "hmtx": [
+      392,
+      8
+    ],
+    "loca": [
+      452,
+      6
+    ],
+    "maxp": [
+      264,
+      32
+    ],
+    "name": [
+      488,
+      108
+    ],
+    "post": [
+      596,
+      38
+    ]
+  },
+  "tablesEnd": 634,
+  "unitsPerEm": 1000,
+  "written_by": "fontTools 4.65.0"
+}

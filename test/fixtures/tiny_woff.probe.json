@@ -1,0 +1,66 @@
+{
+  "bytes": 604,
+  "compressedSum": 343,
+  "declaredLength": 604,
+  "detail": "two-glyph font compiled from scratch by scripts/make-font-fixtures.py",
+  "fixture": "tiny.woff",
+  "flavor": "00010000",
+  "numTables": 10,
+  "originalSum": 456,
+  "signature": "wOFF",
+  "tables": {
+    "OS/2": [
+      356,
+      46,
+      96
+    ],
+    "cmap": [
+      412,
+      41,
+      52
+    ],
+    "glyf": [
+      464,
+      26,
+      26
+    ],
+    "head": [
+      244,
+      54,
+      54
+    ],
+    "hhea": [
+      300,
+      32,
+      36
+    ],
+    "hmtx": [
+      404,
+      8,
+      8
+    ],
+    "loca": [
+      456,
+      6,
+      6
+    ],
+    "maxp": [
+      332,
+      22,
+      32
+    ],
+    "name": [
+      492,
+      93,
+      108
+    ],
+    "post": [
+      588,
+      15,
+      38
+    ]
+  },
+  "tablesEnd": 603,
+  "totalSfntSize": 636,
+  "written_by": "fontTools 4.65.0"
+}

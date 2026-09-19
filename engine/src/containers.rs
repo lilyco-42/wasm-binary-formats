@@ -72,6 +72,8 @@ pub fn name() -> &'static str {
         FORMAT_DEB => "deb",
         FORMAT_TS => "mpegts",
         FORMAT_WASM => "wasm",
+        FORMAT_TTF => "ttf",
+        FORMAT_WOFF => "woff",
         _ => "unknown",
     }
 }
@@ -1675,6 +1677,177 @@ fn read_wasm(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// sfnt-based outlines (TrueType) and the WOFF wrapper around them. 27 and 28, following the
+/// WebAssembly module at 26.
+pub const FORMAT_TTF: i32 = 27;
+pub const FORMAT_WOFF: i32 = 28;
+
+const FONT_TABLES: usize = 128;
+
+fn be_u16(bytes: &[u8], at: usize) -> Option<i64> {
+    let part = bytes.get(at..at + 2)?;
+    Some(i64::from(u16::from_be_bytes([part[0], part[1]])))
+}
+
+fn be_i16(bytes: &[u8], at: usize) -> Option<i64> {
+    let part = bytes.get(at..at + 2)?;
+    Some(i16::from_be_bytes([part[0], part[1]]) as i64)
+}
+
+fn be_u32_at(bytes: &[u8], at: usize) -> Option<i64> {
+    let part = bytes.get(at..at + 4)?;
+    Some(i64::from(u32::from_be_bytes([
+        part[0], part[1], part[2], part[3],
+    ])))
+}
+
+/// The sfnt table directory: `version(4) numTables(2) searchRange entryRange rangeShift`, then
+/// 16 bytes per table (`tag checksum offset length`). Offset 0 of a table is where its own fields
+/// start, which is how `head`, `maxp` and `hhea` are read without guessing at positions.
+fn read_sfnt(bytes: &[u8]) -> Option<Vec<String>> {
+    let version = match bytes.get(0..4)? {
+        [0x00, 0x01, 0x00, 0x00] => "1.0",
+        b"true" => "true",
+        b"OTTO" => "OTTO",
+        _ => return None,
+    };
+    if bytes.len() < 12 {
+        return None;
+    }
+    let number = be_u16(bytes, 4)?;
+    if number > FONT_TABLES as i64 {
+        return None;
+    }
+    let mut entries = vec![format!("sfnt\t{version}\t{number}\t0")];
+    let directory_end = 12 + 16 * number as usize;
+    if directory_end > bytes.len() {
+        entries[0] = format!("sfnt\t{version}\t{number}\t1");
+        return Some(entries);
+    }
+    let mut found: Vec<(&'static str, usize)> = Vec::new();
+    let mut highest = 0usize;
+    for index in 0..number as usize {
+        let record = 12 + 16 * index;
+        let tag = match bytes.get(record..record + 4) {
+            Some(four) => match std::str::from_utf8(four) {
+                Ok(text) => text.to_owned(),
+                Err(_) => "?".to_owned(),
+            },
+            None => break,
+        };
+        let Some(offset) = be_u32_at(bytes, record + 8) else {
+            continue;
+        };
+        let Some(length) = be_u32_at(bytes, record + 12) else {
+            continue;
+        };
+        let Ok(at) = usize::try_from(offset) else {
+            continue;
+        };
+        let Ok(size) = usize::try_from(length) else {
+            continue;
+        };
+        entries.push(format!("table\t{tag}\t{offset}\t{length}"));
+        if let Some(end) = at.checked_add(size) {
+            highest = highest.max(end.min(bytes.len()));
+        }
+        // Four tables carry the numbers worth naming, and only when they are present at all: a font
+        // with no `head` is broken, and saying nothing beats inventing a unit size.
+        for name in ["head", "maxp", "hhea", "name"] {
+            if tag == name && !found.iter().any(|(seen, _)| *seen == name) {
+                found.push((name, at));
+            }
+        }
+    }
+    for (name, at) in &found {
+        match *name {
+            "head" => {
+                if let Some(units) = be_u16(bytes, at + 18) {
+                    entries.push(format!("units_per_em\t{units}"));
+                }
+            }
+            "maxp" => {
+                if let Some(glyphs) = be_u16(bytes, at + 4) {
+                    entries.push(format!("num_glyphs\t{glyphs}"));
+                }
+            }
+            "hhea" => {
+                if let (Some(asc), Some(desc)) = (be_i16(bytes, at + 4), be_i16(bytes, at + 6)) {
+                    entries.push(format!("ascender\t{asc}\tdescender\t{desc}"));
+                }
+            }
+            "name" => {
+                if let Some(records) = be_u16(bytes, at + 2) {
+                    entries.push(format!("name_records\t{records}"));
+                }
+            }
+            _ => {}
+        }
+    }
+    entries.push(format!(
+        "tables_end\t{highest}\tuncovered\t{}",
+        bytes.len().saturating_sub(highest)
+    ));
+    Some(entries)
+}
+
+/// WOFF wraps an sfnt: the same table tags, but each entry carries a compressed length next to its
+/// original one, and `totalSfntSize` says how big the uncompressed sfnt was.
+fn read_woff(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 44 || &bytes[0..4] != b"wOFF" {
+        return None;
+    }
+    let flavor = match bytes.get(4..8) {
+        Some([0x00, 0x01, 0x00, 0x00]) => "1.0",
+        Some(b"OTTO") => "OTTO",
+        _ => return None,
+    };
+    let declared = be_u32_at(bytes, 8)?;
+    let number = be_u16(bytes, 12)?;
+    let total = be_u32_at(bytes, 16)?;
+    if number > FONT_TABLES as i64 {
+        return None;
+    }
+    let mut entries = vec![format!(
+        "woff\t{flavor}\t{declared}\t{}\t{number}\t{total}",
+        bytes.len()
+    )];
+    let mut compressed = 0i64;
+    let mut original = 0i64;
+    let mut highest = 0usize;
+    for index in 0..number as usize {
+        let record = 44 + 20 * index;
+        if record + 20 > bytes.len() {
+            entries.push(format!("truncated\t{index}"));
+            return Some(entries);
+        }
+        let tag = String::from_utf8_lossy(&bytes[record..record + 4]).into_owned();
+        let Some(offset) = be_u32_at(bytes, record + 4) else {
+            continue;
+        };
+        let Some(comp) = be_u32_at(bytes, record + 8) else {
+            continue;
+        };
+        let Some(orig) = be_u32_at(bytes, record + 12) else {
+            continue;
+        };
+        entries.push(format!("table\t{tag}\t{offset}\t{comp}\t{orig}"));
+        compressed += comp;
+        original += orig;
+        if let (Ok(at), Ok(size)) = (usize::try_from(offset), usize::try_from(comp)) {
+            highest = highest.max(at.saturating_add(size).min(bytes.len()));
+        }
+    }
+    entries.push(format!(
+        "compressed_bytes\t{compressed}\toriginal_bytes\t{original}"
+    ));
+    entries.push(format!(
+        "tables_end\t{highest}\tuncovered\t{}",
+        bytes.len().saturating_sub(highest)
+    ));
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -1725,8 +1898,14 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_wasm(bytes) {
         return accept(FORMAT_WASM, lines);
     }
+    if let Some(lines) = read_sfnt(bytes) {
+        return accept(FORMAT_TTF, lines);
+    }
+    if let Some(lines) = read_woff(bytes) {
+        return accept(FORMAT_WOFF, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS or WebAssembly container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly or font container",
         -2,
     )
 }
