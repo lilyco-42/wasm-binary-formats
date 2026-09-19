@@ -130,35 +130,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     }
     let size_of_optional = pe.u16(16).unwrap_or_default() as usize;
     let dirs = if magic == 0x10b { 24 + 96 } else { 24 + 112 };
-    let header = Header {
-        machine: pe.u16(4).unwrap_or(MACHINE_UNKNOWN),
-        characteristics: pe.u16(18).unwrap_or_default(),
-        magic,
-        // AddressOfEntryPoint and Subsystem sit at the same offset in both optional header
-        // flavours; only ImageBase moves. Offsets below are from the start of the NT headers,
-        // which are 24 bytes of signature + file header before the optional header.
-        entry_rva: pe.u32(40).unwrap_or_default(),
-        image_base: if magic == 0x10b {
-            pe.u32(52).unwrap_or_default()
-        } else {
-            pe.u64(48).unwrap_or_default()
-        },
-        subsystem: pe.u16(92).unwrap_or_default(),
-        // COM descriptor directory is index 14 of the data directories, eight bytes each.
-        cli_rva: if size_of_optional >= dirs - 24 + 15 * 8 {
-            pe.u32(dirs + 14 * 8).unwrap_or_default()
-        } else {
-            0
-        },
-        sections: Vec::new(),
-    };
-
     // Section table follows the optional header. Its offset is derived from the declared
     // optional-header size, which is attacker controlled, so every read is bounds-checked.
-    let sections_at = 24 + size_of_optional;
     let count = pe.u16(6).unwrap_or_default().max(0) as usize;
     let mut sections = Vec::new();
-    if let Some(start) = lfanew.checked_add(sections_at) {
+    if let Some(start) = lfanew.checked_add(24 + size_of_optional) {
         for index in 0..count {
             let Some(entry) = file.at(start + index * 40) else {
                 break;
@@ -166,19 +142,41 @@ pub fn parse(bytes: &[u8]) -> i32 {
             if entry.0.len() < 40 {
                 break;
             }
-            let name = section_name(&entry.0[..8]);
             sections.push(Section {
-                virtual_address: entry.u32(12).unwrap_or_default(),
+                name: section_name(&entry.0[..8]),
                 virtual_size: entry.u32(8).unwrap_or_default(),
+                virtual_address: entry.u32(12).unwrap_or_default(),
                 raw_size: entry.u32(16).unwrap_or_default(),
                 raw_pointer: entry.u32(20).unwrap_or_default(),
                 characteristics: entry.u32(36).unwrap_or_default(),
-                name,
             });
         }
     }
-    header.sections = sections;
-    PE.with(|slot| *slot.borrow_mut() = Some(header));
+
+    PE.with(|slot| {
+        *slot.borrow_mut() = Some(Header {
+            machine: pe.u16(4).unwrap_or(MACHINE_UNKNOWN),
+            characteristics: pe.u16(18).unwrap_or_default(),
+            magic,
+            // AddressOfEntryPoint and Subsystem sit at the same offset in both optional header
+            // flavours; only ImageBase moves. Offsets below are from the start of the NT headers,
+            // which are 24 bytes of signature + file header before the optional header.
+            entry_rva: pe.u32(40).unwrap_or_default(),
+            image_base: if magic == 0x10b {
+                pe.u32(52).unwrap_or_default()
+            } else {
+                pe.u64(48).unwrap_or_default()
+            },
+            subsystem: pe.u16(92).unwrap_or_default(),
+            // COM descriptor directory is index 14 of the data directories, eight bytes each.
+            cli_rva: if size_of_optional >= dirs - 24 + 15 * 8 {
+                pe.u32(dirs + 14 * 8).unwrap_or_default()
+            } else {
+                0
+            },
+            sections,
+        })
+    });
     0
 }
 
@@ -209,22 +207,27 @@ pub fn cli_rva() -> i64 {
 }
 
 pub fn sections() -> String {
-    with_header(String::new(), |header| {
-        header
-            .sections
-            .iter()
-            .map(|section| {
-                format!(
-                    "{}\t{}\t{}\t{}\t{}\t{}",
-                    section.name,
-                    section.virtual_address,
-                    section.virtual_size,
-                    section.raw_size,
-                    section.raw_pointer,
-                    section.characteristics
-                )
+    PE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(|header| {
+                header
+                    .sections
+                    .iter()
+                    .map(|section| {
+                        format!(
+                            "{}\t{}\t{}\t{}\t{}\t{}",
+                            section.name,
+                            section.virtual_address,
+                            section.virtual_size,
+                            section.raw_size,
+                            section.raw_pointer,
+                            section.characteristics
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
             })
-            .collect::<Vec<_>>()
-            .join("\n")
+            .unwrap_or_default()
     })
 }
