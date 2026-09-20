@@ -60,7 +60,9 @@ int disasm_run(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
     return insns == NULL ? -2 : 0;
   }
   for (size_t i = 0; i < count && i < ROW_MAX_SEEN; i++) {
-    snprintf(rows[listed], ROW_MAX, "%llx\t%s\t%s",
+    /* The address goes out in hex, the way every listing tool shows it, because "1000" on its own
+     * reads as decimal to anything downstream. */
+    snprintf(rows[listed], ROW_MAX, "0x%llx\t%s\t%s",
              (unsigned long long)insns[i].address, insns[i].mnemonic, insns[i].op_str);
     listed++;
   }

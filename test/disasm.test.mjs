@@ -63,15 +63,18 @@ test('the module decodes its own self test', () => {
 });
 
 test('x86-64 comes out as instruction text, one row per instruction', () => {
-  // push rbp; mov rbp, rsp; sub rsp, 0x10; hlt; ret - the prologue self_test uses.
+  // push rbp; mov rbp, rsp; sub rsp, 0x10; hlt; ret - the prologue self_test uses. Addresses are the
+  // hex text the module prints, so a row cannot be read as decimal by mistake.
   const code = new Uint8Array([0x55, 0x48, 0x89, 0xe5, 0x48, 0x83, 0xec, 0x10, 0xf4, 0xc3]);
   const { rc, rows } = run(code, 0x1000, 0);
   assert.equal(rc, 5, rows.join(' | '));
-  assert.equal(rows[0], '4096\tpush\trbp', rows.join(' | '));
-  assert.equal(rows[1], '4097\tmov\trbp, rsp');
-  assert.equal(rows[2], '4100\tsub\trsp, 0x10');
-  assert.equal(rows[3], '4104\thlt\t');
-  assert.equal(rows[4], '4105\tret\t');
+  assert.deepEqual(rows, [
+    '0x1000\tpush\trbp',
+    '0x1001\tmov\trbp, rsp',
+    '0x1004\tsub\trsp, 0x10',
+    '0x1008\thlt\t',
+    '0x1009\tret\t',
+  ]);
 });
 
 test('aarch64 decodes too, so the module is not x86 only', () => {
@@ -79,8 +82,7 @@ test('aarch64 decodes too, so the module is not x86 only', () => {
   const code = new Uint8Array([0xc0, 0x03, 0x5f, 0xd6, 0xfd, 0x03, 0x00, 0x91]);
   const { rc, rows } = run(code, 0x8000, 1);
   assert.equal(rc, 2, rows.join(' | '));
-  assert.match(rows[0], /^32768\tret\t/, rows.join(' | '));
-  assert.match(rows[1], /\tmov\tx29, sp$/, rows.join(' | '));
+  assert.deepEqual(rows, ['0x8000\tret\t', '0x8004\tmov\tx29, sp']);
 });
 
 test('bytes that decode to nothing are reported as nothing', () => {
