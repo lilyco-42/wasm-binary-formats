@@ -263,23 +263,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 32 | 14.6% |
+| own Rust reader, named header fields decoded | 33 | 15.1% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **123** | 56.2% |
-| **covered, any level** | **96** | 43.8% |
+| **no parser at all - real gap** | **122** | 55.7% |
+| **covered, any level** | **97** | 44.3% |
 
-Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
+Top binary gap groups by count: unknown 57, archive 14, image 13, document 10, application 10,
+code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf`/`woff2` -
 `otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
 Python refuses to install into its own environment.
 
-So the honest answer to the objective is **no, not yet**: 96 of 219 binary labels have a parser
-that runs here (32 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 123 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 97 of 219 binary labels have a parser
+that runs here (33 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 122 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -292,6 +293,7 @@ node scripts/make-fixture.mjs    # rewrites test/fixtures/lab-fixture.apk
 bash scripts/make-media-fixtures.sh    # ffmpeg/Pillow media, tiny.pcx, tiny.pdf
 bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and their probes
 python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes it back for the probe
+python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tools/plist-sim.py decodes them back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -382,8 +384,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **96 covered** (32 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **123 with no
+Coverage is scored against magika's 219 binary labels: **97 covered** (33 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **122 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -410,6 +412,17 @@ does not re-derive them:
   compiles a two-glyph font out of nothing, so `tiny.ttf`/`tiny.woff` are an independent writer's
   bytes with no third-party outline to licence (+2 labels; `woff2` still needs `brotli`, which this
   Python refuses to install into itself).
+  `applebplist` looked for its producer in the wrong place too: CPython's `plistlib` writes the binary
+  format, so `scripts/make-plist-fixtures.py` dumps three files - a dictionary holding one value of
+  every scalar type, a KeyedArchiver graph whose `$top` reaches its objects only through UIDs, and an
+  empty dictionary - and `tools/plist-sim.py` decodes them with `struct` and compares that walk against
+  `plistlib.loads` of the identical bytes before a single row is asserted (+1 label, at field level:
+  97 covered, 122 gaps). The read is of the object *graph*, which is what earns the `edges`/`reach`
+  rows rather than a listing of markers, and the trap is the two widths the trailer carries: byte 6 is
+  the offset table's entry width, byte 7 the width of references *inside* an object, and `tiny.bplist`
+  uses 2 and 1 - a reader that reuses one number for both walks off the end of every table. Sets and
+  ordered sets stay unnamed: `plistlib` refuses a Python `set`, so markers 0xB and 0xC get a row quoting
+  their byte and nothing else.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
@@ -434,8 +447,7 @@ does not re-derive them:
   Netpbm reader rejects it rather than reporting a geometry from the wrong offsets. **IPv4** is still
   unresolved: the generated reader over-reads the hand-built 24-byte packet by four bytes, and until
   that is explained the format is not claimed.
-* Blocked on somebody else: `wasm` has no producer on this machine (no toolchain runs locally, and
-  the scoop and Git installations contain no `.wasm` to read), and 28 generated readers still have
+* Blocked on somebody else: 28 generated readers still have
   no fixture because nothing here writes rpm, xar, ext2, GPT, ISO 9660, registry hives or
   `.DS_Store`. And the licence question that gates shipping - what kaitai.io permits for *generated*
   code - has no written answer upstream, so the 41 generated readers stay feasibility evidence, not

@@ -12,6 +12,9 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   bplist "bplist00", objects, then `num` big-endian offsets of `offset_size` each, then a
+//!         32-byte trailer; references inside an object are `object_ref_size` wide, which is not
+//!         the same number (see `read_bplist`)
 //!   PDF   "%PDF-x.y" header, `startxref` offset near the end of the file, then a classic `xref`
 //!         table of 20-byte rows and a `trailer` dictionary (PDF 1.5 xref streams are reported as
 //!         unsupported rather than walked). The trailer's `/Root` is resolved through the table to
@@ -75,6 +78,7 @@ pub fn name() -> &'static str {
         FORMAT_TTF => "ttf",
         FORMAT_WOFF => "woff",
         FORMAT_ICNS => "icns",
+        FORMAT_BPLIST => "bplist",
         _ => "unknown",
     }
 }
@@ -1852,8 +1856,19 @@ fn read_woff(bytes: &[u8]) -> Option<Vec<String>> {
 /// Apple icon files: the icon directory, and the pixel size of every PNG payload read out of that
 /// payload's own header. 30, after the fonts at 27 and 28.
 pub const FORMAT_ICNS: i32 = 30;
+pub const FORMAT_BPLIST: i32 = 31;
 
 const ICNS_ENTRIES: usize = 128;
+
+/// How far a plist walk is allowed to go: table entries decoded, references read out of one object,
+/// report rows emitted, and graph depth. A file that asks for more gets a `stopped` row instead of
+/// an unbounded loop.
+const BPLIST_OBJECTS: usize = 4096;
+const BPLIST_SLOTS: u64 = 4096;
+const BPLIST_ROWS: usize = 4096;
+const BPLIST_DEPTH: usize = 32;
+/// 2001-01-01, the day binary plists count seconds from, expressed in days since 1970-01-01.
+const BPLIST_EPOCH_DAYS: i64 = 11_323;
 
 /// Icon entries are `tag(4) length(4, including these eight bytes)`, and the length of the last one
 /// decides whether the file was walked to its end. Older icon types carry JPEG-2000 rather than PNG,
@@ -1910,6 +1925,443 @@ fn read_icns(bytes: &[u8]) -> Option<Vec<String>> {
         bytes.len().saturating_sub(at)
     ));
     if at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
+/// Big-endian unsigned integer of 1..=8 bytes, the only width a binary plist trailer, offset table
+/// or object reference is allowed to use.
+fn be_uint(bytes: &[u8], at: usize, width: usize) -> Option<u64> {
+    if width == 0 || width > 8 {
+        return None;
+    }
+    let body = bytes.get(at..at.checked_add(width)?)?;
+    let mut value = 0u64;
+    for byte in body {
+        value = (value << 8) | u64::from(*byte);
+    }
+    Some(value)
+}
+
+fn be_f32(bytes: &[u8], at: usize) -> Option<f64> {
+    let quad: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(f64::from(f32::from_be_bytes(quad)))
+}
+
+fn be_f64(bytes: &[u8], at: usize) -> Option<f64> {
+    let octet: [u8; 8] = bytes.get(at..at.checked_add(8)?)?.try_into().ok()?;
+    Some(f64::from_be_bytes(octet))
+}
+
+/// Days since 1970-01-01 to (year, month, day) - the branch-free civil-from-days conversion that
+/// date libraries ship. `tools/plist-sim.py` formats the same instants through python's calendar and
+/// both are checked against the same fixture dates, so an error here fails a test instead of
+/// quietly reporting a plausible wrong date.
+fn civil_from_days(days: i64) -> (i64, i64, i64) {
+    let shifted = days.saturating_add(719_468);
+    let era = if shifted >= 0 {
+        shifted
+    } else {
+        shifted - 146_096
+    } / 146_097;
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let march_based = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * march_based + 2) / 5 + 1;
+    let month = if march_based < 10 {
+        march_based + 3
+    } else {
+        march_based - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+/// Tab and C0/C1 control characters would break the report's own columns and a lone surrogate has
+/// no encoding at all, so both become `?`. Everything else - including the non-ASCII text the
+/// fixture carries - passes through: a reader that shows a string shows the string.
+fn printable(text: &str) -> String {
+    text.chars()
+        .map(|c| if c == '\t' || c.is_control() { '?' } else { c })
+        .collect()
+}
+
+fn utf16_be(bytes: &[u8]) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+        .collect();
+    let mut out = String::new();
+    let mut index = 0;
+    while index < units.len() {
+        let unit = units[index];
+        let next = units.get(index + 1).copied();
+        let pair =
+            next.filter(|low| (0xD800..0xDC00).contains(&unit) && (0xDC00..0xE000).contains(low));
+        let value = match pair {
+            Some(low) => {
+                Some(0x1_0000 + ((u32::from(unit) - 0xD800) << 10) + (u32::from(low) - 0xDC00))
+            }
+            None => Some(u32::from(unit)),
+        };
+        out.push(value.and_then(char::from_u32).unwrap_or('?'));
+        index += 1 + usize::from(pair.is_some());
+    }
+    out
+}
+
+/// A counted object: the length or element count is the low nibble, or - when that nibble is 0xF -
+/// an integer object written inline straight after the marker, which is not a table entry of its
+/// own. Returns the count and the offset the payload or the references start at.
+fn bp_count(bytes: &[u8], at: usize, low: u8) -> Option<(u64, usize)> {
+    if low != 0xF {
+        return Some((u64::from(low), at.checked_add(1)?));
+    }
+    let int_marker = *bytes.get(at.checked_add(1)?)?;
+    if int_marker >> 4 != 1 {
+        return None;
+    }
+    let width = 1usize << (int_marker & 0xF);
+    let value = be_uint(bytes, at + 2, width)?;
+    Some((value, at + 2 + width))
+}
+
+/// An object that holds references: which marker class it is (`dict` says keys-then-values), the
+/// count it claims, and the references this reader accepted out of that count.
+struct BpNode {
+    dict: bool,
+    count: u64,
+    refs: Vec<(u64, usize)>,
+}
+
+struct BpWalk {
+    reachable: i64,
+    depth: usize,
+    cycles: i64,
+}
+
+/// The walk from the top object. An object reached twice is sharing, which KeyedArchiver graphs do
+/// constantly; only a reference back to something already on this path is a cycle.
+fn walk_bp(
+    index: usize,
+    depth: usize,
+    nodes: &[Option<BpNode>],
+    seen: &mut [bool],
+    path: &mut Vec<usize>,
+    walk: &mut BpWalk,
+) {
+    if path.contains(&index) {
+        walk.cycles += 1;
+        return;
+    }
+    if depth > walk.depth {
+        walk.depth = depth;
+    }
+    if seen.get(index).copied().unwrap_or(true) {
+        return;
+    }
+    seen[index] = true;
+    walk.reachable += 1;
+    if depth >= BPLIST_DEPTH {
+        return;
+    }
+    path.push(index);
+    if let Some(node) = nodes.get(index).and_then(|slot| slot.as_ref()) {
+        for (_, reference) in &node.refs {
+            walk_bp(*reference, depth + 1, nodes, seen, path, walk);
+        }
+    }
+    path.pop();
+}
+
+/// One object header decoded into report rows, plus its references when it holds any. Anything the
+/// bytes do not support - a count that runs past the object area, an integer width the format does
+/// not have, a 0xF nibble not followed by an integer - becomes a `bad` row naming what stopped it,
+/// never a guessed value.
+fn bp_object(
+    bytes: &[u8],
+    at: usize,
+    row: &str,
+    ref_size: usize,
+    objects: u64,
+    body_end: usize,
+    table_len: usize,
+) -> (Vec<String>, Option<BpNode>) {
+    let Some(marker) = bytes.get(at).copied() else {
+        return (vec![format!("{row}\tbad\toffset")], None);
+    };
+    let high = marker >> 4;
+    let low = marker & 0xF;
+    match high {
+        0 => {
+            let body = match low {
+                0x0 => format!("{row}\tnull"),
+                0x8 => format!("{row}\tbool\tfalse"),
+                0x9 => format!("{row}\tbool\ttrue"),
+                0xF => format!("{row}\tfiller"),
+                _ => format!("{row}\tmarker\t0x{marker:02x}"),
+            };
+            (vec![body], None)
+        }
+        1 => {
+            let width = 1usize << low;
+            if width > 8 {
+                return (vec![format!("{row}\tbad\twidth")], None);
+            }
+            let body = match be_uint(bytes, at + 1, width) {
+                // Only the full eight-byte integer is signed, which is how a negative number
+                // written by one comes back out of another's bytes.
+                Some(raw) if width == 8 && raw >= 1 << 63 => {
+                    format!("{row}\tint\t{}\t{width}", raw as i64)
+                }
+                Some(raw) => format!("{row}\tint\t{raw}\t{width}"),
+                None => format!("{row}\tbad\tshort"),
+            };
+            (vec![body], None)
+        }
+        2 | 3 => {
+            let width = 1usize << low;
+            if width != 4 && width != 8 {
+                return (vec![format!("{row}\tbad\twidth")], None);
+            }
+            let number = if width == 4 {
+                be_f32(bytes, at + 1)
+            } else {
+                be_f64(bytes, at + 1)
+            };
+            let Some(number) = number else {
+                return (vec![format!("{row}\tbad\tshort")], None);
+            };
+            let body = if high == 2 {
+                format!("{row}\treal\t{number}")
+            } else if !number.is_finite() {
+                format!("{row}\tdate\t{number}")
+            } else {
+                let total = number.floor() as i64;
+                let seconds = total.rem_euclid(86_400);
+                let days = total.div_euclid(86_400) + BPLIST_EPOCH_DAYS;
+                let (year, month, day) = civil_from_days(days);
+                if !(1_600..=2_400).contains(&year) {
+                    format!("{row}\tdate\t{number}")
+                } else {
+                    format!(
+                        "{row}\tdate\t{year:04}-{month:02}-{day:02}\t{:02}:{:02}:{:02}",
+                        seconds / 3_600,
+                        (seconds / 60) % 60,
+                        seconds % 60
+                    )
+                }
+            };
+            (vec![body], None)
+        }
+        4 | 5 | 6 => match bp_count(bytes, at, low) {
+            None => (vec![format!("{row}\tbad\tcount")], None),
+            Some((claim, after)) => {
+                let unit = 1 + usize::from(high == 6);
+                let body = match claim
+                    .checked_mul(unit as u64)
+                    .and_then(|span| usize::try_from(span).ok())
+                    .and_then(|span| after.checked_add(span))
+                    .filter(|end| *end <= body_end)
+                {
+                    None => format!("{row}\tbad\tshort"),
+                    Some(end) => {
+                        let payload = bytes.get(after..end).unwrap_or_default();
+                        match high {
+                            4 => {
+                                let hint = if payload.starts_with(b"\x89PNG\r\n\x1a\n") {
+                                    "png"
+                                } else if payload.starts_with(b"\xff\xd8\xff") {
+                                    "jpeg"
+                                } else {
+                                    "bytes"
+                                };
+                                format!("{row}\tdata\t{claim}\t{hint}")
+                            }
+                            5 => {
+                                let latin: String =
+                                    payload.iter().map(|byte| *byte as char).collect();
+                                format!("{row}\tascii\t{claim}\t{}", printable(&latin))
+                            }
+                            _ => {
+                                format!("{row}\tutf16\t{claim}\t{}", printable(&utf16_be(payload)))
+                            }
+                        }
+                    }
+                };
+                (vec![body], None)
+            }
+        },
+        8 => {
+            let width = usize::from(low) + 1;
+            let body = match be_uint(bytes, at + 1, width) {
+                Some(value) => format!("{row}\tuid\t{value}"),
+                None => format!("{row}\tbad\tshort"),
+            };
+            (vec![body], None)
+        }
+        0xA | 0xD => match bp_count(bytes, at, low) {
+            None => (vec![format!("{row}\tbad\tcount")], None),
+            Some((count, after)) => {
+                let dict = high == 0xD;
+                let kind = if dict { "dict" } else { "array" };
+                let width = if low == 0xF { "wide" } else { "narrow" };
+                let mut rows = vec![format!("{row}\t{kind}\t{count}\t{width}")];
+                let slots = count.saturating_mul(u64::from(dict) + 1);
+                if slots > BPLIST_SLOTS || after > body_end {
+                    return (rows, None);
+                }
+                let mut refs = Vec::new();
+                let mut broken = 0i64;
+                for slot in 0..slots {
+                    let position =
+                        after.saturating_add(slot.saturating_mul(ref_size as u64) as usize);
+                    match be_uint(bytes, position, ref_size) {
+                        // Both bounds matter: the reference has to name an object the file claims
+                        // to hold, and one this reader actually decoded an offset for.
+                        Some(value) if value < objects => match usize::try_from(value) {
+                            Ok(target) if target < table_len => refs.push((slot, target)),
+                            _ => broken += 1,
+                        },
+                        _ => broken += 1,
+                    }
+                }
+                if broken > 0 {
+                    rows.push(format!("{row}\tbad\trefs\t{broken}"));
+                }
+                (rows, Some(BpNode { dict, count, refs }))
+            }
+        },
+        _ => (vec![format!("{row}\tmarker\t0x{marker:02x}")], None),
+    }
+}
+
+/// Apple binary property lists: the trailer, the offset table it points at, every object that table
+/// addresses, and the reference graph between them.
+///
+/// 31, after the icon directory at 30. The layout is the one `scripts/make-plist-fixtures.py` writes
+/// with CPython's own writer and this reads back byte for byte: an eight-byte `bplist00` magic, then
+/// the objects, then `num` big-endian offsets each `offset_size` bytes (trailer byte 6), then the
+/// 32-byte trailer carrying `num`, the top object number and the offset-table position. Inside an
+/// object, references are `object_ref_size` (trailer byte 7) wide - a different number, which is why
+/// both are reported before anything is walked. Integers are `1 << low nibble` bytes and signed only
+/// at the full eight; UIDs are `low nibble + 1`; strings count characters while data counts bytes;
+/// and a 0xF nibble means the real count follows as an inline integer object.
+///
+/// Sets and ordered sets (markers 0xB and 0xC) have no fixture here because no writer on this host
+/// produces them, so the reader reports their marker byte without naming them - the same rule the
+/// WebAssembly reader follows for a section id the specification does not define.
+fn read_bplist(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 40 || &bytes[0..8] != b"bplist00" {
+        return None;
+    }
+    let trailer_start = bytes.len() - 32;
+    let trailer = bytes.get(trailer_start..)?;
+    let offset_size = usize::from(trailer[6]);
+    let ref_size = usize::from(trailer[7]);
+    if !(1..=8).contains(&offset_size) || !(1..=8).contains(&ref_size) {
+        return None;
+    }
+    let objects = be_uint(trailer, 8, 8)?;
+    let top = be_uint(trailer, 16, 8)?;
+    let table_at = be_uint(trailer, 24, 8)?;
+    let table_end = table_at.saturating_add(objects.saturating_mul(offset_size as u64));
+    let declared = table_end.saturating_add(32);
+    let mut entries = vec![
+        format!("bplist\t{declared}\t{}\t{objects}\t{top}", bytes.len()),
+        format!("trailer\t{offset_size}\t{ref_size}\t{table_at}\t{table_end}"),
+    ];
+
+    let wanted = objects.min(BPLIST_OBJECTS as u64) as usize;
+    let mut offsets: Vec<Option<usize>> = Vec::with_capacity(wanted);
+    let mut bad_offsets = 0i64;
+    for index in 0..wanted {
+        let position = table_at.saturating_add((index as u64).saturating_mul(offset_size as u64));
+        let slot = usize::try_from(position)
+            .ok()
+            .and_then(|position| be_uint(bytes, position, offset_size))
+            .and_then(|value| usize::try_from(value).ok())
+            .filter(|value| *value >= 8 && *value < trailer_start);
+        if slot.is_none() {
+            bad_offsets += 1;
+        }
+        offsets.push(slot);
+    }
+    let increasing = offsets.windows(2).all(|pair| match (pair[0], pair[1]) {
+        (Some(left), Some(right)) => right > left,
+        _ => true,
+    });
+
+    let mut nodes: Vec<Option<BpNode>> = (0..wanted).map(|_| None).collect();
+    let mut edges = Vec::new();
+    let mut emitted = 0i64;
+    let mut unresolved = 0i64;
+    let mut stopped = false;
+    for (index, slot) in offsets.iter().enumerate() {
+        if entries.len() >= BPLIST_ROWS {
+            stopped = true;
+            break;
+        }
+        let row = format!("obj\t{index}");
+        let Some(at) = slot else {
+            entries.push(format!("{row}\tbad\toffset"));
+            continue;
+        };
+        let (rows, node) = bp_object(bytes, *at, &row, ref_size, objects, trailer_start, wanted);
+        entries.extend(rows);
+        let Some(node) = node else { continue };
+        for (slot, reference) in &node.refs {
+            if edges.len() >= BPLIST_ROWS {
+                stopped = true;
+                break;
+            }
+            if offsets.get(*reference).and_then(|value| *value).is_none() {
+                unresolved += 1;
+                continue;
+            }
+            let role = if !node.dict {
+                "element"
+            } else if *slot < node.count {
+                "key"
+            } else {
+                "value"
+            };
+            edges.push(format!("child\t{index}\t{slot}\t{reference}\t{role}"));
+            emitted += 1;
+        }
+        nodes[index] = Some(node);
+    }
+    entries.extend(edges);
+    entries.push(format!("edges\t{emitted}\tunresolved\t{unresolved}"));
+
+    let mut walk = BpWalk {
+        reachable: 0,
+        depth: 0,
+        cycles: 0,
+    };
+    let mut seen = vec![false; wanted];
+    let mut path: Vec<usize> = Vec::new();
+    if usize::try_from(top).is_ok_and(|top| top < wanted) {
+        walk_bp(top as usize, 1, &nodes, &mut seen, &mut path, &mut walk);
+    }
+    let BpWalk {
+        reachable,
+        depth,
+        cycles,
+    } = walk;
+    entries.push(format!(
+        "reach\t{reachable}\tdepth\t{depth}\tcycles\t{cycles}"
+    ));
+    entries.push(format!(
+        "offsets\t{}\tstrictly_increasing\t{}",
+        wanted - bad_offsets as usize,
+        u8::from(increasing)
+    ));
+    entries.push(format!("stopped\t{}", u8::from(stopped)));
+    if declared == bytes.len() as u64 {
         entries.push("walked\tend".to_owned());
     }
     Some(entries)
@@ -1974,8 +2426,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_icns(bytes) {
         return accept(FORMAT_ICNS, lines);
     }
+    if let Some(lines) = read_bplist(bytes) {
+        return accept(FORMAT_BPLIST, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font or icon container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon or property-list container",
         -2,
     )
 }

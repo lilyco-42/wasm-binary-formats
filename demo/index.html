@@ -34,11 +34,11 @@ code{background:#f4f6f8;padding:1px 5px;border-radius:4px;font-size:13px}
 <body>
 <div class="wrap">
   <h1>APK 解包与网页资源运行</h1>
-  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。<code>.exe</code> / <code>.dll</code> 走 PE 头解析，只读不运行。其余常见二进制（tar / ar / deb / cab、gz / xz / bz2 / lz4 / zst、RIFF 与 TIFF、Matroska / WebM / MP4 家族、FLAC / MP2 / MP3 / Ogg / WAVE、MPEG-TS 节目表、PDF 页树、WebAssembly 模块段表、字体与图标目录、docx / xlsx / pptx / odt / epub 包）会走结构解析，把头部字段、成员表与页树逐行列出来——读结构，不解码像素、不渲染文档、不执行任何代码。文件不上传，解包与解析都在 WebAssembly 内完成。</p>
+  <p class="sub">上传 <code>.apk</code> / <code>.zip</code>，在浏览器里列出条目；<code>assets/</code> 下的网页资源可以直接在沙箱里跑起来。<code>.exe</code> / <code>.dll</code> 走 PE 头解析，只读不运行。其余常见二进制（tar / ar / deb / cab、gz / xz / bz2 / lz4 / zst、RIFF 与 TIFF、Matroska / WebM / MP4 家族、FLAC / MP2 / MP3 / Ogg / WAVE、MPEG-TS 节目表、PDF 页树、WebAssembly 模块段表、字体与图标目录、Apple 二进制属性列表（对象表与引用图）、docx / xlsx / pptx / odt / epub 包）会走结构解析，把头部字段、成员表与页树逐行列出来——读结构，不解码像素、不渲染文档、不执行任何代码。文件不上传，解包与解析都在 WebAssembly 内完成。</p>
 
   <div class="bar">
     <button class="primary" id="pick">选择 APK / ZIP / EXE / 常见二进制</button>
-    <input type="file" id="file" accept=".apk,.zip,.jar,.exe,.dll,.docx,.xlsx,.pptx,.odt,.ods,.odp,.epub,.tar,.ar,.deb,.cab,.gz,.xz,.bz2,.lz4,.zst,.wav,.avi,.webp,.tiff,.tif,.flac,.mp3,.mp2,.ogg,.mkv,.webm,.mp4,.m4a,.mov,.avif,.3gp,.asf,.wma,.wmv,.ts,.flv,.pdf,.pbm,.pgm,.ppm,.pnm,.dex,.wasm,.ttf,.woff,.icns" hidden>
+    <input type="file" id="file" accept=".apk,.zip,.jar,.exe,.dll,.docx,.xlsx,.pptx,.odt,.ods,.odp,.epub,.tar,.ar,.deb,.cab,.gz,.xz,.bz2,.lz4,.zst,.wav,.avi,.webp,.tiff,.tif,.flac,.mp3,.mp2,.ogg,.mkv,.webm,.mp4,.m4a,.mov,.avif,.3gp,.asf,.wma,.wmv,.ts,.flv,.pdf,.pbm,.pgm,.ppm,.pnm,.dex,.wasm,.ttf,.woff,.icns,.bplist,.plist" hidden>
     <label class="chk"><input type="checkbox" id="allowjs" checked> 允许运行网页内的脚本</label>
     <span id="name" style="color:var(--dim);font-size:13px"></span>
   </div>

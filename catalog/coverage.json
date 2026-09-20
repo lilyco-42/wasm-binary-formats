@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 32,
+    "selfFields": 33,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 123,
+    "gaps": 122,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -24,9 +24,9 @@
       "archive": 14,
       "code": 5,
       "document": 10,
-      "application": 11,
       "executable": 5,
       "text": 2,
+      "application": 10,
       "inode": 3,
       "font": 2,
       "undefined": 1
@@ -226,8 +226,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "appledouble",

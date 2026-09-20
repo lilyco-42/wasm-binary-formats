@@ -8,3 +8,4 @@ node_modules/
 engine/target/
 temp/
 generated/
+__pycache__/

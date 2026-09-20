@@ -307,8 +307,25 @@ test('every container the demo offers answers with the code the page prints', ()
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
     ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['tiny.icns', 30],
+    ['tiny.bplist', 31], ['keyed.bplist', 31],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
+});
+
+test('a binary plist keeps its object graph and its text across the ABI', () => {
+  const keyed = assertReadable('container', 'keyed.bplist', 31).rows;
+  assert.ok(keyed.includes('obj\t11\tuid\t4'), 'the UID reference between two objects is gone');
+  assert.ok(keyed.some((row) => row.startsWith('child\t19\t')), 'no reference rows');
+  assert.equal(keyed.filter((row) => row.startsWith('child\t')).length, 22);
+  assert.ok(keyed.includes('edges\t22\tunresolved\t0'), `broken references: ${keyed.find((r) => r.startsWith('edges'))}`);
+  assert.ok(keyed.includes('walked\tend'), 'the table and trailer do not account for the file');
+
+  // Non-ASCII text travels as UTF-8 through a byte buffer, so it is the part most likely to come
+  // back mangled on the other side.
+  const tiny = assertReadable('container', 'tiny.bplist', 31).rows;
+  assert.ok(tiny.includes('obj\t50\tutf16\t7\théllo世界'), `utf16 row: ${tiny.find((r) => r.startsWith('obj\t50'))}`);
+  assert.ok(tiny.includes('obj\t18\tdate\t2026-09-20\t02:47:12'), 'the date walked back is not the one written');
+  assert.ok(tiny.includes('obj\t24\tint\t-7\t8'), 'a negative integer came back unsigned');
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
@@ -355,7 +372,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
