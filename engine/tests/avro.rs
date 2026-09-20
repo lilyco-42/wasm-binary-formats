@@ -170,11 +170,18 @@ fn a_container_with_no_terminator_for_its_metadata_map_is_left_alone() {
 
 #[test]
 fn a_short_or_foreign_file_is_not_an_avro_container() {
-    assert_eq!(parse(b"Obj\x01\x04\x00"), -2, "no map, no marker");
+    // Eight bytes is the shortest input the dispatcher hands to any reader, so these are the
+    // "recognised nothing" answers; anything smaller is refused as too short to identify at all.
+    assert_eq!(parse(b"Obj\x01\x04\x00\x00\x00"), -2, "no map, no marker");
     assert_eq!(
-        parse(b"OBA\x01aaaaaaaaaaaaaaaa"),
+        parse(b"OBA\x01aaaaaaaa"),
         -2,
         "the magic has to be Obj\\x01"
     );
     assert_eq!(parse(&[0u8; 64]), -2, "zero bytes carry no magic");
+    assert_eq!(
+        parse(b"Obj\x01\x04"),
+        -1,
+        "below the size any reader can use"
+    );
 }
