@@ -43,10 +43,11 @@ fn rows(file: &str) -> Vec<String> {
     report()
 }
 
-fn summary(lines: &[String]) -> Vec<&String> {
+fn summary(lines: &[String]) -> Vec<String> {
     lines
         .iter()
         .filter(|line| !line.starts_with("box\t"))
+        .cloned()
         .collect()
 }
 
