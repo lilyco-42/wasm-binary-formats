@@ -22,6 +22,9 @@
 //!   stl   no magic at all: 80 header bytes, u32 triangle count, 50 bytes per triangle, so
 //!         84 + 50n == filesize is the only thing the format asserts about itself; a stored normal
 //!         is listed as written and counted against the normal the three points imply
+//!   ps    no magic, a line: `%!` at byte 0 or at the offset a preview header's own two length words
+//!         add up to, then `%%Key: value` document comments whose page count is a claim rather than a
+//!         fact - LibreOffice states 0 pages for a file carrying one `%%Page:` comment
 //!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
 //!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
 //!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
@@ -128,6 +131,7 @@ pub fn name() -> &'static str {
         FORMAT_STL => "stl",
         FORMAT_ICC => "icc",
         FORMAT_EMF => "emf",
+        FORMAT_PS => "postscript",
         _ => "unknown",
     }
 }
@@ -5716,6 +5720,172 @@ fn read_emf(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// PostScript: a file that claims a line rather than a magic, plus the preview header that can bury it.
+///
+/// The claim is `%!` at the start of a line, and everything a reader can say without running the file
+/// comes from the `%%Key: value` document comments below it. Two things are reported as claims rather
+/// than facts, because the two producers committed here disagree about one of them: `%%Pages` says 0 in
+/// the LibreOffice file that carries a `%%Page: 1 1` and 1 in the ImageMagick one, so the count and the
+/// claim go out side by side (the PDF `/Count` row and the EMF record count again). And a preview header
+/// is believed only on its own arithmetic - the two little-endian words at 20 and 24 have to add up to
+/// exactly where `%!` begins - which is also the only reason the bytes between them are printed as hex
+/// and named nothing: they are a length in one sample and `TK` in another.
+pub const FORMAT_PS: i32 = 46;
+
+const PS_LISTED: usize = 32;
+/// The four bytes that open a preview-prefixed EPS. Not a PostScript claim on its own: the arithmetic
+/// in `read_ps` has to close before it means anything.
+const PS_PREVIEW_MAGIC: [u8; 4] = [0xC5, 0xD0, 0xD3, 0xC6];
+
+fn ps_text(bytes: &[u8]) -> String {
+    // Latin-1, one byte per character, so a comment carrying a non-ASCII byte prints the same here as
+    // the writer wrote it instead of arriving as a replacement glyph.
+    bytes.iter().map(|byte| char::from(*byte)).collect()
+}
+
+fn preview_bytes_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// The offset of the last `%%EOF` anywhere in the file, or -1 when there is none.
+fn ps_last_eof(bytes: &[u8]) -> i64 {
+    let width = b"%%EOF".len();
+    if bytes.len() < width {
+        return -1;
+    }
+    (0..=(bytes.len() - width))
+        .rev()
+        .find(|at| bytes[*at..*at + width] == b"%%EOF"[..])
+        .map_or(-1i64, |at| at as i64)
+}
+
+/// The four numbers of a `%%BoundingBox`, or nothing when the text is not four integers.
+fn ps_box(value: &str) -> Option<[i64; 4]> {
+    let mut parts = value.split_whitespace();
+    let mut box_out = [0i64; 4];
+    for slot in box_out.iter_mut() {
+        *slot = parts.next()?.parse().ok()?;
+    }
+    Some(box_out)
+}
+
+fn read_ps(bytes: &[u8]) -> Option<Vec<String>> {
+    let mut start = 0usize;
+    let mut preview = None;
+    if bytes.starts_with(&PS_PREVIEW_MAGIC) && bytes.len() >= 28 {
+        let head = usize::try_from(Le(bytes).u32(20)?).ok()?;
+        let span = usize::try_from(Le(bytes).u32(24)?).ok()?;
+        let offset = head.checked_add(span)?;
+        if bytes
+            .get(offset..offset.checked_add(2)?)
+            .is_some_and(|head| head == b"%!")
+        {
+            preview = Some((head, span, offset));
+            start = offset;
+        }
+    }
+    if !bytes
+        .get(start..start.checked_add(2)?)
+        .is_some_and(|head| head == b"%!")
+    {
+        return None;
+    }
+    let banner_end = match bytes[start..].iter().position(|byte| *byte == b'\n') {
+        Some(offset) => start + offset,
+        None => bytes.len(),
+    };
+    let banner = ps_text(&bytes[start + 2..banner_end]);
+    let banner = banner.trim_end();
+    if banner.is_empty() {
+        return None;
+    }
+
+    let mut keyed: Vec<(String, String)> = Vec::new();
+    let mut structural = 0usize;
+    for line in bytes[start..].split(|byte| *byte == b'\n') {
+        let line = line.strip_suffix(&b"\r"[..]).unwrap_or(line);
+        if !line.starts_with(b"%%") {
+            continue;
+        }
+        let text = ps_text(&line[2..]);
+        let text = text.trim_end();
+        if text.starts_with("EOF") {
+            continue;
+        }
+        let Some((key, value)) = text.split_once(':') else {
+            structural += 1;
+            continue;
+        };
+        let key = key.trim();
+        if key.is_empty() || key.contains(' ') {
+            structural += 1;
+            continue;
+        }
+        keyed.push((key.to_owned(), value.trim().to_owned()));
+    }
+
+    let has_eof = bytes.trim_end().ends_with(b"%%EOF");
+    let claimed = keyed
+        .iter()
+        .find(|(key, _)| key == "Pages")
+        .and_then(|(_, value)| value.parse::<i64>().ok());
+    let found = keyed.iter().filter(|(key, _)| key == "Page").count();
+    let boxed = keyed
+        .iter()
+        .find(|(key, _)| key == "BoundingBox")
+        .map(|(_, value)| value.clone());
+    let bounds = boxed.as_deref().and_then(ps_box);
+    let broken = usize::from(!has_eof) + usize::from(boxed.is_some() && bounds.is_none());
+
+    let mut rows = vec![format!(
+        "ps\t{}\tbroken\t{broken}\tpreview\t{}\tstart\t{start}\tdsc\t{banner}",
+        bytes.len(),
+        if preview.is_some() { "yes" } else { "none" }
+    )];
+    if let Some((head, span, offset)) = preview {
+        rows.push(format!(
+            "preview\theader\t{head}\tdata\t{span}\tto\t{offset}\tbytes\t{}",
+            preview_bytes_hex(&bytes[4..20])
+        ));
+    }
+    if let Some([left, bottom, right, top]) = bounds {
+        rows.push(format!(
+            "bounds\t{left}\t{bottom}\t{right}\t{top}\twh\t{}x{}",
+            right - left,
+            top - bottom
+        ));
+    }
+    rows.push(format!(
+        "pages\tclaimed\t{}\tfound\t{found}",
+        claimed.map_or_else(|| "absent".to_owned(), |value| value.to_string())
+    ));
+    for (index, (key, value)) in keyed.iter().take(PS_LISTED).enumerate() {
+        rows.push(format!(
+            "comment\t{index}\t{key}\t{}",
+            if value.is_empty() { "-" } else { value }
+        ));
+    }
+    if keyed.len() > PS_LISTED {
+        rows.push(format!("cut\tcomments\t{}", keyed.len()));
+    }
+    rows.push(format!(
+        "comments\tcounted\t{}\tstructural\t{structural}\tlines\t{}\tcrlf\t{}\teof\t{}",
+        keyed.len(),
+        bytes.iter().filter(|byte| **byte == b'\n').count(),
+        bytes
+            .windows(2)
+            .filter(|pair| pair[0] == b'\r' && pair[1] == b'\n')
+            .count(),
+        ps_last_eof(bytes)
+    ));
+    rows.push(if has_eof {
+        "walked\tend".to_owned()
+    } else {
+        "stopped\tno\teof".to_owned()
+    });
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -5821,13 +5991,16 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_emf(bytes) {
         return accept(FORMAT_EMF, lines);
     }
+    if let Some(lines) = read_ps(bytes) {
+        return accept(FORMAT_PS, lines);
+    }
     // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
     // triangle count implies, so every container with a real signature gets to answer first.
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript or binary STL",
         -2,
     )
 }

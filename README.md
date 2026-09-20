@@ -263,25 +263,25 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 45 | 20.5% |
+| own Rust reader, named header fields decoded | 46 | 21.0% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **107** | 48.9% |
-| **covered, any level** | **112** | 51.1% |
+| **no parser at all - real gap** | **106** | 48.4% |
+| **covered, any level** | **113** | 51.6% |
 
-Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 8,
+Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 7,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
-name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`,
+name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 112 of 219 binary labels have a parser
-that runs here (45 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 107 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 113 of 219 binary labels have a parser
+that runs here (46 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 106 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -295,7 +295,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 112 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 113 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text and cross-references for x86-64, AArch64 and Thumb bytes |
 
@@ -372,6 +372,7 @@ temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes 
 temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
 temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
 temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
+temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -480,8 +481,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **112 covered** (45 field-level and 26
-container-level from this repo's own readers, 41 generated and mostly load-gated), **107 with no
+Coverage is scored against magika's 219 binary labels: **113 covered** (46 field-level and 26
+container-level from this repo's own readers, 41 generated and mostly load-gated), **106 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -687,6 +688,23 @@ does not re-derive them:
   agree to within the pixel the extents round apart. That pair is not a third copy of the same
   rectangle: on a file whose device is a monitor, it describes the monitor. The bounds themselves are
   checked outside this repo, against what Pillow's GDI-backed EMF opener reports as the image size.
+  PostScript (+1 field-level label, 113 covered, 106 gaps) claims a line rather than a magic: `%!` at
+  byte 0 - or not at byte 0 at all. LibreOffice's EPS export puts a binary preview in front, and the only
+  way to name it honestly is its own arithmetic: the two little-endian words at 20 and 24 are the header's
+  size (30) and the preview's length (11878), and their sum is exactly where `%!PS-Adobe-3.0` begins. That
+  sum is the gate; the sixteen bytes between the magic and those words are printed as hex and named
+  nothing, because one sample spells them `TK` and another puts a length there. ImageMagick supplies the
+  second producer, writing a plain `%!PS-Adobe-3.0` at offset 0, and the two disagree in the way worth
+  reporting: LibreOffice states `%%Pages: 0` for a file carrying one `%%Page: 1 1` while ImageMagick
+  states 1 for one page - so `pages` prints the claim and the count side by side, the third instance of
+  that shape after a PDF's `/Count` and an EMF's record count. Line endings are counted rather than
+  assumed (the DSC allows CR, LF or CRLF: the two fixtures hold 9 CRLF and 0 respectively), and
+  `broken` is the number of failed checks - a missing `%%EOF`, or a `%%BoundingBox` that is not four
+  numbers - reported beside, not instead of, a walk that still finished.
+  Lesson from the same round, and it undoes an old assumption: `magick` (ImageMagick 7.1.2) and a MiKTeX
+  install have been on this host the whole time. The formats recorded as "no producer here" were checked
+  against the package indexes and the obvious binaries, not against everything on PATH - so re-probe
+  before believing any blocked-by-producer claim, as with the PDF/Chromium and venv cases above.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

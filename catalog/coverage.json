@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 45,
+    "selfFields": 46,
     "selfContainer": 26,
     "binarySpecAvailable": 0,
-    "gaps": 107,
+    "gaps": 106,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -23,7 +23,7 @@
       "image": 9,
       "archive": 11,
       "code": 5,
-      "document": 8,
+      "document": 7,
       "executable": 5,
       "text": 2,
       "application": 9,
@@ -3138,8 +3138,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "powershell",

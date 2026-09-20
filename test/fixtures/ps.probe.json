@@ -1,0 +1,43 @@
+{
+ "plain.ps": {
+  "bytes": 5720,
+  "rows": [
+   "ps\t5720\tbroken\t0\tpreview\tnone\tstart\t0\tdsc\tPS-Adobe-3.0",
+   "bounds\t0\t0\t2\t2\twh\t2x2",
+   "pages\tclaimed\t1\tfound\t1",
+   "comment\t0\tCreator\t(ImageMagick)",
+   "comment\t1\tTitle\t(plain.ps)",
+   "comment\t2\tCreationDate\t(2026-09-20T21:09:58+00:00)",
+   "comment\t3\tBoundingBox\t-0 -0 2 2",
+   "comment\t4\tHiResBoundingBox\t0 0 2 2",
+   "comment\t5\tDocumentData\tClean7Bit",
+   "comment\t6\tLanguageLevel\t1",
+   "comment\t7\tOrientation\tPortrait",
+   "comment\t8\tPageOrder\tAscend",
+   "comment\t9\tPages\t1",
+   "comment\t10\tPage\t1 1",
+   "comment\t11\tPageBoundingBox\t0 0 2 2",
+   "comments\tcounted\t12\tstructural\t7\tlines\t280\tcrlf\t0\teof\t5714",
+   "walked\tend"
+  ]
+ },
+ "preview.eps": {
+  "bytes": 14149,
+  "rows": [
+   "ps\t14149\tbroken\t0\tpreview\tyes\tstart\t11908\tdsc\tPS-Adobe-3.0 EPSF-3.0",
+   "preview\theader\t30\tdata\t11878\tto\t11908\tbytes\t842e0000c10800000000000000000000",
+   "bounds\t0\t0\t539\t785\twh\t539x785",
+   "pages\tclaimed\t0\tfound\t1",
+   "comment\t0\tBoundingBox\t0 0 539 785",
+   "comment\t1\tPages\t0",
+   "comment\t2\tCreator\tLibreOffice 26.8",
+   "comment\t3\tTitle\tnone",
+   "comment\t4\tCreationDate\tnone",
+   "comment\t5\tLanguageLevel\t2",
+   "comment\t6\tBeginResource\tprocset SDRes-Prolog 1.0 0",
+   "comment\t7\tPage\t1 1",
+   "comments\tcounted\t8\tstructural\t10\tlines\t135\tcrlf\t9\teof\t14143",
+   "walked\tend"
+  ]
+ }
+}

@@ -324,6 +324,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tet.stl', 43], ['many.stl', 43], ['normals.stl', 43],
     ['srgb.icc', 44], ['xyz.icc', 44],
     ['page.emf', 45], ['gdi.emf', 45],
+    ['preview.eps', 46], ['plain.ps', 46],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -571,6 +572,22 @@ test('an enhanced metafile is walked record by record, and both counts are print
   assert.ok(page.includes('bounds	0	0	897	1308	wh	897x1308'), page.join(' | '));
 });
 
+test('a PostScript header buried behind a preview is found by its own arithmetic', () => {
+  // LibreOffice states `%%Pages: 0` for a file that carries one page comment, ImageMagick states 1 for
+  // one page, and the reader reports both numbers without correcting either.
+  const eps = assertReadable('container', 'preview.eps', 46).rows;
+  assert.equal(eps[0], 'ps	14149	broken	0	preview	yes	start	11908	dsc	PS-Adobe-3.0 EPSF-3.0', eps.join(' | '));
+  assert.equal(eps[1], 'preview	header	30	data	11878	to	11908	bytes	842e0000c10800000000000000000000');
+  assert.ok(eps.includes('pages	claimed	0	found	1'), eps.join(' | '));
+  assert.equal(eps[eps.length - 1], 'walked	end');
+
+  const plain = assertReadable('container', 'plain.ps', 46).rows;
+  assert.equal(plain[0], 'ps	5720	broken	0	preview	none	start	0	dsc	PS-Adobe-3.0', plain.join(' | '));
+  assert.ok(plain.includes('comment	0	Creator	(ImageMagick)'), plain.join(' | '));
+  assert.ok(plain.includes('pages	claimed	1	found	1'), plain.join(' | '));
+  assert.ok(plain.includes('bounds	0	0	2	2	wh	2x2'), plain.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -616,6 +633,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
     ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
+    ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
