@@ -42,8 +42,8 @@ fn label<T: std::fmt::Debug>(value: &T) -> String {
 }
 
 /// A symbol row. Static and dynamic tables share the shape but not the lifetime, so both come
-/// through here.
-fn symbol_row<T: ObjectSymbol>(prefix: &str, index: usize, symbol: &T) -> String {
+/// through here; the reader's symbol trait is parameterised over the input's lifetime.
+fn symbol_row<'data, T: ObjectSymbol<'data>>(prefix: &str, index: usize, symbol: &T) -> String {
     format!(
         "{prefix}\t{index}\t{}\taddr\t{}\tsize\t{}\tkind\t{}\tsection\t{}",
         clean(symbol.name().unwrap_or("?")),
