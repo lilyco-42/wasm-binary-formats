@@ -310,6 +310,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.bplist', 31], ['keyed.bplist', 31],
     ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
     ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
+    ['tiny.woff2', 34],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -347,6 +348,16 @@ test('a JPEG 2000 container keeps its box order and its height-first ihdr', () =
   const grey = assertReadable('container', 'grey.jp2', 33).rows;
   assert.equal(grey[7], 'ihdr	8	64	1	8	filter	7');
   assert.equal(grey[8], 'colr	1	17');
+});
+
+test('a WOFF2 directory arrives with the lengths its TTF parent gives', () => {
+  const rows = assertReadable('container', 'tiny.woff2', 34).rows;
+  assert.equal(rows[0], 'woff2	312	312	10	0');
+  assert.equal(rows[1], 'flavor	10000	sfnt	636', 'the sfnt size is the length of tiny.ttf');
+  assert.ok(rows.includes('table	2	glyf	28	54	0'), 'the one table with a transform length: ' + rows[6]);
+  assert.ok(rows.includes('table	6	loca	6	0	0'), rows.slice(4, 14).join(' | '));
+  assert.ok(rows.includes('directory	70	read	10	broken	0	data_end	309	padding	3'), rows[14]);
+  assert.ok(rows.includes('walked	end'), rows[15]);
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
@@ -393,7 +404,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

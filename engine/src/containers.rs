@@ -12,6 +12,8 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   woff2 "wOF2", u32 flavor/length, u16 table count, u32 sfnt size + compressed size, then a
+//!         directory of flags + UIntBase128 lengths over one brotli block
 //!   jp2   u32 length + FourCC boxes, first box `jP  ` with signature 0x0D0A870A; `ihdr` inside
 //!         the `jp2h` superbox lists height before width and sample depth minus one
 //!   qoi   "qoif", u32 width, u32 height, u8 channels, u8 colourspace, then one-byte-tagged
@@ -85,6 +87,7 @@ pub fn name() -> &'static str {
         FORMAT_BPLIST => "bplist",
         FORMAT_QOI => "qoi",
         FORMAT_JP2 => "jp2",
+        FORMAT_WOFF2 => "woff2",
         _ => "unknown",
     }
 }
@@ -2557,6 +2560,147 @@ fn read_jp2(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// WOFF2: the header, the table directory, and where the compressed block ends. 34, after JP2 at 33.
+///
+/// Unlike WOFF (28), which stores each table separately and may compress each one, WOFF2 keeps a
+/// *directory of lengths* and one brotli block for all of them - so the read here is the directory,
+/// and the decompression is deliberately not attempted (no brotli in a dependency-free crate). The
+/// directory entries are `flags` (six bits of table name, two bits of transform version), an optional
+/// literal tag when those six bits say 63, then `origLength` and - only for `glyf` and `loca` at
+/// version 0 - `transformLength`, all lengths as UIntBase128.
+///
+/// The 63-entry name table below is not recited from memory: `scripts/make-woff2-fixture.py` dumps
+/// fontTools' own `woff2KnownTags`, and `engine/tests/woff2.rs` compares the two. The fixture also
+/// carries the witness that matters more than any table - every untransformed `origLength` equals the
+/// length that same table has in `test/fixtures/tiny.ttf`, the font this file was made from, so a
+/// directory walked with the wrong widths could not agree with it.
+pub const FORMAT_WOFF2: i32 = 34;
+
+const WOFF2_TABLES: usize = 256;
+
+/// Index = tag, exactly as fontTools lists them; the probe next to the fixture is the copy this came
+/// from, and the test fails if the two drift apart.
+pub const WOFF2_KNOWN_TAGS: [&str; 63] = [
+    "cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post", "cvt ", "fpgm", "glyf", "loca",
+    "prep", "CFF ", "VORG", "EBDT", "EBLC", "gasp", "hdmx", "kern", "LTSH", "PCLT", "VDMX", "vhea",
+    "vmtx", "BASE", "GDEF", "GPOS", "GSUB", "EBSC", "JSTF", "MATH", "CBDT", "CBLC", "COLR", "CPAL",
+    "SVG ", "sbix", "acnt", "avar", "bdat", "bloc", "bsln", "cvar", "fdsc", "feat", "fmtx", "fvar",
+    "gvar", "hsty", "just", "lcar", "mort", "morx", "opbd", "prop", "trak", "Zapf", "Silf", "Glat",
+    "Gloc", "Feat", "Sill",
+];
+
+const WOFF2_UNKNOWN_TAG: u8 = 63;
+
+/// UIntBase128: big-endian septets, the high bit meaning "another byte follows". The format allows
+/// five, so a fifth continuation bit is a broken directory, not a bigger number.
+fn u128(bytes: &[u8], at: usize) -> Option<(u64, usize)> {
+    let mut value = 0u64;
+    let mut cursor = at;
+    for _ in 0..5 {
+        let byte = *bytes.get(cursor)?;
+        cursor += 1;
+        value = (value << 7) | u64::from(byte & 0x7F);
+        if byte & 0x80 == 0 {
+            return Some((value, cursor));
+        }
+    }
+    None
+}
+
+fn read_woff2(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 48 || !bytes.starts_with(b"wOF2") {
+        return None;
+    }
+    let flavor = be_u32_at(bytes, 4)?;
+    let declared = be_u32_at(bytes, 8)?;
+    let tables = be_u16(bytes, 12)?;
+    let reserved = be_u16(bytes, 14)?;
+    let total_sfnt = be_u32_at(bytes, 16)?;
+    let compressed = be_u32_at(bytes, 20)?;
+    let major = be_u16(bytes, 24)?;
+    let minor = be_u16(bytes, 26)?;
+    let mut entries = vec![
+        format!("woff2\t{declared}\t{}\t{tables}\t{reserved}", bytes.len()),
+        format!("flavor\t{flavor:x}\tsfnt\t{total_sfnt}"),
+        format!("header\t{major}\t{minor}\tcompressed\t{compressed}"),
+        format!(
+            "areas\t{}\t{}\t{}\t{}\t{}",
+            be_u32_at(bytes, 28)?,
+            be_u32_at(bytes, 32)?,
+            be_u32_at(bytes, 36)?,
+            be_u32_at(bytes, 40)?,
+            be_u32_at(bytes, 44)?
+        ),
+    ];
+    let mut at = 48usize;
+    let mut walked = 0i64;
+    let mut broken = 0i64;
+    for index in 0..tables.min(WOFF2_TABLES as i64) {
+        let Some(flags) = bytes.get(at).copied() else {
+            broken += 1;
+            break;
+        };
+        at += 1;
+        let slot = flags & 0x3F;
+        let version = flags >> 6;
+        let tag = if slot == WOFF2_UNKNOWN_TAG {
+            let Some(end) = at.checked_add(4) else {
+                broken += 1;
+                break;
+            };
+            match bytes.get(at..end) {
+                Some(raw) => {
+                    at = end;
+                    fourcc(raw)
+                }
+                None => {
+                    broken += 1;
+                    break;
+                }
+            }
+        } else {
+            WOFF2_KNOWN_TAGS[usize::from(slot)].to_owned()
+        };
+        let Some((original, after)) = u128(bytes, at) else {
+            broken += 1;
+            break;
+        };
+        at = after;
+        // Only glyf and loca carry a second length, and only at version 0 (their transformed form).
+        let transformed = if (tag == "glyf" || tag == "loca") && version == 0 {
+            match u128(bytes, at) {
+                Some((value, after)) => {
+                    at = after;
+                    i64::try_from(value).unwrap_or(i64::MAX)
+                }
+                None => {
+                    broken += 1;
+                    -1
+                }
+            }
+        } else {
+            -1
+        };
+        entries.push(format!(
+            "table\t{index}\t{tag}\t{original}\t{transformed}\t{version}"
+        ));
+        walked += 1;
+    }
+    if tables > WOFF2_TABLES as i64 {
+        broken += 1;
+    }
+    let data_end = at as i64 + compressed;
+    let padded = data_end.saturating_add(3) & !3;
+    entries.push(format!(
+        "directory\t{at}\tread\t{walked}\tbroken\t{broken}\tdata_end\t{data_end}\tpadding\t{}",
+        padded - data_end
+    ));
+    if broken == 0 && declared == bytes.len() as i64 && padded == bytes.len() as i64 {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -2625,8 +2769,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_jp2(bytes) {
         return accept(FORMAT_JP2, lines);
     }
+    if let Some(lines) = read_woff2(bytes) {
+        return accept(FORMAT_WOFF2, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI or JPEG 2000 container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2 or JPEG 2000 container",
         -2,
     )
 }

@@ -263,24 +263,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 35 | 16.0% |
+| own Rust reader, named header fields decoded | 36 | 16.4% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **120** | 54.8% |
-| **covered, any level** | **99** | 45.2% |
+| **no parser at all - real gap** | **119** | 54.3% |
+| **covered, any level** | **100** | 45.7% |
 
 Top binary gap groups by count: unknown 57, archive 14, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf`/`woff2` -
-`otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
-Python refuses to install into its own environment.
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf` -
+`otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
+reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 99 of 219 binary labels have a parser
-that runs here (35 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 120 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 100 of 219 binary labels have a parser
+that runs here (36 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 119 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -296,6 +296,7 @@ python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes i
 python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tools/plist-sim.py decodes them back
 python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and decodes them back
 python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; the probe walks them back
+temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -386,8 +387,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **99 covered** (35 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **120 with no
+Coverage is scored against magika's 219 binary labels: **100 covered** (36 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **119 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -412,8 +413,9 @@ does not re-derive them:
   the same bytes). Same lesson as the PDF writer: look at what already exists before recording a
   format as unproducible. Fonts went the same way - `fontTools` is installed and MIT-licensed, and it
   compiles a two-glyph font out of nothing, so `tiny.ttf`/`tiny.woff` are an independent writer's
-  bytes with no third-party outline to licence (+2 labels; `woff2` still needs `brotli`, which this
-  Python refuses to install into itself).
+  bytes with no third-party outline to licence (+2 labels; `woff2` looked blocked because the one
+  dependency it needs, `brotli`, would not install into the interpreter on PATH - which the next
+  paragraph shows was a mistake of attribution).
   `applebplist` looked for its producer in the wrong place too: CPython's `plistlib` writes the binary
   format, so `scripts/make-plist-fixtures.py` dumps three files - a dictionary holding one value of
   every scalar type, a KeyedArchiver graph whose `$top` reaches its objects only through UIDs, and an
@@ -448,6 +450,19 @@ does not re-derive them:
   `SIZ` segment's own geometry was dropped from the probe for the same reason: laid out from memory it
   did not add up to its declared length, so the reader keeps to the boxes and leaves the codestream at
   its SOC marker.
+  **A recorded blocker is worth re-testing before it is repeated.** `woff2` had been listed as a gap
+  "because writing it needs `brotli` and this Python refuses to install into its own environment" -
+  true of the interpreter on PATH, irrelevant to the machine: `python -m venv --system-site-packages
+  temp/venv` plus one `pip install fonttools brotli` worked immediately, and network access turned out
+  to be available. That produced `tiny.woff2` (+1 field-level label, 100 covered, 119 gaps) and put
+  `npy`/`h5`/`parquet` in reach too. The read itself is the table directory over one brotli block -
+  decompression is *not* attempted, because a dependency-free wasm crate cannot do it, which is why the
+  credit is header-and-directory fields and not a rendered glyph. Two witnesses keep the directory honest:
+  every untransformed `origLength` equals the length that table has in `tiny.ttf`, the font the file was
+  made from (the test reads both), and the 63-entry known-tag list is compared in order against
+  fontTools' own copy inside `woff2.probe.json` rather than against a recollection - the failure mode
+  this repo has hit in three formats now. `glyf` and `loca` at version 0 carry a second, transformed
+  length; `DSIG`-style arbitrary tags name themselves in the entry.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

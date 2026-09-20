@@ -1,0 +1,189 @@
+{
+ "directory_end": 70,
+ "header": {
+  "flavor": 65536,
+  "meta": [
+   0,
+   0,
+   0
+  ],
+  "num_tables": 10,
+  "priv": [
+   0,
+   0
+  ],
+  "reserved": 0,
+  "total_compressed_size": 239,
+  "total_sfnt_size": 636,
+  "version": [
+   1,
+   0
+  ]
+ },
+ "known_tags": [
+  "cmap",
+  "head",
+  "hhea",
+  "hmtx",
+  "maxp",
+  "name",
+  "OS/2",
+  "post",
+  "cvt ",
+  "fpgm",
+  "glyf",
+  "loca",
+  "prep",
+  "CFF ",
+  "VORG",
+  "EBDT",
+  "EBLC",
+  "gasp",
+  "hdmx",
+  "kern",
+  "LTSH",
+  "PCLT",
+  "VDMX",
+  "vhea",
+  "vmtx",
+  "BASE",
+  "GDEF",
+  "GPOS",
+  "GSUB",
+  "EBSC",
+  "JSTF",
+  "MATH",
+  "CBDT",
+  "CBLC",
+  "COLR",
+  "CPAL",
+  "SVG ",
+  "sbix",
+  "acnt",
+  "avar",
+  "bdat",
+  "bloc",
+  "bsln",
+  "cvar",
+  "fdsc",
+  "feat",
+  "fmtx",
+  "fvar",
+  "gvar",
+  "hsty",
+  "just",
+  "lcar",
+  "mort",
+  "morx",
+  "opbd",
+  "prop",
+  "trak",
+  "Zapf",
+  "Silf",
+  "Glat",
+  "Gloc",
+  "Feat",
+  "Sill"
+ ],
+ "length": 312,
+ "tables": [
+  {
+   "index": 0,
+   "orig": 96,
+   "tag": "OS/2",
+   "tag_index": 6,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 1,
+   "orig": 52,
+   "tag": "cmap",
+   "tag_index": 0,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 2,
+   "orig": 28,
+   "tag": "glyf",
+   "tag_index": 10,
+   "transform": 54,
+   "version": 0
+  },
+  {
+   "index": 3,
+   "orig": 54,
+   "tag": "head",
+   "tag_index": 1,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 4,
+   "orig": 36,
+   "tag": "hhea",
+   "tag_index": 2,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 5,
+   "orig": 8,
+   "tag": "hmtx",
+   "tag_index": 3,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 6,
+   "orig": 6,
+   "tag": "loca",
+   "tag_index": 11,
+   "transform": 0,
+   "version": 0
+  },
+  {
+   "index": 7,
+   "orig": 32,
+   "tag": "maxp",
+   "tag_index": 4,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 8,
+   "orig": 108,
+   "tag": "name",
+   "tag_index": 5,
+   "transform": null,
+   "version": 0
+  },
+  {
+   "index": 9,
+   "orig": 38,
+   "tag": "post",
+   "tag_index": 7,
+   "transform": null,
+   "version": 0
+  }
+ ],
+ "transformed_tags": [
+  "glyf",
+  "loca"
+ ],
+ "ttf_length": 636,
+ "ttf_table_sizes": {
+  "OS/2": 96,
+  "cmap": 52,
+  "glyf": 26,
+  "head": 54,
+  "hhea": 36,
+  "hmtx": 8,
+  "loca": 6,
+  "maxp": 32,
+  "name": 108,
+  "post": 38
+ },
+ "unknown_tag_index": 63
+}

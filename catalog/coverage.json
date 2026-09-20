@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 35,
+    "selfFields": 36,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 120,
+    "gaps": 119,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -28,7 +28,7 @@
       "text": 2,
       "application": 10,
       "inode": 3,
-      "font": 2,
+      "font": 1,
       "undefined": 1
     }
   },
@@ -4543,8 +4543,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "xar",
