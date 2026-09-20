@@ -42,7 +42,7 @@ const SELF = {
   // Only the two labels a generated `microsoft_cfb` reader does not carry: magika names the Word and
   // Excel documents by what is inside the compound file, and this reader stops at the container.
   doc: ['container'], xls: ['container'],
-  arrow: ['fields'], parquet: ['fields'], onnx: ['fields'], heif: ['fields'],
+  arrow: ['fields'], parquet: ['fields'], onnx: ['fields'], heif: ['fields'], stlbinary: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };

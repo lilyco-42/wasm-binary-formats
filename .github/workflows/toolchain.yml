@@ -54,3 +54,21 @@ jobs:
           rustup target add wasm32-unknown-unknown >/dev/null
           cargo build --release --target wasm32-unknown-unknown 2>&1 | tail -3
           ls -l target/wasm32-unknown-unknown/release/*.wasm 2>/dev/null | awk '{print "wasm artifact:", $5, "bytes", $9}'
+
+      # The question a C analysis engine (Capstone, and through it the disassembler the page would
+      # want) turns on: can this runner embox C at all, and how heavy is the result. Timed, because a
+      # probe that takes half an hour is not a build step.
+      - name: can a C engine be compiled to wasm here
+        timeout-minutes: 12
+        run: |
+          printf 'int answer(void) { return 42; }\n' > /tmp/probe.c
+          started=$(date +%s)
+          if sudo apt-get install -y -q emscripten >/tmp/apt.log 2>&1; then
+            echo "apt installed emscripten in $(( $(date +%s) - started ))s"
+            emcc --version | head -1
+            emcc -O2 /tmp/probe.c -o /tmp/probe.wasm 2>&1 | tail -3
+            ls -l /tmp/probe.wasm 2>/dev/null | awk '{print "emscripten wasm:", $5, "bytes"}' || echo "emcc produced no wasm"
+          else
+            echo "apt failed; tail:"
+            tail -5 /tmp/apt.log
+          fi

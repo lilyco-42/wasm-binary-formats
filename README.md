@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 42 | 19.2% |
+| own Rust reader, named header fields decoded | 43 | 19.6% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **110** | 50.2% |
-| **covered, any level** | **109** | 49.8% |
+| **no parser at all - real gap** | **109** | 49.8% |
+| **covered, any level** | **110** | 50.2% |
 
-Top binary gap groups by count: unknown 54, archive 11, image 10, application 10, document 8,
+Top binary gap groups by count: unknown 54, archive 11, image 9, application 10, document 8,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
@@ -279,9 +279,9 @@ name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`,
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 109 of 219 binary labels have a parser
-that runs here (42 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 110 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 110 of 219 binary labels have a parser
+that runs here (43 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 109 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -339,6 +339,7 @@ temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes 
 temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
 temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
 temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
+temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -597,6 +598,15 @@ does not re-derive them:
   stream name and size. The invariant the reader actually claims is the one a document does not need:
   chains are linked lists, so sector numbers interleave freely, but no sector may belong to two
   owners - `collisions` counts the ones that do, and it is 0 in all three real files.
+  Binary STL (+1 field-level label, 110 covered, 109 gaps) is the opposite case: a format with no
+  magic at all, where the only thing a file asserts about itself is `84 + 50 * triangles == size`.
+  That identity is necessary and not sufficient - text happens to satisfy arithmetic too - so the
+  reader also asks that the coordinates it is about to name are finite and that the stored normal is
+  either zero or a unit vector, which is what turns an ASCII STL away. Normals are then listed as
+  written *and* counted against the normal the three points imply, because writers disagree: meshio
+  computes them, plenty of exporters leave them at zero, and `normals.stl` carries both cases on
+  purpose. `scripts/make-stl-fixtures.py` writes the meshes with meshio and asserts that meshio's own
+  reader returns the same triangle count the header declares.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

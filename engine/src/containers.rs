@@ -19,6 +19,9 @@
 //!   cfb   D0CF11E0A1B11AE1 + a 512-byte header naming the sector size as a shift, a FAT whose own
 //!         sector list is the 109-slot DIFAT, 128-byte directory entries, and streams under the
 //!         0x1000 cutoff chained through a second FAT inside the root entry's own data
+//!   stl   no magic at all: 80 header bytes, u32 triangle count, 50 bytes per triangle, so
+//!         84 + 50n == filesize is the only thing the format asserts about itself; a stored normal
+//!         is listed as written and counted against the normal the three points imply
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
@@ -113,6 +116,7 @@ pub fn name() -> &'static str {
         FORMAT_ONNX => "onnx",
         FORMAT_HEIF => "heif",
         FORMAT_CFB => "cfb",
+        FORMAT_STL => "stl",
         _ => "unknown",
     }
 }
@@ -5207,6 +5211,217 @@ fn read_cfb(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// Binary STL: 80 header bytes, a u32 triangle count, then exactly 50 bytes per triangle.
+///
+/// The format has no magic, so the only self-statement a file can make is the arithmetic - and that
+/// is necessary, not sufficient, so the reader also requires the first and last readable triangle's
+/// coordinates to be finite numbers before it claims the file. The stored normal is not trusted: it
+/// is listed as written and counted against the normal the three points imply, because writers differ
+/// and some leave it zeroed.
+pub const FORMAT_STL: i32 = 43;
+
+const STL_HEAD: usize = 80;
+const STL_TRI: usize = 50;
+const STL_LISTED: usize = 16;
+const STL_MAX_TRIS: u32 = 200_000_000;
+
+fn stl_f32(bytes: &[u8], at: usize) -> Option<f32> {
+    let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(f32::from_le_bytes(raw))
+}
+
+fn stl_u32(bytes: &[u8], at: usize) -> Option<u32> {
+    let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(u32::from_le_bytes(raw))
+}
+
+fn stl_u16(bytes: &[u8], at: usize) -> Option<u32> {
+    let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+    Some(u32::from(u16::from_le_bytes(raw)))
+}
+
+/// The 80-byte header is free text; anything that is not printable becomes a dot, and only the dots
+/// the padding produced are trimmed off the end.
+fn stl_text(bytes: &[u8]) -> String {
+    let text: String = bytes[..STL_HEAD]
+        .iter()
+        .map(|byte| {
+            if (0x20..0x7F).contains(byte) {
+                char::from(*byte)
+            } else {
+                '.'
+            }
+        })
+        .collect();
+    let trimmed = text.trim_end_matches('.');
+    if trimmed.is_empty() {
+        "-".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+fn stl_trio(bytes: &[u8], at: usize) -> Option<String> {
+    let parts: Vec<String> = (0..3)
+        .filter_map(|axis| stl_f32(bytes, at + axis * 4))
+        .map(|value| format!("{value:.6}"))
+        .collect();
+    if parts.len() == 3 {
+        Some(parts.join(","))
+    } else {
+        None
+    }
+}
+
+/// True when the twelve coordinates of one triangle are all real numbers.
+fn stl_triangle_sane(bytes: &[u8], base: usize) -> bool {
+    (0..12).all(|axis| stl_f32(bytes, base + 4 + axis * 4).map_or(false, |value| value.is_finite()))
+}
+
+/// A binary STL's stored normal is a unit vector - or zero, which plenty of writers emit. Text bytes
+/// read as three denormal floats, so this is what keeps an ASCII STL from being reported as a binary
+/// one whose triangles happen to line up.
+fn stl_normal_plausible(bytes: &[u8], base: usize) -> bool {
+    let parts: Vec<f32> = (0..3)
+        .filter_map(|axis| stl_f32(bytes, base + axis * 4))
+        .collect();
+    if parts.len() != 3 {
+        return false;
+    }
+    let length = parts.iter().map(|part| part * part).sum::<f32>().sqrt();
+    length == 0.0 || (0.5..1.5).contains(&length)
+}
+
+/// The unit normal the three points imply, as a cross product; `None` when the points are collinear.
+fn stl_implied(points: [f32; 9]) -> Option<[f32; 3]> {
+    let a = &points[0..3];
+    let b = &points[3..6];
+    let c = &points[6..9];
+    let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let cross = [
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    ];
+    let length = (cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]).sqrt();
+    if length == 0.0 {
+        return None;
+    }
+    Some([cross[0] / length, cross[1] / length, cross[2] / length])
+}
+
+fn read_stl(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < STL_HEAD + 4 + STL_TRI {
+        return None;
+    }
+    let count = stl_u32(bytes, STL_HEAD)?;
+    if count == 0 || count > STL_MAX_TRIS {
+        return None;
+    }
+    let declared = 84usize.checked_add(count as usize * STL_TRI)?;
+    if !stl_triangle_sane(bytes, STL_HEAD + 4) || !stl_normal_plausible(bytes, STL_HEAD + 4) {
+        return None;
+    }
+    // A file that claims far more triangles than it holds is still recognisably an STL, so it is
+    // read and reported rather than refused; a file whose last bytes are elsewhere is the same case.
+    let readable = (bytes.len() - (STL_HEAD + 4)) / STL_TRI;
+    let last = readable.min(count as usize) - 1;
+    if readable == 0 || !stl_triangle_sane(bytes, STL_HEAD + 4 + last * STL_TRI) {
+        return None;
+    }
+    let fit = match declared.cmp(&bytes.len()) {
+        std::cmp::Ordering::Equal => "exact",
+        std::cmp::Ordering::Less => "short",
+        std::cmp::Ordering::Greater => "long",
+    };
+    let mut broken = usize::from(fit != "exact");
+
+    let listed = usize::try_from(count)
+        .unwrap_or(usize::MAX)
+        .min(STL_LISTED)
+        .min(readable);
+    let mut rows = Vec::new();
+    let mut low = [f32::MAX; 3];
+    let mut high = [f32::MIN; 3];
+    let mut zeroed = 0usize;
+    let mut wrong = 0usize;
+    for index in 0..listed {
+        let base = STL_HEAD + 4 + index * STL_TRI;
+        let normal: [f32; 3] = [
+            stl_f32(bytes, base)?,
+            stl_f32(bytes, base + 4)?,
+            stl_f32(bytes, base + 8)?,
+        ];
+        let mut points = [0f32; 9];
+        for slot in 0..9 {
+            points[slot] = stl_f32(bytes, base + 12 + slot * 4)?;
+        }
+        for corner in 0..3 {
+            for axis in 0..3 {
+                let value = points[corner * 3 + axis];
+                low[axis] = low[axis].min(value);
+                high[axis] = high[axis].max(value);
+            }
+        }
+        if normal.iter().all(|part| *part == 0.0) {
+            zeroed += 1;
+        } else if stl_implied(points).map_or(true, |implied| {
+            (0..3).any(|axis| (normal[axis] - implied[axis]).abs() > 1e-3)
+        }) {
+            wrong += 1;
+        }
+        rows.push(format!(
+            "tri\t{index}\tnormal\t{}\tv0\t{}\tv1\t{}\tv2\t{}\tattr\t{}",
+            stl_trio(bytes, base)?,
+            stl_trio(bytes, base + 12)?,
+            stl_trio(bytes, base + 24)?,
+            stl_trio(bytes, base + 36)?,
+            stl_u16(bytes, base + 48)?
+        ));
+    }
+    if count as usize > listed {
+        rows.push(format!("cut\ttris\t{count}"));
+    }
+    if listed > 0 {
+        rows.push(format!(
+            "box\tmin\t{}\tmax\t{}",
+            low.iter()
+                .map(|value| format!("{value:.6}"))
+                .collect::<Vec<_>>()
+                .join(","),
+            high.iter()
+                .map(|value| format!("{value:.6}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
+    rows.insert(
+        0,
+        format!(
+            "sizes\tdeclared\t{declared}\tactual\t{}\tfit\t{fit}",
+            bytes.len()
+        ),
+    );
+    rows.push(format!(
+        "normals\tzero\t{zeroed}\twrong\t{wrong}\tcounted\t{listed}"
+    ));
+    rows.insert(
+        0,
+        format!(
+            "stl\t{}\ttris\t{count}\tbroken\t{broken}\tsolid\t{}",
+            bytes.len(),
+            stl_text(bytes)
+        ),
+    );
+    if broken == 0 {
+        rows.push("walked\tend".to_owned());
+    } else {
+        rows.push(format!("stopped\tbroken\t{broken}"));
+    }
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -5304,8 +5519,13 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_cfb(bytes) {
         return accept(FORMAT_CFB, lines);
     }
+    // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
+    // triangle count implies, so every container with a real signature gets to answer first.
+    if let Some(lines) = read_stl(bytes) {
+        return accept(FORMAT_STL, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image or compound file",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file or binary STL",
         -2,
     )
 }
