@@ -1,0 +1,71 @@
+name: Disassembler module
+
+# A feasibility build, kept out of engine.yml on purpose: nothing the demo or the coverage gates
+# depend on can be broken by this. It answers one question with artefacts rather than opinion - can a
+# real disassembly engine be compiled for the browser by this runner, how big is it, and does it print
+# the instructions the native library does?
+#
+# Capstone is BSD-3 licensed; the built module is uploaded as an artifact only, and is not put on the
+# Pages site until a demo panel and tests exist for it.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CAPSTONE_REF: 5.0.5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install the toolchain
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q emscripten cmake ninja-build
+          emcc --version | head -1
+          cmake --version | head -1
+
+      - name: fetch capstone
+        run: git clone --depth 1 --branch "$CAPSTONE_REF" https://github.com/capstone-engine/capstone.git vendor/capstone
+
+      # x86, AArch64 and Thumb only: those are the sections the container readers here can already
+      # locate, and every architecture added is another megabyte every visitor would have to opt into.
+      - name: build the engine for wasm
+        run: |
+          source /usr/share/emscripten/emsdk/emsdk_env.sh 2>/dev/null || true
+          emcmake cmake -S vendor/capstone -B build-capstone -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DBUILD_SHARED_LIBS=0 \
+            -DCAPSTONE_BUILD_TESTS=0 \
+            -DCAPSTONE_ARCHITECTURE_DEFAULT=0 \
+            -DCAPSTONE_X86_SUPPORT=1 \
+            -DCAPSTONE_ARM_SUPPORT=1 \
+            -DCAPSTONE_ARM64_SUPPORT=1
+          cmake --build build-capstone -j3
+          ls -l build-capstone/*.a | awk '{print "static library:", $5, "bytes", $9}'
+
+      - name: link the shim
+        run: |
+          emcc -O2 -I vendor/capstone/include disasm/shim.c \
+            build-capstone/libcapstone.a -o apk-lens-disasm.wasm \
+            -s STANDALONE_WASM -s EXPORTED_FUNCTIONS=_disasm_run,_disasm_count,_disasm_at,_self_test,_malloc,_free \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=0
+          ls -l apk-lens-disasm.wasm | awk '{print "module:", $5, "bytes"}'
+          gzip -kc apk-lens-disasm.wasm | wc -c | awk '{print "gzipped:", $1, "bytes"}'
+
+      # The answer this job exists for: does the module, run here, print the same instructions the
+      # library prints natively? node runs a core-wasm module without a browser.
+      - name: smoke test the module
+        run: node test/disasm.test.mjs apk-lens-disasm.wasm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-lens-disasm-wasm
+          path: apk-lens-disasm.wasm
+          retention-days: 14
