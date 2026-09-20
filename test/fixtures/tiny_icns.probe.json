@@ -1,0 +1,132 @@
+{
+  "bytes": 13452,
+  "declaredLength": 13452,
+  "detail": "64x64 RGBA icon; Pillow writes the full icon set, upscaled from the source",
+  "entries": [
+    {
+      "body": 64,
+      "first4": "69633037",
+      "format": "metadata",
+      "pillow": null,
+      "size": 72,
+      "tag": "TOC "
+    },
+    {
+      "body": 394,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 128,
+      "pillow": [
+        128,
+        128,
+        "PNG"
+      ],
+      "size": 402,
+      "tag": "ic07",
+      "width": 128
+    },
+    {
+      "body": 859,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 256,
+      "pillow": [
+        256,
+        256,
+        "PNG"
+      ],
+      "size": 867,
+      "tag": "ic08",
+      "width": 256
+    },
+    {
+      "body": 2203,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 512,
+      "pillow": [
+        512,
+        512,
+        "PNG"
+      ],
+      "size": 2211,
+      "tag": "ic09",
+      "width": 512
+    },
+    {
+      "body": 6493,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 1024,
+      "pillow": [
+        1024,
+        1024,
+        "PNG"
+      ],
+      "size": 6501,
+      "tag": "ic10",
+      "width": 1024
+    },
+    {
+      "body": 112,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 32,
+      "pillow": [
+        32,
+        32,
+        "PNG"
+      ],
+      "size": 120,
+      "tag": "ic11",
+      "width": 32
+    },
+    {
+      "body": 185,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 64,
+      "pillow": [
+        64,
+        64,
+        "PNG"
+      ],
+      "size": 193,
+      "tag": "ic12",
+      "width": 64
+    },
+    {
+      "body": 859,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 256,
+      "pillow": [
+        256,
+        256,
+        "PNG"
+      ],
+      "size": 867,
+      "tag": "ic13",
+      "width": 256
+    },
+    {
+      "body": 2203,
+      "first4": "89504e47",
+      "format": "png",
+      "height": 512,
+      "pillow": [
+        512,
+        512,
+        "PNG"
+      ],
+      "size": 2211,
+      "tag": "ic14",
+      "width": 512
+    }
+  ],
+  "entriesEnd": 13452,
+  "fixture": "tiny.icns",
+  "magic": "icns",
+  "tiled": true,
+  "written_by": "Pillow 12.3.0 ICNS plugin"
+}

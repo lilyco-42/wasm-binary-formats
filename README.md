@@ -263,12 +263,12 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 31 | 14.2% |
+| own Rust reader, named header fields decoded | 32 | 14.6% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **124** | 56.6% |
-| **covered, any level** | **95** | 43.4% |
+| **no parser at all - real gap** | **123** | 56.2% |
+| **covered, any level** | **96** | 43.8% |
 
 Top gap groups by count: unknown 58, image 14, archive 14, application 11, document 10, executable 6.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
@@ -277,9 +277,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
 Python refuses to install into its own environment.
 
-So the honest answer to the objective is **no, not yet**: 95 of 219 binary labels have a parser
-that runs here (31 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 124 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 96 of 219 binary labels have a parser
+that runs here (32 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 123 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -291,6 +291,7 @@ node tools/coverage.mjs          # writes catalog/coverage.json, the 219-label m
 node scripts/make-fixture.mjs    # rewrites test/fixtures/lab-fixture.apk
 bash scripts/make-media-fixtures.sh    # ffmpeg/Pillow media, tiny.pcx, tiny.pdf
 bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and their probes
+python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes it back for the probe
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -342,6 +343,15 @@ builds the wasm target and runs both test layers on CI.
   and the stream. One `assert.equal(pcx.palette256, undefined)` cost 37 s to fail - long enough to
   stall the CI step and look like a hang. The whole media file now runs in 18 ms, because the
   assertions compare scalars and lengths instead of handing objects to the comparator.
+* A remembered table is the thing this repo keeps getting caught by. Apple's icon types are usually
+  described by a tag-to-size table, but Pillow writes `ic13` and `ic14` at 256 and 512 *image* pixels,
+  not at the point sizes the names imply - so the ICNS reader takes its dimensions from each embedded
+  PNG's own header, and `scripts/make-icon-fixtures.py` writes a probe that decodes the payload again
+  with Pillow, which is what says the two agree. Same class as the section ids for WebAssembly (10 is
+  `code`, not `data count`), which a first simulation got wrong before the real module corrected it.
+* Blocked on privileges rather than tools: `wim`. `dism.exe` is on PATH and would be a genuine
+  producer, but `/Capture-Image` refuses without elevation (error 740), and elevating is not
+  something to do from a script.
 * A generator that quietly writes the wrong document reads as a reader bug. The two-page A4 sample
   came out as one Letter page because `printf 'a' 'b' 'c'` treats everything after the first argument
   as a substitution rather than as more text, so the continued string that carried the `@page` rule
@@ -372,8 +382,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **95 covered** (31 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **124 with no
+Coverage is scored against magika's 219 binary labels: **96 covered** (32 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **123 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 

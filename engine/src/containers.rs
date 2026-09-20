@@ -74,6 +74,7 @@ pub fn name() -> &'static str {
         FORMAT_WASM => "wasm",
         FORMAT_TTF => "ttf",
         FORMAT_WOFF => "woff",
+        FORMAT_ICNS => "icns",
         _ => "unknown",
     }
 }
@@ -1848,6 +1849,72 @@ fn read_woff(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Apple icon files: the icon directory, and the pixel size of every PNG payload read out of that
+/// payload's own header. 30, after the fonts at 27 and 28.
+pub const FORMAT_ICNS: i32 = 30;
+
+const ICNS_ENTRIES: usize = 128;
+
+/// Icon entries are `tag(4) length(4, including these eight bytes)`, and the length of the last one
+/// decides whether the file was walked to its end. Older icon types carry JPEG-2000 rather than PNG,
+/// which this reader classes as `other` instead of guessing at a box signature it has not seen.
+fn read_icns(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 || &bytes[0..4] != b"icns" {
+        return None;
+    }
+    let declared = be_u32_at(bytes, 4)?;
+    let mut at = 8usize;
+    let mut count = 0i64;
+    let mut broken = 0i64;
+    let mut toc = 0i64;
+    let mut rows: Vec<String> = Vec::new();
+    while at + 8 <= bytes.len() && (count as usize) < ICNS_ENTRIES {
+        let tag = String::from_utf8_lossy(bytes.get(at..at + 4)?).into_owned();
+        let Some(size) = be_u32_at(bytes, at + 4) else {
+            broken += 1;
+            break;
+        };
+        let Ok(span) = usize::try_from(size) else {
+            broken += 1;
+            break;
+        };
+        if span < 8 || at + span > bytes.len() {
+            broken += 1;
+            break;
+        }
+        let payload = bytes.get(at + 8..at + span).unwrap_or(bytes);
+        let kind = if payload.starts_with(b"\x89PNG\r\n\x1a\n") {
+            "png"
+        } else {
+            "other"
+        };
+        rows.push(format!("icon\t{tag}\t{span}\t{kind}"));
+        if kind == "png" {
+            if let (Some(width), Some(height)) = (be_u32_at(payload, 16), be_u32_at(payload, 20)) {
+                rows.push(format!("px\t{tag}\t{width}\t{height}"));
+            }
+        } else if tag == "TOC " {
+            toc = ((span - 8) / 8) as i64;
+        }
+        count += 1;
+        at += span;
+    }
+    let mut entries = vec![format!(
+        "icns\t{declared}\t{}\t{count}\t{broken}",
+        bytes.len()
+    )];
+    entries.extend(rows);
+    entries.push(format!("toc_lists\t{toc}"));
+    entries.push(format!(
+        "entries_end\t{at}\tuncovered\t{}",
+        bytes.len().saturating_sub(at)
+    ));
+    if at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -1904,8 +1971,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_woff(bytes) {
         return accept(FORMAT_WOFF, lines);
     }
+    if let Some(lines) = read_icns(bytes) {
+        return accept(FORMAT_ICNS, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly or font container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font or icon container",
         -2,
     )
 }

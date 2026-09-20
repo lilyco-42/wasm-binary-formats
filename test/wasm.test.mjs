@@ -306,7 +306,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
-    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28],
+    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['tiny.icns', 30],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -355,7 +355,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
