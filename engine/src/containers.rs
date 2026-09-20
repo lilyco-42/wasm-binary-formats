@@ -4151,7 +4151,7 @@ fn pb_varint(bytes: &[u8], at: usize, stop: usize) -> Option<(i64, usize)> {
     None
 }
 
-impl Pb<'_> {
+impl<'a> Pb<'a> {
     fn empty() -> Pb<'static> {
         Pb {
             bytes: &[],
