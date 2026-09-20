@@ -322,6 +322,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['photo.heic', 41], ['block.heic', 41], ['seq.heic', 41], ['container.heif', 41],
     ['word97.doc', 42], ['excel97.xls', 42], ['wide97.xls', 42],
     ['tet.stl', 43], ['many.stl', 43], ['normals.stl', 43],
+    ['srgb.icc', 44], ['xyz.icc', 44],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -515,6 +516,32 @@ test('a binary STL keeps its count and its arithmetic together across the ABI', 
   assert.ok(odd.includes('normals	zero	1	wrong	1	counted	2'), odd.join(' | '));
 });
 
+test('an ICC profile keeps its table inside its own stated length across the ABI', () => {
+  const srgb = assertReadable('container', 'srgb.icc', 44).rows;
+  assert.equal(srgb[0], 'icc\t588\tdeclared\t588\tbroken\t0\tversion\t4.4\tcmm\tlcms', srgb.join(' | '));
+  assert.equal(
+    srgb[1],
+    'profile\tclass\tmntr\tspace\tRGB\tpcs\tXYZ\tintent\tperceptual\tcreator\tlcms'
+  );
+  assert.ok(srgb.includes('tag\t0\tdesc\tsig\tmluc\tat\t264\tlen\t54'), srgb.join(' | '));
+  assert.ok(srgb.includes('tag\t10\tchrm\tsig\tchrm\tat\t552\tlen\t36'), 'the last of eleven tags');
+  assert.equal(
+    srgb[srgb.length - 2],
+    'table\ttags\t11\tlisted\t11\toutside\t0\tdata_end\t588\ttail\t0'
+  );
+  assert.equal(srgb[srgb.length - 1], 'walked\tend');
+
+  // The identity profile is where a tag type stops being a colour table: A2B0 is a curve/matrix/lut
+  // sequence, so the reader names the type it read and leaves the transform alone.
+  const xyz = assertReadable('container', 'xyz.icc', 44).rows;
+  assert.ok(xyz.includes('tag\t4\tA2B0\tsig\tmAB\tat\t404\tlen\t80'), xyz.join(' | '));
+  assert.ok(
+    xyz.includes('table\ttags\t5\tlisted\t5\toutside\t0\tdata_end\t484\ttail\t0'),
+    xyz.join(' | ')
+  );
+  assert.ok(xyz[1].startsWith('profile\tclass\tabst'), 'an abstract profile, not a display one');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -559,7 +586,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

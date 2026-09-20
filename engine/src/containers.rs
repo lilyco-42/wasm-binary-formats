@@ -22,6 +22,10 @@
 //!   stl   no magic at all: 80 header bytes, u32 triangle count, 50 bytes per triangle, so
 //!         84 + 50n == filesize is the only thing the format asserts about itself; a stored normal
 //!         is listed as written and counted against the normal the three points imply
+//!   icc   u32be total size, and the only signature the format has: the constant "acsp" at 36, past
+//!         the header fields it identifies. Big-endian throughout, 12-byte tag records from 132,
+//!         each pointing at a payload whose own four-byte type is read from wherever the file says
+//!         it is, which is why the table is checked against the length rather than trusted
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
@@ -117,6 +121,7 @@ pub fn name() -> &'static str {
         FORMAT_HEIF => "heif",
         FORMAT_CFB => "cfb",
         FORMAT_STL => "stl",
+        FORMAT_ICC => "icc",
         _ => "unknown",
     }
 }
@@ -5409,6 +5414,137 @@ fn read_stl(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// ICC colour profile: a big-endian header, `acsp` at 36, and a tag table that points into the same
+/// buffer the header declares the length of.
+///
+/// The self-statement is the same shape as binary STL's - the first four bytes are the size of the
+/// whole file - and the signature has to be at 36, so a claim needs both. A profile whose stated
+/// length disagrees with the buffer is still read and reported, because the disagreement is the useful
+/// fact; but a tag table that would run past the bytes is refused, since everything beyond the real
+/// end is payload and reading it as a directory would invent rows. Pointers that leave the declared
+/// length are counted, not followed. Nothing here interprets a colour transform; the types are named
+/// as the file spells them.
+pub const FORMAT_ICC: i32 = 44;
+
+const ICC_TAGS: usize = 48;
+const ICC_INTENTS: [(u32, &str); 4] = [
+    (0, "perceptual"),
+    (1, "relative"),
+    (2, "saturation"),
+    (3, "absolute"),
+];
+
+fn icc_be(bytes: &[u8], at: usize, wide: usize) -> Option<u64> {
+    let stop = at.checked_add(wide)?;
+    let slice = bytes.get(at..stop)?;
+    let mut value = 0u64;
+    for byte in slice {
+        value = (value << 8) | u64::from(*byte);
+    }
+    Some(value)
+}
+
+/// Four-byte ICC signatures are space padded, so `RGB ` and `RGB` name the same space; anything that
+/// is not printable at all answers as `?`.
+fn icc_token(bytes: &[u8], at: usize) -> String {
+    let Some(slice) = bytes.get(at..at.checked_add(4)?) else {
+        return "?".to_owned();
+    };
+    let text: String = slice
+        .iter()
+        .filter(|byte| (0x20..0x7F).contains(*byte))
+        .map(|byte| char::from(*byte))
+        .collect();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        "?".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+fn read_icc(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 132 || &bytes[36..40] != b"acsp" {
+        return None;
+    }
+    let declared = icc_be(bytes, 0, 4)? as usize;
+    let tags = icc_be(bytes, 128, 4)?;
+    let records = usize::try_from(tags).unwrap_or(usize::MAX);
+    let table_end = 132usize.checked_add(records.checked_mul(12)?)?;
+    // The table has to be inside the file. A count that outruns the bytes is not believed, because
+    // everything past the real end is tag payload, and reading it as a directory would be reporting
+    // numbers the profile never wrote.
+    if table_end > bytes.len() {
+        return None;
+    }
+    let mut broken = usize::from(declared != bytes.len()) + usize::from(table_end > declared);
+    let listed = records.min(ICC_TAGS);
+    let mut rows = Vec::new();
+    let mut end = table_end;
+    let mut outside = 0usize;
+
+    for index in 0..listed {
+        let base = 132 + index * 12;
+        let signature = icc_token(bytes, base);
+        let at = icc_be(bytes, base + 4, 4)?;
+        let size = icc_be(bytes, base + 8, 4)?;
+        let stop = at.checked_add(size)?;
+        // A pointer that leaves the declared length is counted and not followed: reading a type from
+        // bytes that are not part of this profile would invent a tag, and on a 32-bit target a wide
+        // offset would truncate into one that is, so the two builds would disagree about the file.
+        let inside = usize::try_from(stop).ok().filter(|stop| *stop <= declared);
+        if inside.is_none() || usize::try_from(at).map_or(true, |start| start < 128) {
+            outside += 1;
+        }
+        if let Some(furthest) = inside.filter(|stop| *stop > end) {
+            end = furthest;
+        }
+        rows.push(format!(
+            "tag\t{index}\t{signature}\tsig\t{}\tat\t{at}\tlen\t{size}",
+            icc_token(bytes, usize::try_from(at).unwrap_or(usize::MAX))
+        ));
+    }
+    if records > listed {
+        rows.push(format!("cut\ttags\t{tags}"));
+    }
+    broken += usize::from(outside > 0);
+    let intent = icc_be(bytes, 64, 4)?;
+    rows.push(format!(
+        "table\ttags\t{tags}\tlisted\t{listed}\toutside\t{outside}\tdata_end\t{end}\ttail\t{}",
+        declared.saturating_sub(end)
+    ));
+    rows.insert(
+        0,
+        format!(
+            "profile\tclass\t{}\tspace\t{}\tpcs\t{}\tintent\t{}\tcreator\t{}",
+            icc_token(bytes, 12),
+            icc_token(bytes, 16),
+            icc_token(bytes, 20),
+            ICC_INTENTS
+                .iter()
+                .find(|(value, _)| u64::from(*value) == intent)
+                .map_or_else(|| intent.to_string(), |(_, name)| (*name).to_owned()),
+            icc_token(bytes, 80)
+        ),
+    );
+    rows.insert(
+        0,
+        format!(
+            "icc\t{}\tdeclared\t{declared}\tbroken\t{broken}\tversion\t{}.{}\tcmm\t{}",
+            bytes.len(),
+            bytes[8],
+            (bytes[9] >> 4) & 0x0F,
+            icc_token(bytes, 4)
+        ),
+    );
+    if broken == 0 {
+        rows.push("walked\tend".to_owned());
+    } else {
+        rows.push(format!("stopped\tbroken\t{broken}"));
+    }
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -5506,13 +5642,18 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_cfb(bytes) {
         return accept(FORMAT_CFB, lines);
     }
+    // Before STL, which has no signature at all: `acsp` at 36 is ICC's only self-assertion besides
+    // its length, so a file that spells it is claimed here rather than left to arithmetic.
+    if let Some(lines) = read_icc(bytes) {
+        return accept(FORMAT_ICC, lines);
+    }
     // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
     // triangle count implies, so every container with a real signature gets to answer first.
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile or binary STL",
         -2,
     )
 }

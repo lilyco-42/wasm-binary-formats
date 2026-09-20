@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 43,
+    "selfFields": 44,
     "selfContainer": 26,
     "binarySpecAvailable": 0,
-    "gaps": 109,
+    "gaps": 108,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,7 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "unknown": 54,
+      "unknown": 53,
       "image": 9,
       "archive": 11,
       "code": 5,
@@ -1777,8 +1777,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "icns",

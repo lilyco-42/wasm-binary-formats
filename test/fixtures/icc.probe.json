@@ -1,0 +1,42 @@
+{
+ "srgb.icc": {
+  "bytes": 588,
+  "copyright": "No copyright, use freely",
+  "pcs": "sRGB built-in",
+  "profile_name": "sRGB built-in",
+  "rows": [
+   "icc\t588\tdeclared\t588\tbroken\t0\tversion\t4.4\tcmm\tlcms",
+   "profile\tclass\tmntr\tspace\tRGB\tpcs\tXYZ\tintent\tperceptual\tcreator\tlcms",
+   "tag\t0\tdesc\tsig\tmluc\tat\t264\tlen\t54",
+   "tag\t1\tcprt\tsig\tmluc\tat\t320\tlen\t76",
+   "tag\t2\twtpt\tsig\tXYZ\tat\t396\tlen\t20",
+   "tag\t3\tchad\tsig\tsf32\tat\t416\tlen\t44",
+   "tag\t4\trXYZ\tsig\tXYZ\tat\t460\tlen\t20",
+   "tag\t5\tbXYZ\tsig\tXYZ\tat\t480\tlen\t20",
+   "tag\t6\tgXYZ\tsig\tXYZ\tat\t500\tlen\t20",
+   "tag\t7\trTRC\tsig\tpara\tat\t520\tlen\t32",
+   "tag\t8\tgTRC\tsig\tpara\tat\t520\tlen\t32",
+   "tag\t9\tbTRC\tsig\tpara\tat\t520\tlen\t32",
+   "tag\t10\tchrm\tsig\tchrm\tat\t552\tlen\t36",
+   "table\ttags\t11\tlisted\t11\toutside\t0\tdata_end\t588\ttail\t0",
+   "walked\tend"
+  ]
+ },
+ "xyz.icc": {
+  "bytes": 484,
+  "copyright": "No copyright, use freely",
+  "pcs": "XYZ identity built-in",
+  "profile_name": "XYZ identity built-in",
+  "rows": [
+   "icc\t484\tdeclared\t484\tbroken\t0\tversion\t4.4\tcmm\tlcms",
+   "profile\tclass\tabst\tspace\tXYZ\tpcs\tXYZ\tintent\tperceptual\tcreator\tlcms",
+   "tag\t0\tdesc\tsig\tmluc\tat\t192\tlen\t70",
+   "tag\t1\tcprt\tsig\tmluc\tat\t264\tlen\t76",
+   "tag\t2\twtpt\tsig\tXYZ\tat\t340\tlen\t20",
+   "tag\t3\tchad\tsig\tsf32\tat\t360\tlen\t44",
+   "tag\t4\tA2B0\tsig\tmAB\tat\t404\tlen\t80",
+   "table\ttags\t5\tlisted\t5\toutside\t0\tdata_end\t484\ttail\t0",
+   "walked\tend"
+  ]
+ }
+}

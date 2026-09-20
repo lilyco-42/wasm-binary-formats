@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 43 | 19.6% |
+| own Rust reader, named header fields decoded | 44 | 20.1% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **109** | 49.8% |
-| **covered, any level** | **110** | 50.2% |
+| **no parser at all - real gap** | **108** | 49.3% |
+| **covered, any level** | **111** | 50.7% |
 
-Top binary gap groups by count: unknown 54, archive 11, image 9, application 10, document 8,
+Top binary gap groups by count: unknown 53, archive 11, image 9, application 10, document 8,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
@@ -279,9 +279,9 @@ name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`,
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 110 of 219 binary labels have a parser
-that runs here (43 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 109 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 111 of 219 binary labels have a parser
+that runs here (44 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 108 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -295,7 +295,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 110 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 111 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text for x86-64, AArch64 and Thumb bytes |
 
@@ -349,6 +349,7 @@ temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes th
 temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
 temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
 temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
+temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -618,6 +619,21 @@ does not re-derive them:
   exporters leave them at zero, and `normals.stl` carries both cases on purpose.
   `scripts/make-stl-fixtures.py` writes the meshes with meshio and asserts that meshio's own reader
   returns the same triangle count the header declares.
+  ICC profile (+1 field-level label, 111 covered, 108 gaps) has a magic, but not where a reader
+  normally looks for one: the constant `acsp` sits at byte 36, behind the fields it identifies, and
+  the whole format is big-endian in a tree of formats that are little-endian. The header states its own
+  total length, so the two self-assertions are checked against each other, and the line the round
+  actually drew is between the two ways they can disagree. A length that does not match the buffer is
+  *reported* - `broken 1` beside the real and stated sizes - because the table is still there to read.
+  A tag count whose table would run past the bytes is *refused*, because past the end of a real table
+  sits tag payload, and walking it as a directory prints pointers no profile wrote. Two details only
+  the written file settled: signatures are space-padded, so `RGB ` and `RGB` are the same colour space,
+  and three of sRGB's eleven tags - `rTRC`, `gTRC`, `bTRC` - share one offset, so a reader that
+  deduplicates pointers would report a shorter table than the profile carries.
+  `scripts/make-icc-fixtures.py` builds both profiles with littleCMS through Pillow (`createProfile`
+  assembles them from the library's own tables; neither is a copy of a file), walks the bytes with a
+  private mirror, and refuses to write the probe unless `ImageCms` reading the same bytes agrees on the
+  name and copyright it itself wrote.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
