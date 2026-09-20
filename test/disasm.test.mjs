@@ -40,7 +40,8 @@ const compiled = new WebAssembly.Module(bytes.buffer.slice(0));
 const instance = new WebAssembly.Instance(compiled, importsFor(compiled));
 const ex = instance.exports;
 
-for (const name of ['memory', 'self_test', 'disasm_run', 'disasm_count', 'disasm_at', 'disasm_xrefs']) {
+for (const name of ['memory', 'self_test', 'disasm_run', 'disasm_count', 'disasm_at', 'disasm_xrefs',
+           'disasm_funcs']) {
   assert.ok(name in ex, `${path} does not export ${name}`);
 }
 
@@ -152,4 +153,80 @@ test('aarch64 edges come out too, so the pass is not x86 only', () => {
   );
   assert.equal(rc, 1, rows.join(' | '));
   assert.equal(rows[0], 'xref\tfrom\t0x5000\tkind\tcall\tto\t0x5008\twhere\toutside');
+});
+
+function funcs(code, pc, arch) {
+  const ptr = ex.malloc(code.length);
+  new Uint8Array(ex.memory.buffer, ptr, code.length).set(code);
+  const rc = ex.disasm_funcs(ptr, code.length, BigInt(pc), arch);
+  ex.free(ptr);
+  const rows = [];
+  for (let i = 0; i < ex.disasm_count(); i++) rows.push(cString(ex.disasm_at(i)));
+  return { rc, rows };
+}
+
+test('a call out of the window is one function and two blocks', () => {
+  // call rel32 +10 at 0x2000 targets 0x200f, past the six bytes in hand, so nothing inside starts a
+  // second function; the call still closes its block and the ret closes the next one.
+  const { rc, rows } = funcs(new Uint8Array([0xe8, 0x0a, 0x00, 0x00, 0x00, 0xc3]), 0x2000, 0);
+  assert.equal(rc, 1, rows.join(' | '));
+  assert.deepEqual(rows, [
+    'func\t0\tstart\t0x2000\tend\t0x2006\tinsns\t2\tblocks\t2\tcalls\t1\tjumps\t0\trets\t1',
+    'block\t0\tfunc\t0\tstart\t0x2000\tend\t0x2005\tinsns\t1\tterm\tcall',
+    'block\t1\tfunc\t0\tstart\t0x2005\tend\t0x2006\tinsns\t1\tterm\tret',
+    'funcs\ttotal\t1\tblocks\t2\tleaders\t1\tinsns\t2\tentry\t0x2000\twindow\t6',
+  ]);
+});
+
+test('a call that lands inside the window starts a second function', () => {
+  // The displacement is zero, so the target is the address after the call - 0x2005, the ret - and a
+  // linear scan has to treat it as an entry. That is what a linker-filled call looks like.
+  const { rc, rows } = funcs(new Uint8Array([0xe8, 0x00, 0x00, 0x00, 0x00, 0xc3]), 0x2000, 0);
+  assert.equal(rc, 2, rows.join(' | '));
+  assert.deepEqual(rows, [
+    'func\t0\tstart\t0x2000\tend\t0x2005\tinsns\t1\tblocks\t1\tcalls\t1\tjumps\t0\trets\t0',
+    'func\t1\tstart\t0x2005\tend\t0x2006\tinsns\t1\tblocks\t1\tcalls\t0\tjumps\t0\trets\t1',
+    'block\t0\tfunc\t0\tstart\t0x2000\tend\t0x2005\tinsns\t1\tterm\tcall',
+    'block\t1\tfunc\t1\tstart\t0x2005\tend\t0x2006\tinsns\t1\tterm\tret',
+    'funcs\ttotal\t2\tblocks\t2\tleaders\t2\tinsns\t2\tentry\t0x2000\twindow\t6',
+  ]);
+});
+
+test('a conditional branch closes a block without ending the function', () => {
+  // je +1 at 0x3000: the instruction is two bytes, so the target is 0x3002 + 1 - the ret, three bytes
+  // in. The hlt between them is not a terminator, but it sits before a leader, so its block ends there
+  // with `term none` and the function still runs from 0x3000 to 0x3004.
+  const { rc, rows } = funcs(new Uint8Array([0x74, 0x01, 0xf4, 0xc3]), 0x3000, 0);
+  assert.equal(rc, 1, rows.join(' | '));
+  assert.deepEqual(rows, [
+    'func\t0\tstart\t0x3000\tend\t0x3004\tinsns\t3\tblocks\t3\tcalls\t0\tjumps\t1\trets\t1',
+    'block\t0\tfunc\t0\tstart\t0x3000\tend\t0x3002\tinsns\t1\tterm\tjump',
+    'block\t1\tfunc\t0\tstart\t0x3002\tend\t0x3003\tinsns\t1\tterm\tnone',
+    'block\t2\tfunc\t0\tstart\t0x3003\tend\t0x3004\tinsns\t1\tterm\tret',
+    'funcs\ttotal\t1\tblocks\t3\tleaders\t2\tinsns\t3\tentry\t0x3000\twindow\t4',
+  ]);
+});
+
+test('aarch64 blocks come out too, so the pass is not x86 only', () => {
+  // bl +8 (0x94000002) at 0x5000 targets 0x5008, one past the eight bytes, then ret.
+  const { rc, rows } = funcs(
+    new Uint8Array([0x02, 0x00, 0x00, 0x94, 0xc0, 0x03, 0x5f, 0xd6]), 0x5000, 1
+  );
+  assert.equal(rc, 1, rows.join(' | '));
+  assert.equal(rows[0], 'func\t0\tstart\t0x5000\tend\t0x5008\tinsns\t2\tblocks\t2\tcalls\t1\tjumps\t0\trets\t1');
+  assert.equal(rows[1], 'block\t0\tfunc\t0\tstart\t0x5000\tend\t0x5004\tinsns\t1\tterm\tcall');
+  assert.equal(rows[2], 'block\t1\tfunc\t0\tstart\t0x5004\tend\t0x5008\tinsns\t1\tterm\tret');
+  assert.equal(rows[3], 'funcs\ttotal\t1\tblocks\t2\tleaders\t1\tinsns\t2\tentry\t0x5000\twindow\t8');
+});
+
+test('a jump to itself is one block that never leaves', () => {
+  // jmp rel8 -2 at 0x3000 lands on its own address, so the block ends at the terminator and the only
+  // leader is the entry: one function, one block, and no fallthrough claimed anywhere.
+  const { rc, rows } = funcs(new Uint8Array([0xeb, 0xfe]), 0x3000, 0);
+  assert.equal(rc, 1, rows.join(' | '));
+  assert.deepEqual(rows, [
+    'func\t0\tstart\t0x3000\tend\t0x3002\tinsns\t1\tblocks\t1\tcalls\t0\tjumps\t1\trets\t0',
+    'block\t0\tfunc\t0\tstart\t0x3000\tend\t0x3002\tinsns\t1\tterm\tjump',
+    'funcs\ttotal\t1\tblocks\t1\tleaders\t1\tinsns\t1\tentry\t0x3000\twindow\t2',
+  ]);
 });

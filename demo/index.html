@@ -201,20 +201,28 @@ function disassembleHere(mod) {
   if (rc < 0) return `反汇编拒绝了这个节（返回 ${rc}）。`;
   const lines = Array.from({ length: mod.disasm_count() },
     (_, i) => cString(mod, mod.disasm_at(i)));
-  // Read the listing before asking for edges: both passes answer out of the same row buffer, and an
-  // older cached module has no second pass at all, so this is feature-detected rather than assumed.
+  // Read the listing before asking for edges: every pass answers out of the same row buffer, and an
+  // older cached module has no second or third pass at all, so each is feature-detected by name.
+  const pass = (run) => {
+    const at = mod.malloc(slice.length);
+    new Uint8Array(mod.memory.buffer, at, slice.length).set(slice);
+    const rc = run(at);
+    mod.free(at);
+    return { rc, rows: Array.from({ length: mod.disasm_count() }, (_, i) => cString(mod, mod.disasm_at(i))) };
+  };
   let refs = '';
   if (typeof mod.disasm_xrefs === 'function') {
-    const again = mod.malloc(slice.length);
-    new Uint8Array(mod.memory.buffer, again, slice.length).set(slice);
-    const edges = mod.disasm_xrefs(again, slice.length, BigInt(address), arch);
-    mod.free(again);
-    const found = Array.from({ length: mod.disasm_count() },
-      (_, i) => cString(mod, mod.disasm_at(i)));
-    refs = edges < 0 ? `\n\n交叉引用：拒绝（返回 ${edges}）`
-      : `\n\n交叉引用：\n${found.join('\n')}`;
+    const edges = pass((at) => mod.disasm_xrefs(at, slice.length, BigInt(address), arch));
+    refs = edges.rc < 0 ? `\n\n交叉引用：拒绝（返回 ${edges.rc}）`
+      : `\n\n交叉引用：\n${edges.rows.join('\n')}`;
   }
-  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}`;
+  let flow = '';
+  if (typeof mod.disasm_funcs === 'function') {
+    const split = pass((at) => mod.disasm_funcs(at, slice.length, BigInt(address), arch));
+    flow = split.rc < 0 ? `\n\n函数划分：拒绝（返回 ${split.rc}）`
+      : `\n\n函数与基本块：${split.rc} 个函数\n${split.rows.join('\n')}`;
+  }
+  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}${flow}`;
 }
 
 function cString(mod, pointer) {

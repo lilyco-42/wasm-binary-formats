@@ -300,7 +300,7 @@ time after it.
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 115 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
-| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text and cross-references for x86-64, AArch64 and Thumb bytes |
+| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references and basic blocks / function boundaries for x86-64, AArch64 and Thumb bytes |
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
@@ -336,8 +336,8 @@ something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no w
 multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
 200 KB demo. Instruction decoding, by contrast, turned out to be reachable the same day the question
 was measured, so it ships: what is left on this lane is the rest of the pipeline those tools are known
-for - function boundaries and then names and types over the edges that now exist - one opt-in module at
-a time. A decompiler is not on the list: the well-known one is proprietary, and
+for - per-block successors and then names and types over the blocks and edges that now exist - one
+opt-in module at a time. A decompiler is not on the list: the well-known one is proprietary, and
 "we ported it" would not be true.
 
 The cross-reference pass is `disasm_xrefs`, and it is deliberately narrower than the window in IDA it
@@ -352,6 +352,23 @@ against the number of instructions scanned. `self_test` exercises this second pa
 `call rel32 + 10`, so a build that decodes text but not edges returns a negative number and the page
 says so. What it does **not** claim: a control-flow graph, function detection, or any statement that an
 address it prints is a function entry.
+
+The third pass is `disasm_funcs`, and it is the reason the edges above are kept rather than thrown
+away: a **block** ends at a call, a jump or a return, or just before any address one of this window's
+transfers points at, and a **function** starts at the entry address plus every address a *call* in the
+window points at, running to the next such start. The rows state both rules instead of leaving a graph
+the caller cannot see - `func` carries its extent, instruction count, block count and how many of each
+terminator kind it holds, and `block` carries its own extent, its function and its terminator, which is
+`none` when a leader, not a terminator, ended it. Only Capstone's groups decide this, so `call`, `jump`
+and `ret` mean the same thing for all three instruction sets, and `self_test` refuses a build whose
+six-byte `call` + `ret` does not come back as one function and two blocks.
+
+Two limits are stated rather than smoothed over. The split is a linear scan, not reachability: a
+function is an address range, so bytes the control flow never touches still fall inside one, and no
+per-block successor list is claimed. And a call's target is what the raw bytes say, which for a `clang -c`
+object - where the linker has not filled the displacement in yet - means the instruction *after* the
+call; `objdump -d` splits those same bytes at its symbol table instead, which a window of instructions
+does not have. The page therefore says how many functions it found, and shows the rows.
 
 ## Reproduce
 

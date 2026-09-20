@@ -230,16 +230,235 @@ int disasm_xrefs(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
   return edges;
 }
 
+/* Basic blocks and function boundaries - the third pass, and the reason the two above keep detail
+ * enabled. A block is a maximal straight-line run that ends in a call, a jump or a return, or that
+ * stops just before an address some control transfer in this window points at; a function starts at the
+ * entry address and at every address a *call* in the window points at, and runs to the next such start.
+ * Both rules are printed as rows rather than left as a graph the caller cannot see.
+ *
+ * One limit deserves naming: a call's displacement is resolved by Capstone to the target the raw bytes
+ * state, so inside an object file - where a linker has not yet filled it in - the "function" starts on
+ * the instruction after the call. `objdump -d` splits at symbol names instead, which an object keeps in
+ * its symbol table and a window of bytes does not have. */
+#define MAX_TARGETS 1024
+#define MAX_BLOCKS 512
+#define MAX_FUNCS 256
+
+static uint64_t targets[MAX_TARGETS];
+static int target_count;
+static uint64_t starts[MAX_TARGETS];
+static int start_count;
+static int leaders_cut;
+static uint64_t block_from[MAX_BLOCKS];
+static uint64_t block_to[MAX_BLOCKS];
+static int block_insns[MAX_BLOCKS];
+static const char *block_term[MAX_BLOCKS];
+static int block_count;
+static int blocks_cut;
+
+static int known(uint64_t *list, int n, uint64_t want) {
+  for (int i = 0; i < n; i++) {
+    if (list[i] == want) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void remember(uint64_t *list, int *n, int cap, uint64_t want, int *cut) {
+  if (known(list, *n, want)) {
+    return;
+  }
+  if (*n < cap) {
+    list[(*n)++] = want;
+    return;
+  }
+  *cut = 1;
+}
+
+static int cmp_u64(const void *a, const void *b) {
+  uint64_t x = *(const uint64_t *)a;
+  uint64_t y = *(const uint64_t *)b;
+  return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+/* "call", "jump" or "ret" for an instruction that ends a block, NULL otherwise. Only Capstone's groups
+ * are consulted, so the three words carry the same meaning for x86-64, AArch64 and Thumb. */
+static const char *terminator(const cs_insn *in) {
+  if (has_group(in, CS_GRP_CALL)) {
+    return "call";
+  }
+  if (has_group(in, CS_GRP_RET)) {
+    return "ret";
+  }
+  if (has_group(in, CS_GRP_JUMP)) {
+    return "jump";
+  }
+  return NULL;
+}
+
+/* Returns the number of functions found, -1 for an unknown architecture and -2 when Capstone refused
+ * to decode anything. The rows it leaves behind are one summary, then `func` rows, then `block` rows. */
+int disasm_funcs(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
+  csh handle;
+  cs_insn *insns = NULL;
+  size_t count;
+  uint64_t stop;
+  int funcs = 0;
+  int cut = 0;
+  uint64_t run_from = pc;
+
+  listed = 0;
+  target_count = 0;
+  start_count = 0;
+  leaders_cut = 0;
+  block_count = 0;
+  blocks_cut = 0;
+  if (code == NULL || len == 0) {
+    return -1;
+  }
+  if (open_detail(arch, &handle) != 0) {
+    return -1;
+  }
+  count = cs_disasm(handle, code, len, pc, 0, &insns);
+  if (count == 0) {
+    cs_close(&handle);
+    return insns == NULL ? -2 : 0;
+  }
+  stop = pc + (uint64_t)len;
+  remember(targets, &target_count, MAX_TARGETS, pc, &leaders_cut);
+  remember(starts, &start_count, MAX_TARGETS, pc, &leaders_cut);
+
+  for (size_t i = 0; i < count; i++) {
+    ref found[8];
+    int refs = collect(&insns[i], arch, found, 8);
+    for (int j = 0; j < refs; j++) {
+      if (strcmp(found[j].kind, "mem") == 0) {
+        continue;
+      }
+      if (found[j].target < pc || found[j].target >= stop) {
+        continue;
+      }
+      remember(targets, &target_count, MAX_TARGETS, found[j].target, &leaders_cut);
+      if (strcmp(found[j].kind, "call") == 0) {
+        remember(starts, &start_count, MAX_TARGETS, found[j].target, &leaders_cut);
+      }
+    }
+  }
+  qsort(starts, (size_t)start_count, sizeof(uint64_t), cmp_u64);
+
+  for (size_t i = 0, run = 0; i < count; i++) {
+    const cs_insn *in = &insns[i];
+    const char *term = terminator(in);
+    uint64_t next = in->address + (uint64_t)in->size;
+    int closed = term != NULL || i + 1 == count ||
+                 (i + 1 < count && known(targets, target_count, insns[i + 1].address));
+
+    if (run == 0) {
+      run_from = in->address;
+    }
+    run++;
+    if (!closed) {
+      continue;
+    }
+    if (block_count < MAX_BLOCKS) {
+      block_from[block_count] = run_from;
+      block_to[block_count] = next;
+      block_insns[block_count] = (int)run;
+      block_term[block_count] = term == NULL ? "none" : term;
+      block_count++;
+    } else {
+      blocks_cut = 1;
+    }
+    run = 0;
+  }
+
+  for (int k = 0; k < start_count; k++) {
+    uint64_t from = starts[k];
+    uint64_t to = (k + 1 < start_count) ? starts[k + 1]
+                                        : insns[count - 1].address + (uint64_t)insns[count - 1].size;
+    int inside = 0;
+    int inner = 0;
+    int calls = 0;
+    int jumps = 0;
+    int rets = 0;
+
+    for (size_t i = 0; i < count; i++) {
+      const char *term;
+      if (insns[i].address < from || insns[i].address >= to) {
+        continue;
+      }
+      inside++;
+      term = terminator(&insns[i]);
+      if (term == NULL) {
+        continue;
+      }
+      if (strcmp(term, "call") == 0) {
+        calls++;
+      } else if (strcmp(term, "jump") == 0) {
+        jumps++;
+      } else {
+        rets++;
+      }
+    }
+    for (int b = 0; b < block_count; b++) {
+      if (block_from[b] >= from && block_from[b] < to) {
+        inner++;
+      }
+    }
+    if (funcs < MAX_FUNCS) {
+      snprintf(rows[listed], ROW_MAX,
+               "func\t%d\tstart\t0x%llx\tend\t0x%llx\tinsns\t%d\tblocks\t%d\tcalls\t%d\tjumps\t%d\trets\t%d",
+               funcs, (unsigned long long)from, (unsigned long long)to, inside, inner, calls, jumps,
+               rets);
+      listed++;
+    } else {
+      cut = 1;
+    }
+    funcs++;
+  }
+
+  for (int b = 0; b < block_count; b++) {
+    int owner = 0;
+    for (int k = 0; k < start_count; k++) {
+      if (starts[k] <= block_from[b]) {
+        owner = k;
+      }
+    }
+    snprintf(rows[listed], ROW_MAX,
+             "block\t%d\tfunc\t%d\tstart\t0x%llx\tend\t0x%llx\tinsns\t%d\tterm\t%s",
+             b, owner, (unsigned long long)block_from[b], (unsigned long long)block_to[b],
+             block_insns[b], block_term[b]);
+    listed++;
+  }
+  if (cut || blocks_cut || leaders_cut) {
+    snprintf(rows[listed], ROW_MAX, "cut\tfuncs\t%d\tblocks\t%d\tleaders\t%d", funcs, block_count,
+             target_count);
+    listed++;
+  }
+  snprintf(rows[listed], ROW_MAX,
+           "funcs\ttotal\t%d\tblocks\t%d\tleaders\t%d\tinsns\t%zu\tentry\t0x%llx\twindow\t%u",
+           funcs, block_count, target_count, count, (unsigned long long)pc, (unsigned)len);
+  listed++;
+
+  cs_free(insns, count);
+  cs_close(&handle);
+  return funcs;
+}
+
 /* A five-instruction x86-64 prologue whose text is fixed and checkable, so a loader can tell that a
  * real engine answered rather than a stub. The second half asks the cross-reference pass to find the
  * call in `e8 0a 00 00 00` and to place its target outside the six bytes it was given - the xref path
- * is a different code path, and a build that decodes text but not edges is not a pass. */
+ * is a different code path, and a build that decodes text but not edges is not a pass. The third half
+ * asks for blocks and functions, which is a third code path again: `call` then `ret` is two blocks in
+ * one function, and the only function whose start the bytes themselves state. */
 int self_test(void) {
   static const uint8_t code[] = {0x55, 0x48, 0x89, 0xe5, 0x48, 0x83,
                                  0xec, 0x10, 0xf4, 0xc3};
   static const uint8_t call[] = {0xe8, 0x0a, 0x00, 0x00, 0x00, 0xc3};
   int count = disasm_run(code, sizeof(code), 0x1000, 0);
   int edges;
+  int funcs;
 
   if (count < 3 || disasm_at(0) == NULL) {
     return -1;
@@ -256,6 +475,16 @@ int self_test(void) {
   }
   if (strstr(rows[0], "outside") == NULL) {
     return -5;
+  }
+  funcs = disasm_funcs(call, sizeof(call), 0x2000, 0);
+  if (funcs != 1 || strstr(rows[0], "func\t0") == NULL || strstr(rows[0], "start\t0x2000") == NULL) {
+    return -6;
+  }
+  if (strstr(rows[1], "block\t0") == NULL || strstr(rows[1], "term\tcall") == NULL) {
+    return -7;
+  }
+  if (strstr(rows[2], "block\t1") == NULL || strstr(rows[2], "term\tret") == NULL) {
+    return -8;
   }
   return count;
 }
