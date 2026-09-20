@@ -16,15 +16,23 @@ import test from 'node:test';
 const path = process.argv[2];
 assert.ok(path, 'usage: node test/disasm.test.mjs <apk-lens-disasm.wasm>');
 
-// A standalone-wasm module may still ask for a few host symbols; anything it asks for is answered by
-// a no-op so that the import list itself is not what this test fails on.
-const stub = new Proxy({}, {
-  get: () => () => 0,
-  has: () => true,
-});
+// Emscripten's standalone output still asks for a handful of WASI entry points. They are answered by
+// name from the module's own import list - so a stub that silently drifts out of date is not what
+// this file would fail on - and nothing on this path is expected to call them.
+function importsFor(module) {
+  const namespaces = {};
+  for (const wanted of WebAssembly.Module.imports(module)) {
+    namespaces[wanted.module] ||= new Proxy({}, {
+      get: () => () => 0,
+      has: () => true,
+    });
+  }
+  return namespaces;
+}
 
 const bytes = await readFile(path);
-const { instance } = await WebAssembly.instantiate(bytes.buffer.slice(0), stub);
+const compiled = new WebAssembly.Module(bytes.buffer.slice(0));
+const { instance } = await WebAssembly.instantiate(compiled, importsFor(compiled));
 const ex = instance.exports;
 
 for (const name of ['memory', 'self_test', 'disasm_run', 'disasm_count', 'disasm_at']) {
