@@ -192,6 +192,7 @@ fn a_file_with_a_dictionary_indexes_it_separately() {
         lines
             .iter()
             .filter(|line| line.starts_with("block\t"))
+            .map(|line| line.as_str())
             .collect::<Vec<_>>()
             .join("\n"),
         "block\t0\tenvelope\t368\tmeta\t144\tbody\t8\nblock\t1\tenvelope\t520\tmeta\t144\tbody\t8"
