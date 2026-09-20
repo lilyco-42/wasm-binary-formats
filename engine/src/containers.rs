@@ -6484,7 +6484,7 @@ fn read_der(bytes: &[u8]) -> Option<Vec<String>> {
     let mut version = 1usize;
     if inner.first()?.1 == 0xA0 {
         let inside = der_children(bytes, inner[0].0);
-        let (start, end) = der_body(bytes, *inside.first()?.0)?;
+        let (start, end) = der_body(bytes, inside.first()?.0)?;
         let stated = bytes
             .get(start..end)?
             .iter()
@@ -6502,7 +6502,7 @@ fn read_der(bytes: &[u8]) -> Option<Vec<String>> {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let sig_at = inner[cursor + 1].0;
-    let sig_obj = *der_children(bytes, sig_at).first()?.0;
+    let sig_obj = der_children(bytes, sig_at).first()?.0;
     let (sig_start, sig_end) = der_body(bytes, sig_obj)?;
     let sig_oid = der_oid(bytes.get(sig_start..sig_end)?);
     let validity_at = inner[cursor + 3].0;
@@ -6528,7 +6528,7 @@ fn read_der(bytes: &[u8]) -> Option<Vec<String>> {
     if algs.len() != 2 {
         return None;
     }
-    let pub_obj = *der_children(bytes, algs[0].0).first()?.0;
+    let pub_obj = der_children(bytes, algs[0].0).first()?.0;
     let (pub_start, pub_end) = der_body(bytes, pub_obj)?;
     let pub_oid = der_oid(bytes.get(pub_start..pub_end)?);
     let (key_start, key_end) = der_body(bytes, algs[1].0)?;
