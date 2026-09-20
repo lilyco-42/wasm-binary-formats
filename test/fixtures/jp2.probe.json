@@ -1,0 +1,117 @@
+{
+ "grey": {
+  "boxes": [
+   "jP  \t12\t0",
+   "ftyp\t20\t12",
+   "jp2h\t45\t32",
+   "jp2c\t148\t77"
+  ],
+  "broken": 0,
+  "children": [
+   "ihdr\t22\t40",
+   "colr\t15\t62"
+  ],
+  "codestream": {
+   "at": 77,
+   "size": 148,
+   "soc": true
+  },
+  "colr": {
+   "approx": 0,
+   "enumerated": 17,
+   "method": 1,
+   "precision": 0
+  },
+  "declared": 225,
+  "ihdr": {
+   "bits": 8,
+   "colour_filter": 7,
+   "components": 1,
+   "depth_byte": 7,
+   "height": 8,
+   "ipr": 0,
+   "unknown": 0,
+   "width": 64
+  },
+  "length": 225,
+  "mode_after_decode": "L",
+  "signature": "0d0a870a"
+ },
+ "rgba": {
+  "boxes": [
+   "jP  \t12\t0",
+   "ftyp\t20\t12",
+   "jp2h\t79\t32",
+   "jp2c\t181\t111"
+  ],
+  "broken": 0,
+  "children": [
+   "ihdr\t22\t40",
+   "colr\t15\t62",
+   "cdef\t34\t77"
+  ],
+  "codestream": {
+   "at": 111,
+   "size": 181,
+   "soc": true
+  },
+  "colr": {
+   "approx": 0,
+   "enumerated": 16,
+   "method": 1,
+   "precision": 0
+  },
+  "declared": 292,
+  "ihdr": {
+   "bits": 8,
+   "colour_filter": 7,
+   "components": 4,
+   "depth_byte": 7,
+   "height": 16,
+   "ipr": 0,
+   "unknown": 0,
+   "width": 16
+  },
+  "length": 292,
+  "mode_after_decode": "RGBA",
+  "signature": "0d0a870a"
+ },
+ "tiny": {
+  "boxes": [
+   "jP  \t12\t0",
+   "ftyp\t20\t12",
+   "jp2h\t45\t32",
+   "jp2c\t239\t77"
+  ],
+  "broken": 0,
+  "children": [
+   "ihdr\t22\t40",
+   "colr\t15\t62"
+  ],
+  "codestream": {
+   "at": 77,
+   "size": 239,
+   "soc": true
+  },
+  "colr": {
+   "approx": 0,
+   "enumerated": 16,
+   "method": 1,
+   "precision": 0
+  },
+  "declared": 316,
+  "ihdr": {
+   "bits": 8,
+   "colour_filter": 7,
+   "components": 3,
+   "depth_byte": 7,
+   "height": 20,
+   "ipr": 0,
+   "unknown": 0,
+   "width": 32
+  },
+  "length": 316,
+  "mode_after_decode": "RGB",
+  "signature": "0d0a870a"
+ }
+}

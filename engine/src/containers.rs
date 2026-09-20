@@ -12,6 +12,8 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   jp2   u32 length + FourCC boxes, first box `jP  ` with signature 0x0D0A870A; `ihdr` inside
+//!         the `jp2h` superbox lists height before width and sample depth minus one
 //!   qoi   "qoif", u32 width, u32 height, u8 channels, u8 colourspace, then one-byte-tagged
 //!         chunks and an eight-byte terminator
 //!   bplist "bplist00", objects, then `num` big-endian offsets of `offset_size` each, then a
@@ -82,6 +84,7 @@ pub fn name() -> &'static str {
         FORMAT_ICNS => "icns",
         FORMAT_BPLIST => "bplist",
         FORMAT_QOI => "qoi",
+        FORMAT_JP2 => "jp2",
         _ => "unknown",
     }
 }
@@ -2450,6 +2453,110 @@ fn read_qoi(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// JPEG 2000 PCA (the `.jp2` container, not the codestream inside it): the top-level box list, the
+/// `jp2h` superbox's children, and the `ihdr`/`colr` fields. 33, after QOI at 32.
+///
+/// Boxes here are `u32 length + FourCC` with the length including the header, `0` meaning "runs to
+/// the end of the file" and `1` meaning "the real length is the big-endian u64 after the tag" - the
+/// same big-endian convention every other integer in the format uses. `ihdr` puts **height before
+/// width**, which is the reverse of the `Xsiz`/`Ysiz` order the part-1 codestream uses, and it stores
+/// sample depth minus one, so the byte that reads 7 is an eight-bit image. Both come out of
+/// `scripts/make-jp2-fixtures.py`, where Pillow encodes the file and then decodes it back and agrees
+/// on the size and mode. `colr` is read as far as its method and enumerated colourspace number, and
+/// that number is printed as a number: the ECSR code list is not something this repo has a fixture
+/// for beyond the two values (16 and 17) that openjpeg wrote here.
+pub const FORMAT_JP2: i32 = 33;
+
+const JP2_BOXES: usize = 256;
+const JP2_CHILDREN: usize = 64;
+const JP2_SIGNATURE: [u8; 4] = [0x0D, 0x0A, 0x87, 0x0A];
+
+/// (total length, header bytes, tag) for the box at `at` inside `end`, or None when the length is
+/// smaller than its own header or runs past the area it is allowed to occupy.
+fn jp2_box(bytes: &[u8], at: usize, end: usize) -> Option<(usize, usize, String)> {
+    let first = usize::try_from(be_u32_at(bytes, at)?).ok()?;
+    let tag = fourcc(bytes.get(at + 4..at + 8)?);
+    let (size, header) = match first {
+        0 => (end.checked_sub(at)?, 8),
+        1 => (usize::try_from(be_uint(bytes, at + 8, 8)?).ok()?, 16),
+        other => (other, 8),
+    };
+    if size < header || at.checked_add(size)? > end {
+        return None;
+    }
+    Some((size, header, tag))
+}
+
+fn read_jp2(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 12 || fourcc(&bytes[4..8]) != "jP  " || bytes[8..12] != JP2_SIGNATURE {
+        return None;
+    }
+    let mut rows = Vec::new();
+    let mut geometry = Vec::new();
+    let mut at = 0usize;
+    let mut boxes = 0i64;
+    let mut broken = 0i64;
+    let mut declared = 0i64;
+    while at < bytes.len() && (boxes as usize) < JP2_BOXES {
+        let Some((size, header, tag)) = jp2_box(bytes, at, bytes.len()) else {
+            broken += 1;
+            break;
+        };
+        rows.push(format!("box\t{tag}\t{size}\t{at}"));
+        declared += size as i64;
+        boxes += 1;
+        if tag == "jp2h" {
+            let limit = at + size;
+            let mut inner = at + header;
+            let mut seen = 0usize;
+            while inner < limit && seen < JP2_CHILDREN {
+                let Some((inner_size, inner_header, child)) = jp2_box(bytes, inner, limit) else {
+                    broken += 1;
+                    break;
+                };
+                rows.push(format!("child\t{child}\t{inner_size}\t{inner}"));
+                seen += 1;
+                let body = bytes
+                    .get(inner + inner_header..inner + inner_size)
+                    .unwrap_or_default();
+                if child == "ihdr" && body.len() >= 14 {
+                    if let (Some(height), Some(width), Some(components)) =
+                        (be_u32_at(body, 0), be_u32_at(body, 4), be_u16(body, 8))
+                    {
+                        geometry.push(format!(
+                            "ihdr\t{height}\t{width}\t{components}\t{}\tfilter\t{}",
+                            i64::from(body[10]) + 1,
+                            body[11]
+                        ));
+                    }
+                }
+                if child == "colr" && body.len() >= 3 {
+                    let method = body[0];
+                    if method == 1 && body.len() >= 7 {
+                        if let Some(ecsr) = be_u32_at(body, 3) {
+                            geometry.push(format!("colr\t{method}\t{ecsr}"));
+                        }
+                    } else {
+                        geometry.push(format!("colr\t{method}"));
+                    }
+                }
+                inner += inner_size;
+            }
+        }
+        at += size;
+    }
+    let mut entries = vec![format!(
+        "jp2\t{declared}\t{}\t{boxes}\t{broken}",
+        bytes.len()
+    )];
+    entries.append(&mut rows);
+    entries.append(&mut geometry);
+    if broken == 0 && at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -2515,8 +2622,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_qoi(bytes) {
         return accept(FORMAT_QOI, lines);
     }
+    if let Some(lines) = read_jp2(bytes) {
+        return accept(FORMAT_JP2, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list or QOI container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI or JPEG 2000 container",
         -2,
     )
 }

@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 34 | 15.5% |
+| own Rust reader, named header fields decoded | 35 | 16.0% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **121** | 55.2% |
-| **covered, any level** | **98** | 44.8% |
+| **no parser at all - real gap** | **120** | 54.8% |
+| **covered, any level** | **99** | 45.2% |
 
-Top binary gap groups by count: unknown 57, archive 14, image 12, document 10, application 10,
+Top binary gap groups by count: unknown 57, archive 14, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
 Python refuses to install into its own environment.
 
-So the honest answer to the objective is **no, not yet**: 98 of 219 binary labels have a parser
-that runs here (34 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 121 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 99 of 219 binary labels have a parser
+that runs here (35 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 120 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -295,6 +295,7 @@ bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and the
 python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes it back for the probe
 python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tools/plist-sim.py decodes them back
 python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and decodes them back
+python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; the probe walks them back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -385,8 +386,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **98 covered** (34 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **121 with no
+Coverage is scored against magika's 219 binary labels: **99 covered** (35 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **120 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -438,6 +439,15 @@ does not re-derive them:
   near-miss: Pillow also *writes* SGI (`\x01\xda`) and JPEG 2000 (`jP  ` boxes), and magika has no
   `sgi` label but does have `jp2` - so SGI earns nothing here while JP2 is now reachable, and `psd`,
   which Pillow reads but cannot write, stays a gap named rather than quietly dropped.
+  JP2 took the reachable branch (+1 field-level label, 99 covered, 120 gaps) and caught two more
+  remembered-table traps on the way: the `ihdr` box lists **height before width**, the opposite of the
+  `Xsiz`/`Ysiz` order in the codestream beside it, and it stores sample depth minus one, so the byte
+  reads 7 for the 8-bit images Pillow confirms by decoding them back. The third box, `colr`, is printed
+  as its raw enumerated-colourspace number (16 and 17 across the three fixtures) because the code list
+  beyond those two values is exactly the kind of table this repo has been wrong about before - and the
+  `SIZ` segment's own geometry was dropped from the probe for the same reason: laid out from memory it
+  did not add up to its declared length, so the reader keeps to the boxes and leaves the codestream at
+  its SOC marker.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

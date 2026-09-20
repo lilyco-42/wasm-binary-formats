@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 34,
+    "selfFields": 35,
     "selfContainer": 23,
     "binarySpecAvailable": 0,
-    "gaps": 121,
+    "gaps": 120,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -20,7 +20,7 @@
     ],
     "gapByGroup": {
       "unknown": 57,
-      "image": 12,
+      "image": 11,
       "archive": 14,
       "code": 5,
       "document": 10,
@@ -2018,8 +2018,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "jpeg",

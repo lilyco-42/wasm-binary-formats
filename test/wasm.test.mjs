@@ -309,6 +309,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['tiny.icns', 30],
     ['tiny.bplist', 31], ['keyed.bplist', 31],
     ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
+    ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -335,6 +336,17 @@ test('a QOI chunk stream arrives with its six classes apart', () => {
   assert.equal(rows[1], 'chunks	296	rgb	11	argb	14	index	162	diff	28	luma	1	run	80');
   assert.equal(rows[2], 'pixels	512	walked	512	terminator	1');
   assert.ok(rows.includes('walked	end'), rows.join(' | '));
+});
+
+test('a JPEG 2000 container keeps its box order and its height-first ihdr', () => {
+  const rows = assertReadable('container', 'tiny.jp2', 33).rows;
+  assert.equal(rows[0], 'jp2	316	316	4	0');
+  assert.equal(rows[7], 'ihdr	20	32	3	8	filter	7', 'the 32x20 image must not come out 20x32');
+  assert.ok(rows.includes('colr	1	16'), rows.join(' | '));
+  assert.ok(rows.includes('walked	end'), rows.join(' | '));
+  const grey = assertReadable('container', 'grey.jp2', 33).rows;
+  assert.equal(grey[7], 'ihdr	8	64	1	8	filter	7');
+  assert.equal(grey[8], 'colr	1	17');
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
@@ -381,7 +393,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
