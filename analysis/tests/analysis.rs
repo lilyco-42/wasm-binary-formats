@@ -20,9 +20,12 @@ fn the_stub_elf_reports_its_own_section_table() {
         "file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tmachine\tx86_64\tsections\t2\tsymbols\t0\tdynsym\t0\tentry\t0",
         "the counts in the header row have to be the counts the rows below carry"
     );
-    assert_eq!(lines[1], "section\t0\t\taddr\t0\toff\t0\tsize\t0\talign\t0");
     assert_eq!(
-        lines[2], "section\t1\t.text\taddr\t0\toff\t192\tsize\t7\talign\t1",
+        lines[1],
+        "section\t0\t\taddr\t0\toff\t0\tsize\t0\tdisk\t0\talign\t0"
+    );
+    assert_eq!(
+        lines[2], "section\t1\t.text\taddr\t0\toff\t192\tsize\t7\tdisk\t7\talign\t1",
         "the string table names itself, and the name it holds is `.text`"
     );
     assert_eq!(lines.len(), 3);

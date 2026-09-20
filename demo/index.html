@@ -154,7 +154,7 @@ function disassembleHere(mod) {
     || sections.find((cells) => (cells[2] || '').includes('text'));
   if (!wanted) return '分析模块没有给出代码节（.text），所以没有字节可翻。';
   const start = Number(field(wanted, 'off'));
-  const size = Number(field(wanted, 'size')) || 0;
+  const size = Number(field(wanted, 'disk')) || Number(field(wanted, 'size')) || 0;
   const address = Number(field(wanted, 'addr')) || 0;
   if (!Number.isFinite(start) || start >= picked.bytes.length) return '分析模块给出的节位置在文件之外。';
   const slice = picked.bytes.subarray(start, Math.min(start + Math.min(size, WINDOW), picked.bytes.length));

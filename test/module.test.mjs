@@ -85,8 +85,8 @@ test('a minimal ELF comes back as a section table', () => {
     'file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tmachine\tx86_64\tsections\t2\tsymbols\t0\tdynsym\t0\tentry\t0',
     rows.join(' | ')
   );
-  assert.equal(rows[1], 'section\t0\t\taddr\t0\toff\t0\tsize\t0\talign\t0');
-  assert.equal(rows[2], 'section\t1\t.text\taddr\t0\toff\t192\tsize\t7\talign\t1');
+  assert.equal(rows[1], 'section\t0\t\taddr\t0\toff\t0\tsize\t0\tdisk\t0\talign\t0');
+  assert.equal(rows[2], 'section\t1\t.text\taddr\t0\toff\t192\tsize\t7\tdisk\t7\talign\t1');
   assert.equal(ex.self_test(), rows.length, 'the loader calls self_test before it has any file');
 });
 

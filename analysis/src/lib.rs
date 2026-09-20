@@ -68,14 +68,16 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         if index >= MAX_LISTED {
             continue;
         }
+        let range = section.file_range();
         rows.push(format!(
-            "section\t{index}\t{}\taddr\t{}\toff\t{}\tsize\t{}\talign\t{}",
+            "section\t{index}\t{}\taddr\t{}\toff\t{}\tsize\t{}\tdisk\t{}\talign\t{}",
             clean(section.name().unwrap_or("?")),
             section.address(),
-            // The file offset, not just the address: the disassembler module is handed bytes from
-            // here, and an address says nothing about where the section lies in the file.
-            section.offset().unwrap_or(u64::MAX),
+            // The on-disk position and length, not just the address: the disassembler module is
+            // handed bytes from here, and an address says nothing about where they lie in the file.
+            range.map_or(u64::MAX, |(at, _)| at),
             section.size(),
+            range.map_or(0, |(_, size)| size),
             section.align()
         ));
     }
@@ -114,8 +116,10 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
             if file.is_little_endian() { "little" } else { "big" },
             label(&file.kind()),
             // Named by the reader's own enum, lower-cased: the disassembler module has to be told
-            // which instruction set to open, and this is the only place that says so.
-            label(&file.machine()),
+            // which instruction set to open, and this is the only place that says so. The row calls
+            // it `machine`, the way the header field does, while this reader's method is
+            // `architecture`.
+            label(&file.architecture()),
             file.entry()
         ),
     );
