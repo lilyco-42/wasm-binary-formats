@@ -5447,7 +5447,10 @@ fn icc_be(bytes: &[u8], at: usize, wide: usize) -> Option<u64> {
 /// Four-byte ICC signatures are space padded, so `RGB ` and `RGB` name the same space; anything that
 /// is not printable at all answers as `?`.
 fn icc_token(bytes: &[u8], at: usize) -> String {
-    let Some(slice) = bytes.get(at..at.checked_add(4)?) else {
+    let Some(stop) = at.checked_add(4) else {
+        return "?".to_owned();
+    };
+    let Some(slice) = bytes.get(at..stop) else {
         return "?".to_owned();
     };
     let text: String = slice
