@@ -5273,9 +5273,11 @@ fn stl_trio(bytes: &[u8], at: usize) -> Option<String> {
     }
 }
 
-/// True when the twelve coordinates of one triangle are all real numbers.
+/// True when the nine coordinates of one triangle are all real numbers. The normal is three floats at
+/// the triangle's start and the coordinates nine more from its twelfth byte; reaching past the ninth
+/// coordinate reads the attribute bytes, and off the end of the last triangle in the file.
 fn stl_triangle_sane(bytes: &[u8], base: usize) -> bool {
-    (0..12).all(|axis| stl_f32(bytes, base + 4 + axis * 4).map_or(false, |value| value.is_finite()))
+    (0..9).all(|axis| stl_f32(bytes, base + 12 + axis * 4).map_or(false, |value| value.is_finite()))
 }
 
 /// A binary STL's stored normal is a unit vector - or zero, which plenty of writers emit. Text bytes
