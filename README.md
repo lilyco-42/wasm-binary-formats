@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 44 | 20.1% |
+| own Rust reader, named header fields decoded | 45 | 20.5% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **108** | 49.3% |
-| **covered, any level** | **111** | 50.7% |
+| **no parser at all - real gap** | **107** | 48.9% |
+| **covered, any level** | **112** | 51.1% |
 
-Top binary gap groups by count: unknown 53, archive 11, image 9, application 10, document 8,
+Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 8,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
@@ -279,9 +279,9 @@ name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`,
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 111 of 219 binary labels have a parser
-that runs here (44 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 108 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 112 of 219 binary labels have a parser
+that runs here (45 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 107 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -295,7 +295,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 111 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 112 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text for x86-64, AArch64 and Thumb bytes |
 
@@ -351,6 +351,7 @@ temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice 
 temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
 temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
 temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
+temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -459,8 +460,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **111 covered** (44 field-level and 26
-container-level from this repo's own readers, 41 generated and mostly load-gated), **108 with no
+Coverage is scored against magika's 219 binary labels: **112 covered** (45 field-level and 26
+container-level from this repo's own readers, 41 generated and mostly load-gated), **107 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -651,6 +652,21 @@ does not re-derive them:
   assembles them from the library's own tables; neither is a copy of a file), walks the bytes with a
   private mirror, and refuses to write the probe unless `ImageCms` reading the same bytes agrees on the
   name and copyright it itself wrote.
+  Enhanced Metafile (+1 field-level label, 112 covered, 107 gaps) is a record list in which the header
+  is just another record - `u32 type, u32 size` - so the file's own length lives at byte 48 and the walk
+  has to land on it, while the signature (`' EMF'`, at 40) sits behind the fields it signs. Two
+  producers are committed on purpose, because one file cannot tell a rule from a habit: `gdi.emf` comes
+  from Windows' own `CreateEnhMetaFileW`, and `page.emf` from LibreOffice's Draw export. They disagree
+  about the header's record count - GDI's 5 matches the walk's 5, LibreOffice's 22 is one short of its
+  23, because the header record is or is not counted - so the reader prints `records` and `walked`
+  side by side and corrects neither. Record *types* are reported as numbers for the same reason: type 14
+  closes both files, which is a fact about position, and no citable name table runs here (`cab`'s folder
+  area is the earlier instance of the same refusal). What the reader does name is geometry: `bounds` in
+  device units, `frame` in hundredths of a millimetre, and a pixels/mm pair that states the resolution
+  relating them - 120.05 dpi for LibreOffice's page, 162.56 for GDI's screen, and the two rectangles
+  agree to within the pixel the extents round apart. That pair is not a third copy of the same
+  rectangle: on a file whose device is a monitor, it describes the monitor. The bounds themselves are
+  checked outside this repo, against what Pillow's GDI-backed EMF opener reports as the image size.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

@@ -1,0 +1,60 @@
+{
+ "gdi.emf": {
+  "bytes": 308,
+  "gdiSize": [
+   68,
+   35
+  ],
+  "rows": [
+   "emf\t308\tbroken\t0\tversion\t1.0\tnsize\t108\trecords\t5\twalked\t5",
+   "bounds\t4\t4\t72\t39\twh\t68x35",
+   "frame\t63\t63\t1125\t618\tmm\t10.62x5.55",
+   "device\tpx\t1920x1200\tmm\t300x190\tdpi\t162.56",
+   "record\t0\ttype\t1\tsize\t108",
+   "record\t1\ttype\t43\tsize\t24",
+   "record\t2\ttype\t42\tsize\t24",
+   "record\t3\ttype\t84\tsize\t132",
+   "record\t4\ttype\t14\tsize\t20",
+   "types\tcounted\t5\tdistinct\t5\tlast\t14",
+   "walked\tend"
+  ]
+ },
+ "page.emf": {
+  "bytes": 808,
+  "gdiSize": [
+   897,
+   1308
+  ],
+  "rows": [
+   "emf\t808\tbroken\t0\tversion\t1.0\tnsize\t108\trecords\t22\twalked\t23",
+   "bounds\t0\t0\t897\t1308\twh\t897x1308",
+   "frame\t0\t0\t18999\t27699\tmm\t189.99x276.99",
+   "device\tpx\t898x1309\tmm\t190x277\tdpi\t120.05",
+   "record\t0\ttype\t1\tsize\t108",
+   "record\t1\ttype\t70\tsize\t44",
+   "record\t2\ttype\t70\tsize\t76",
+   "record\t3\ttype\t17\tsize\t12",
+   "record\t4\ttype\t11\tsize\t16",
+   "record\t5\ttype\t9\tsize\t16",
+   "record\t6\ttype\t12\tsize\t16",
+   "record\t7\ttype\t10\tsize\t16",
+   "record\t8\ttype\t20\tsize\t12",
+   "record\t9\ttype\t18\tsize\t12",
+   "record\t10\ttype\t33\tsize\t8",
+   "record\t11\ttype\t30\tsize\t24",
+   "record\t12\ttype\t33\tsize\t8",
+   "record\t13\ttype\t81\tsize\t312",
+   "record\t14\ttype\t34\tsize\t12",
+   "record\t15\ttype\t20\tsize\t12",
+   "record\t16\ttype\t33\tsize\t8",
+   "record\t17\ttype\t34\tsize\t12",
+   "record\t18\ttype\t20\tsize\t12",
+   "record\t19\ttype\t34\tsize\t12",
+   "record\t20\ttype\t20\tsize\t12",
+   "record\t21\ttype\t70\tsize\t28",
+   "record\t22\ttype\t14\tsize\t20",
+   "types\tcounted\t23\tdistinct\t14\tlast\t14",
+   "walked\tend"
+  ]
+ }
+}

@@ -22,6 +22,11 @@
 //!   stl   no magic at all: 80 header bytes, u32 triangle count, 50 bytes per triangle, so
 //!         84 + 50n == filesize is the only thing the format asserts about itself; a stored normal
 //!         is listed as written and counted against the normal the three points imply
+//!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
+//!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
+//!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
+//!         a pixels/mm pair states the resolution that relates the two - the ratio, not a table, is the
+//!         claim, and it holds on both producers' output to within the pixel the extents round apart
 //!   icc   u32be total size, and the only signature the format has: the constant "acsp" at 36, past
 //!         the header fields it identifies. Big-endian throughout, 12-byte tag records from 132,
 //!         each pointing at a payload whose own four-byte type is read from wherever the file says
@@ -122,6 +127,7 @@ pub fn name() -> &'static str {
         FORMAT_CFB => "cfb",
         FORMAT_STL => "stl",
         FORMAT_ICC => "icc",
+        FORMAT_EMF => "emf",
         _ => "unknown",
     }
 }
@@ -5573,6 +5579,143 @@ fn read_icc(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// Windows Enhanced Metafile: a header record followed by a flat list of `u32 type, u32 size` records.
+///
+/// The claim is the header's own word - `' EMF'` at 40, since the first eight bytes are the record
+/// type and size like every other record's - and everything after that is arithmetic the file has to
+/// satisfy: the header states the byte count, and the walk has to land on it. The record *count* is
+/// not trusted, because the two producers whose output is committed here disagree about it: GDI's says
+/// 5 and the walk finds 5, LibreOffice's says 22 and the walk finds 23 (the header itself). Both
+/// numbers are printed side by side and neither is called right.
+///
+/// What the reader deliberately does not do is name record types. `cab`'s folder area set the
+/// precedent: a number whose meaning has not been witnessed stays a number. Type 14 closes both
+/// fixtures, so it is reported as `last`, which is a fact about position rather than a claim about the
+/// specification. Two rectangles are printed rather than reconciled: bounds in device units, frame in
+/// hundredths of a millimetre, and the pixels/mm pair that states the resolution between them - which
+/// is a different rectangle again on a file whose device is a screen rather than a page.
+pub const FORMAT_EMF: i32 = 45;
+
+/// The signature is the ASCII of ` EMF` read as a little-endian word, exactly as GDI writes it.
+const EMF_SIGNATURE: u32 = 0x464D_4520;
+const EMF_HEADER: usize = 96;
+const EMF_LISTED: usize = 24;
+const EMF_KINDS: usize = 128;
+
+fn emf_u32(bytes: &[u8], at: usize) -> Option<u32> {
+    let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(u32::from_le_bytes(raw))
+}
+
+fn emf_i32(bytes: &[u8], at: usize) -> Option<i32> {
+    Some(i32::from_le_bytes(emf_u32(bytes, at)?.to_le_bytes()))
+}
+
+/// Hundredths of a millimetre, said out loud: `189.99` rather than a bare 18999, because the unit is
+/// the only reason the field is not a pixel count.
+fn emf_micrometres(data: f64) -> String {
+    format!("{:.2}", data)
+}
+
+fn read_emf(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < EMF_HEADER || emf_u32(bytes, 0)? != 1 || emf_u32(bytes, 40)? != EMF_SIGNATURE {
+        return None;
+    }
+    let n_size = emf_u32(bytes, 4)?;
+    let version = emf_u32(bytes, 44)?;
+    let claimed_bytes = emf_u32(bytes, 48)? as usize;
+    let claimed_records = emf_u32(bytes, 52)?;
+    let bounds: Vec<i32> = (0..4)
+        .filter_map(|slot| emf_i32(bytes, 8 + slot * 4))
+        .collect();
+    let frame: Vec<i32> = (0..4)
+        .filter_map(|slot| emf_i32(bytes, 24 + slot * 4))
+        .collect();
+    let device: Vec<u32> = (0..2)
+        .filter_map(|slot| emf_u32(bytes, 72 + slot * 4))
+        .collect();
+    let millimetres: Vec<u32> = (0..2)
+        .filter_map(|slot| emf_u32(bytes, 80 + slot * 4))
+        .collect();
+    if bounds.len() != 4 || frame.len() != 4 || device.len() != 2 || millimetres.len() != 2 {
+        return None;
+    }
+
+    // The walk honours each record's own length, which is what makes a lying header visible: the first
+    // record's size is the step off position zero, so a header that mis-states itself desynchronises
+    // everything after it.
+    let mut at = 0usize;
+    let mut listed: Vec<String> = Vec::new();
+    let mut kinds: Vec<u32> = Vec::new();
+    let mut counted = 0usize;
+    let mut last = -1i64;
+    let mut complete = false;
+    while at + 8 <= bytes.len() {
+        let kind = emf_u32(bytes, at)?;
+        let size = emf_u32(bytes, at + 4)? as usize;
+        if size < 8 || at.saturating_add(size) > bytes.len() {
+            break;
+        }
+        if !kinds.contains(&kind) && kinds.len() < EMF_KINDS {
+            kinds.push(kind);
+        }
+        if counted < EMF_LISTED {
+            listed.push(format!("record\t{counted}\ttype\t{kind}\tsize\t{size}"));
+        }
+        last = i64::from(kind);
+        counted += 1;
+        at += size;
+    }
+    complete = at == bytes.len();
+
+    let broken = usize::from(claimed_bytes != bytes.len()) + usize::from(!complete);
+    let dpi = if millimetres[0] == 0 {
+        "?".to_owned()
+    } else {
+        emf_micrometres(f64::from(device[0]) * 25.4 / f64::from(millimetres[0]))
+    };
+    let mut rows = vec![format!(
+        "emf\t{}\tbroken\t{broken}\tversion\t{}.{}\tnsize\t{n_size}\trecords\t{claimed_records}\twalked\t{counted}",
+        bytes.len()
+    , version >> 16, version & 0xFFFF)];
+    rows.push(format!(
+        "bounds\t{}\t{}\t{}\t{}\twh\t{}x{}",
+        bounds[0],
+        bounds[1],
+        bounds[2],
+        bounds[3],
+        bounds[2].saturating_sub(bounds[0]),
+        bounds[3].saturating_sub(bounds[1])
+    ));
+    rows.push(format!(
+        "frame\t{}\t{}\t{}\t{}\tmm\t{}x{}",
+        frame[0],
+        frame[1],
+        frame[2],
+        frame[3],
+        emf_micrometres(f64::from(frame[2].saturating_sub(frame[0])) / 100.0),
+        emf_micrometres(f64::from(frame[3].saturating_sub(frame[1])) / 100.0)
+    ));
+    rows.push(format!(
+        "device\tpx\t{}x{}\tmm\t{}x{}\tdpi\t{dpi}",
+        device[0], device[1], millimetres[0], millimetres[1]
+    ));
+    rows.append(&mut listed);
+    if counted > EMF_LISTED {
+        rows.push(format!("cut\trecords\t{counted}"));
+    }
+    rows.push(format!(
+        "types\tcounted\t{counted}\tdistinct\t{}\tlast\t{last}",
+        kinds.len()
+    ));
+    if complete {
+        rows.push("walked\tend".to_owned());
+    } else {
+        rows.push(format!("stopped\tat\t{at}"));
+    }
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -5675,13 +5818,16 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_icc(bytes) {
         return accept(FORMAT_ICC, lines);
     }
+    if let Some(lines) = read_emf(bytes) {
+        return accept(FORMAT_EMF, lines);
+    }
     // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
     // triangle count implies, so every container with a real signature gets to answer first.
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile or binary STL",
         -2,
     )
 }

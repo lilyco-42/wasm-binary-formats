@@ -323,6 +323,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['word97.doc', 42], ['excel97.xls', 42], ['wide97.xls', 42],
     ['tet.stl', 43], ['many.stl', 43], ['normals.stl', 43],
     ['srgb.icc', 44], ['xyz.icc', 44],
+    ['page.emf', 45], ['gdi.emf', 45],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -557,6 +558,19 @@ test('a 64-bit box length is read where the format puts it', () => {
   assert.ok(ordinary.includes('duration\t1000\t1000\t1000'), ordinary.join(' | '));
 });
 
+test('an enhanced metafile is walked record by record, and both counts are printed', () => {
+  // GDI counts its own header record in `records`; LibreOffice does not. Neither is corrected here:
+  // the claim and the walk are printed next to each other.
+  const gdi = assertReadable('container', 'gdi.emf', 45).rows;
+  assert.equal(gdi[0], 'emf	308	broken	0	version	1.0	nsize	108	records	5	walked	5', gdi.join(' | '));
+  assert.ok(gdi.includes('record	4	type	14	size	20'), gdi.join(' | '));
+  assert.equal(gdi[gdi.length - 1], 'walked	end');
+  const page = assertReadable('container', 'page.emf', 45).rows;
+  assert.equal(page[0], 'emf	808	broken	0	version	1.0	nsize	108	records	22	walked	23');
+  assert.ok(page.includes('device	px	898x1309	mm	190x277	dpi	120.05'), page.join(' | '));
+  assert.ok(page.includes('bounds	0	0	897	1308	wh	897x1308'), page.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -601,7 +615,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

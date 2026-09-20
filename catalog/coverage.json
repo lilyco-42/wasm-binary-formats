@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 44,
+    "selfFields": 45,
     "selfContainer": 26,
     "binarySpecAvailable": 0,
-    "gaps": 108,
+    "gaps": 107,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -26,7 +26,7 @@
       "document": 8,
       "executable": 5,
       "text": 2,
-      "application": 10,
+      "application": 9,
       "inode": 3,
       "font": 1,
       "undefined": 1
@@ -1259,8 +1259,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "eml",
