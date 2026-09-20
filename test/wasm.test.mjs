@@ -318,6 +318,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['zstd.arrow', 38], ['file.arrow', 38], ['file_dict.arrow', 38],
     ['rows.parquet', 39], ['plain.parquet', 39], ['zstd.parquet', 39], ['gzip.parquet', 39],
     ['nodict.parquet', 39], ['nulls.parquet', 39], ['groups.parquet', 39], ['typed.parquet', 39],
+    ['add.onnx', 40], ['symbolic.onnx', 40], ['types.onnx', 40],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -450,6 +451,17 @@ test('a Parquet footer keeps its field ids and its page offsets across the ABI',
   assert.equal(groups[0], 'parquet\t2256\tfooter\t939\tbytes\t1309\tgroups\t3');
 });
 
+test('an ONNX model keeps its field numbers and its unknown axes across the ABI', () => {
+  const lines = assertReadable('container', 'types.onnx', 40).rows;
+  assert.equal(lines[0], 'onnx	324	nodes	1	tensors	11	opsets	1	bad	0', lines.join(' | '));
+  assert.ok(lines.includes('tensor	1	i32	type	6	type_name	int32	dims	3	int32	3	raw	0'), lines.join(' | '));
+  assert.ok(lines.includes('tensor	10	raw	type	1	type_name	float	dims	3	raw	12'), 'the raw-bytes tensor');
+  assert.equal(lines[lines.length - 1], 'walked	end');
+  const symbolic = assertReadable('container', 'symbolic.onnx', 40).rows;
+  assert.ok(symbolic.includes('input	0	x	type	1	type_name	float	dims	pN,d3,u'), symbolic.join(' | '));
+  assert.ok(symbolic.includes('opset	1	domain	ai.onnx.ml	version	3'), symbolic.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -494,7 +506,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

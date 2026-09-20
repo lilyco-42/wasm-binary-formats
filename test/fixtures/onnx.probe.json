@@ -1,0 +1,75 @@
+{
+ "_observed": {
+  "element_types": {
+   "1": "FLOAT",
+   "10": "FLOAT16",
+   "11": "DOUBLE",
+   "2": "UINT8",
+   "3": "INT8",
+   "6": "INT32",
+   "7": "INT64",
+   "8": "STRING",
+   "9": "BOOL"
+  },
+  "note": "RUST_ELEMENTS is the reader's own naming table, asserted equal to what onnx named"
+ },
+ "add.onnx": {
+  "bytes": 116,
+  "head": "080e320d6164647320612076",
+  "rows": [
+   "onnx\t116\tnodes\t1\ttensors\t1\topsets\t1\tbad\t0",
+   "ir\t14\topset\t-\tversion\t17",
+   "producer\t-\tdoc\tadds a vector",
+   "opset\t0\tdomain\t-\tversion\t17",
+   "graph\tadd_graph\tnodes\t1\tinputs\t1\toutputs\t1\ttensors\t1",
+   "node\t0\top\tAdd\tname\tadd_0\tinputs\t2\toutputs\t1",
+   "input\t0\tx\ttype\t1\ttype_name\tfloat\tdims\td3",
+   "output\t0\ty\ttype\t1\ttype_name\tfloat\tdims\td3",
+   "tensor\t0\tb\ttype\t1\ttype_name\tfloat\tdims\t3\tfloat\t3\traw\t0",
+   "walked\tend"
+  ]
+ },
+ "symbolic.onnx": {
+  "bytes": 220,
+  "head": "080e12166f6e6e782d666978",
+  "rows": [
+   "onnx\t220\tnodes\t2\ttensors\t0\topsets\t2\tbad\t0",
+   "ir\t14\topset\t-\tversion\t17",
+   "producer\tonnx-fixture-generator\tversion\t1.2.3\tdomain\tlab.test\tmodel_version\t42\tdoc\tbatch axis is symbolic, one axis is unknown",
+   "opset\t0\tdomain\t-\tversion\t17",
+   "opset\t1\tdomain\tai.onnx.ml\tversion\t3",
+   "graph\tsymbolic_graph\tnodes\t2\tinputs\t1\toutputs\t1\ttensors\t0",
+   "node\t0\top\tRelu\tname\trelu_0\tinputs\t1\toutputs\t1",
+   "node\t1\top\tNeg\tname\tneg_0\tinputs\t1\toutputs\t1",
+   "input\t0\tx\ttype\t1\ttype_name\tfloat\tdims\tpN,d3,u",
+   "output\t0\ty\ttype\t1\ttype_name\tfloat\tdims\tpN,d3,u",
+   "walked\tend"
+  ]
+ },
+ "types.onnx": {
+  "bytes": 324,
+  "head": "080e3ab9020a180a03663332",
+  "rows": [
+   "onnx\t324\tnodes\t1\ttensors\t11\topsets\t1\tbad\t0",
+   "ir\t14\topset\t-\tversion\t13",
+   "producer\t-",
+   "opset\t0\tdomain\t-\tversion\t13",
+   "graph\ttypes_graph\tnodes\t1\tinputs\t1\toutputs\t1\ttensors\t11",
+   "node\t0\top\tIdentity\tname\tid_0\tinputs\t1\toutputs\t1",
+   "input\t0\tf32\ttype\t1\ttype_name\tfloat\tdims\td2",
+   "output\t0\ty\ttype\t1\ttype_name\tfloat\tdims\td2",
+   "tensor\t0\tf32\ttype\t1\ttype_name\tfloat\tdims\t2\tfloat\t2\traw\t0",
+   "tensor\t1\ti32\ttype\t6\ttype_name\tint32\tdims\t3\tint32\t3\traw\t0",
+   "tensor\t2\ti64\ttype\t7\ttype_name\tint64\tdims\t2\tint64\t2\traw\t0",
+   "tensor\t3\tf64\ttype\t11\ttype_name\tdouble\tdims\t2\tdouble\t2\traw\t0",
+   "tensor\t4\tflag\ttype\t9\ttype_name\tbool\tdims\t2\tint32\t2\traw\t0",
+   "tensor\t5\tu8\ttype\t2\ttype_name\tuint8\tdims\t3\tint32\t3\traw\t0",
+   "tensor\t6\ti8\ttype\t3\ttype_name\tint8\tdims\t2\tint32\t2\traw\t0",
+   "tensor\t7\th\ttype\t10\ttype_name\tfloat16\tdims\t2\tint32\t2\traw\t0",
+   "tensor\t8\twords\ttype\t8\ttype_name\tstring\tdims\t2\tbytes\t2\traw\t0",
+   "tensor\t9\twide\ttype\t1\ttype_name\tfloat\tdims\t2x3\tfloat\t6\traw\t0",
+   "tensor\t10\traw\ttype\t1\ttype_name\tfloat\tdims\t3\traw\t12",
+   "walked\tend"
+  ]
+ }
+}

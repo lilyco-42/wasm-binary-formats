@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 40,
+    "selfFields": 41,
     "selfContainer": 24,
     "binarySpecAvailable": 0,
-    "gaps": 114,
+    "gaps": 113,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -21,7 +21,7 @@
     "gapByGroup": {
       "unknown": 54,
       "image": 11,
-      "archive": 12,
+      "archive": 11,
       "code": 5,
       "document": 10,
       "executable": 5,
@@ -2877,8 +2877,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "ooxml",

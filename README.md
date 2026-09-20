@@ -263,24 +263,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 40 | 18.3% |
+| own Rust reader, named header fields decoded | 41 | 18.7% |
 | own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **114** | 52.1% |
-| **covered, any level** | **105** | 47.9% |
+| **no parser at all - real gap** | **113** | 51.6% |
+| **covered, any level** | **106** | 48.4% |
 
-Top binary gap groups by count: unknown 54, archive 12, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 54, archive 11, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
-and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`h5`,
+and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `h5`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 105 of 219 binary labels have a parser
-that runs here (40 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 114 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 106 of 219 binary labels have a parser
+that runs here (41 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 113 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -302,6 +302,7 @@ temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes H
 temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
 temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
 temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
+temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -392,8 +393,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **105 covered** (40 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **114 with no
+Coverage is scored against magika's 219 binary labels: **106 covered** (41 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **113 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -526,6 +527,16 @@ does not re-derive them:
   caught a recalled table being wrong before it reached the reader - `ZSTD` is ordinal 6, not 5 - and it
   is also why encoding ordinals stay unnamed: the only thing two fixtures that differ in exactly the
   `use_dictionary` option prove is *which* ordinal belongs to a dictionary page.
+  ONNX (+1 field-level label, 106 covered, 113 gaps) is a third encoding class again: the whole file is
+  one protobuf message with no magic, and a length-delimited region is a string or a sub-message only
+  because the schema says so - so no generic walker is available and the reader descends one named
+  level at a time. The generator justifies every field number twice: against the descriptor `onnx`
+  ships, and by byte-for-byte equality between each region and what `onnx` serializes for that node,
+  tensor, input or output. Both were needed, because several numbers a recollection supplies are wrong
+  - `producer_name` is 2 not 3 and `graph` is 7 not 8, and inside a tensor `float_data` is 4,
+  `int32_data` 5 and `string_data` 6, so the remembered 5/6/12 would have called an int32 tensor a
+  float one and a doc string a payload. `ModelProto.ByteSize()` equals the file length, which is what
+  lets the reader require that its walk account for every byte and refuse a truncated model.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

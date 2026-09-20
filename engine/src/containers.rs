@@ -17,6 +17,9 @@
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
+//!   onnx   one protobuf message: tag varint of field number and wire type, then a varint,
+//!         fixed 32/64 slot or a length-delimited region that is a string or a message only
+//!         because this schema says so
 //!   parquet "PAR1" at both ends, an int32 before the last one giving the size of the Thrift
 //!         compact Footer that describes every row group in the file
 //!   npy   0x93 "NUMPY" + two version bytes, then a little-endian header length (u16 in v1, u32
@@ -102,6 +105,7 @@ pub fn name() -> &'static str {
         FORMAT_AVRO => "avro",
         FORMAT_ARROW => "arrow",
         FORMAT_PARQUET => "parquet",
+        FORMAT_ONNX => "onnx",
         _ => "unknown",
     }
 }
@@ -4092,6 +4096,473 @@ fn read_parquet(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// ONNX: one protobuf message that describes a model, read level by level. 40, after Parquet at 39.
+///
+/// An `.onnx` file has no magic and no framing of its own: it is a single `ModelProto` in protobuf
+/// wire format, where each field is a tag varint carrying a number and a wire type followed by a value
+/// that is a varint, a fixed 32/64-bit slot, or a length-delimited region. That region may be a string
+/// or a nested message and *the wire does not say which*, so nothing here can be walked generically -
+/// the reader has to know which fields are messages and descend into those alone, which is why the
+/// accessors below are one per schema level instead of a generic tree printer.
+///
+/// The field numbers are the ones the fixtures write, verified in `scripts/make-onnx-fixtures.py`
+/// against `onnx`'s own descriptor and by byte-for-byte equality with the sub-messages onnx serializes:
+/// `producer_name` is 2 rather than 3, `graph` is 7 rather than 8, and inside a tensor `float_data` is
+/// 4, `int32_data` 5 and `string_data` 6 - so a reader written from memory would label an int32 tensor
+/// as a float one and never notice. Element-type names are limited to the nine the fixtures witness;
+/// every other ordinal prints as a number.
+///
+/// A shape dimension is `dim_value`, or a named `dim_param`, or *neither*, and the three are reported
+/// apart (`d3`, `pN`, `u`): collapsing an unknown axis to a zero would invent a rank that the file does
+/// not state.
+pub const FORMAT_ONNX: i32 = 40;
+
+const ONNX_ITEMS: usize = 512;
+
+enum PbItem {
+    Number(i64),
+    Region(usize, usize),
+}
+
+/// One protobuf message: its fields in file order, plus where it ended.
+struct Pb<'a> {
+    bytes: &'a [u8],
+    items: Vec<(u32, PbItem)>,
+    end: usize,
+    bad: i64,
+}
+
+fn pb_varint(bytes: &[u8], at: usize, stop: usize) -> Option<(i64, usize)> {
+    let mut result = 0u64;
+    let mut cursor = at;
+    let mut shift = 0u32;
+    while cursor < stop {
+        let byte = *bytes.get(cursor)?;
+        cursor += 1;
+        result |= u64::from(byte & 0x7F).checked_shl(shift)?;
+        if byte & 0x80 == 0 {
+            return Some((result as i64, cursor));
+        }
+        shift += 7;
+        if shift > 63 {
+            return None;
+        }
+    }
+    None
+}
+
+impl Pb<'_> {
+    fn empty() -> Pb<'static> {
+        Pb {
+            bytes: &[],
+            items: Vec::new(),
+            end: 0,
+            bad: 0,
+        }
+    }
+
+    fn read(bytes: &[u8], start: usize, stop: usize) -> Pb {
+        let mut out = Pb {
+            bytes,
+            items: Vec::new(),
+            end: start,
+            bad: 0,
+        };
+        let mut at = start;
+        while at < stop {
+            let Some((tag, after)) = pb_varint(bytes, at, stop) else {
+                out.bad += 1;
+                break;
+            };
+            at = after;
+            let field = u32::try_from(tag >> 3).unwrap_or(u32::MAX);
+            let wire = tag & 0x07;
+            if field == 0 {
+                out.bad += 1;
+                break;
+            }
+            match wire {
+                0 => match pb_varint(bytes, at, stop) {
+                    Some((value, after)) => {
+                        at = after;
+                        out.items.push((field, PbItem::Number(value)));
+                    }
+                    None => {
+                        out.bad += 1;
+                        break;
+                    }
+                },
+                2 => match pb_varint(bytes, at, stop) {
+                    Some((size, after)) => {
+                        let size = usize::try_from(size).unwrap_or(usize::MAX);
+                        let begin = after;
+                        let Some(end) = begin.checked_add(size) else {
+                            out.bad += 1;
+                            break;
+                        };
+                        if end > stop {
+                            out.bad += 1;
+                            break;
+                        }
+                        out.items.push((field, PbItem::Region(begin, end)));
+                        at = end;
+                    }
+                    None => {
+                        out.bad += 1;
+                        break;
+                    }
+                },
+                5 => {
+                    if at + 4 > stop {
+                        out.bad += 1;
+                        break;
+                    }
+                    let quad: [u8; 4] = bytes[at..at + 4].try_into().unwrap();
+                    out.items
+                        .push((field, PbItem::Number(i64::from(u32::from_le_bytes(quad)))));
+                    at += 4;
+                }
+                1 => {
+                    if at + 8 > stop {
+                        out.bad += 1;
+                        break;
+                    }
+                    let octet: [u8; 8] = bytes[at..at + 8].try_into().unwrap();
+                    out.items
+                        .push((field, PbItem::Number(u64::from_le_bytes(octet) as i64)));
+                    at += 8;
+                }
+                _ => {
+                    // Groups (3 and 4) are obsolete; anything else means the walk has lost its place.
+                    out.bad += 1;
+                    break;
+                }
+            }
+            if out.items.len() > ONNX_ITEMS {
+                out.bad += 1;
+                break;
+            }
+        }
+        out.end = at;
+        out
+    }
+
+    fn numbers(&self, field: u32) -> Vec<i64> {
+        self.items
+            .iter()
+            .filter(|(id, _)| *id == field)
+            .filter_map(|(_, item)| match item {
+                PbItem::Number(value) => Some(*value),
+                PbItem::Region(..) => None,
+            })
+            .collect()
+    }
+
+    fn regions(&self, field: u32) -> Vec<(usize, usize)> {
+        self.items
+            .iter()
+            .filter(|(id, _)| *id == field)
+            .filter_map(|(_, item)| match item {
+                PbItem::Region(begin, end) => Some((*begin, *end)),
+                PbItem::Number(_) => None,
+            })
+            .collect()
+    }
+
+    fn count(&self, field: u32) -> usize {
+        self.items.iter().filter(|(id, _)| *id == field).count()
+    }
+
+    fn one(&self, field: u32) -> Option<i64> {
+        self.numbers(field).first().copied()
+    }
+
+    fn one_region(&self, field: u32) -> Option<(usize, usize)> {
+        self.regions(field).first().copied()
+    }
+
+    fn text(&self, field: u32) -> Option<String> {
+        let (begin, end) = self.one_region(field)?;
+        Some(printable(&String::from_utf8_lossy(
+            self.bytes.get(begin..end)?,
+        )))
+    }
+
+    fn child(&self, field: u32) -> Option<Pb<'a>> {
+        let (begin, end) = self.one_region(field)?;
+        Some(Pb::read(self.bytes, begin, end))
+    }
+
+    fn children(&self, field: u32) -> Vec<Pb<'a>> {
+        self.regions(field)
+            .into_iter()
+            .take(ONNX_ITEMS)
+            .map(|(begin, end)| Pb::read(self.bytes, begin, end))
+            .collect()
+    }
+
+    /// Every element of a repeated numeric field, whichever of the two legal encodings the writer
+    /// used: unpacked values arrive one per tag, packed ones share one region that holds fixed-width
+    /// words for `float`/`double` and varints for everything else.
+    fn elements(&self, field: u32, width: usize) -> Vec<i64> {
+        let mut out = self.numbers(field);
+        for (begin, end) in self.regions(field) {
+            let Some(blob) = self.bytes.get(begin..end) else {
+                continue;
+            };
+            if width == 0 {
+                let mut at = 0usize;
+                while let Some((value, after)) = pb_varint(blob, at, blob.len()) {
+                    out.push(value);
+                    at = after;
+                }
+            } else {
+                let mut at = 0usize;
+                while at + width <= blob.len() {
+                    if width == 4 {
+                        let quad: [u8; 4] = blob[at..at + 4].try_into().unwrap();
+                        out.push(i64::from(u32::from_le_bytes(quad)));
+                    } else {
+                        let octet: [u8; 8] = blob[at..at + 8].try_into().unwrap();
+                        out.push(u64::from_le_bytes(octet) as i64);
+                    }
+                    at += width;
+                }
+            }
+        }
+        out
+    }
+}
+
+/// The nine element types the fixtures witness, each named by onnx itself when reading the file that
+/// carries it. Anything else is reported as its number.
+fn onnx_element(ordinal: i64) -> &'static str {
+    match ordinal {
+        1 => "float",
+        2 => "uint8",
+        3 => "int8",
+        6 => "int32",
+        7 => "int64",
+        8 => "string",
+        9 => "bool",
+        10 => "float16",
+        11 => "double",
+        _ => "unnamed",
+    }
+}
+
+// ModelProto.
+const ONNX_IR: u32 = 1;
+const ONNX_PRODUCER: u32 = 2;
+const ONNX_PRODUCER_VERSION: u32 = 3;
+const ONNX_DOMAIN: u32 = 4;
+const ONNX_MODEL_VERSION: u32 = 5;
+const ONNX_DOC: u32 = 6;
+const ONNX_GRAPH: u32 = 7;
+const ONNX_OPSET: u32 = 8;
+// OperatorSetIdProto, GraphProto, NodeProto, TensorProto, ValueInfo/Type/Shape/Dimension.
+const OPSET_DOMAIN: u32 = 1;
+const OPSET_VERSION: u32 = 2;
+const GRAPH_NODES: u32 = 1;
+const GRAPH_NAME: u32 = 2;
+const GRAPH_TENSORS: u32 = 5;
+const GRAPH_INPUTS: u32 = 11;
+const GRAPH_OUTPUTS: u32 = 12;
+const NODE_INPUTS: u32 = 1;
+const NODE_OUTPUTS: u32 = 2;
+const NODE_NAME: u32 = 3;
+const NODE_OP: u32 = 4;
+const TENSOR_DIMS: u32 = 1;
+const TENSOR_TYPE: u32 = 2;
+const TENSOR_FLOATS: u32 = 4;
+const TENSOR_INT32S: u32 = 5;
+const TENSOR_STRINGS: u32 = 6;
+const TENSOR_INT64S: u32 = 7;
+const TENSOR_NAME: u32 = 8;
+const TENSOR_RAW: u32 = 9;
+const TENSOR_DOUBLES: u32 = 10;
+const TENSOR_UINT64S: u32 = 11;
+const TENSOR_LOCATION: u32 = 14;
+const INFO_NAME: u32 = 1;
+const INFO_TYPE: u32 = 2;
+const TYPE_TENSOR: u32 = 1;
+const TENSOR_TYPE_ELEM: u32 = 1;
+const TENSOR_TYPE_SHAPE: u32 = 2;
+const SHAPE_DIMS: u32 = 1;
+const DIM_VALUE: u32 = 1;
+const DIM_PARAM: u32 = 2;
+
+/// An absent string and an empty one are different facts in the bytes but the same one on screen:
+/// onnx writes `domain = ''` for the default operator set, and the mirror prints `-` for both.
+fn onnx_label(value: Option<String>) -> String {
+    match value {
+        Some(text) if !text.is_empty() => text,
+        _ => "-".to_owned(),
+    }
+}
+
+/// The dimensions of a graph input or output, keeping named, numeric and unknown axes apart.
+fn onnx_dims(shape: &Pb<'_>) -> String {
+    let mut parts = Vec::new();
+    for dim in shape.children(SHAPE_DIMS) {
+        if let Some(value) = dim.one(DIM_VALUE) {
+            parts.push(format!("d{value}"));
+        } else if let Some(name) = dim.text(DIM_PARAM) {
+            parts.push(format!("p{name}"));
+        } else {
+            parts.push("u".to_owned());
+        }
+    }
+    parts.join(",")
+}
+
+fn onnx_io(graph: &Pb<'_>, field: u32, which: &str, rows: &mut Vec<String>) {
+    for (i, info) in graph.children(field).into_iter().enumerate() {
+        let tensor = match info.child(INFO_TYPE).and_then(|t| t.child(TYPE_TENSOR)) {
+            Some(tensor) => tensor,
+            None => Pb::empty(),
+        };
+        let kind = tensor.one(TENSOR_TYPE_ELEM).unwrap_or(0);
+        let shape = tensor.child(TENSOR_TYPE_SHAPE).unwrap_or_else(Pb::empty);
+        let name = onnx_label(info.text(INFO_NAME));
+        rows.push(format!(
+            "{which}\t{i}\t{name}\ttype\t{kind}\ttype_name\t{}\tdims\t{}",
+            onnx_element(kind),
+            if onnx_dims(&shape).is_empty() {
+                "-".to_owned()
+            } else {
+                onnx_dims(&shape)
+            }
+        ));
+    }
+}
+
+fn read_onnx(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 {
+        return None;
+    }
+    let model = Pb::read(bytes, 0, bytes.len());
+    // Nothing identifies protobuf as ONNX, so the claim rests on structure: the whole buffer has to
+    // parse, an ir_version has to be stated, a graph and an opset import have to be messages, and the
+    // graph has to say something about a model.
+    if model.bad > 0 || model.end != bytes.len() {
+        return None;
+    }
+    if model.one(ONNX_IR).is_none() || model.one_region(ONNX_GRAPH).is_none() {
+        return None;
+    }
+    let graph = model.child(ONNX_GRAPH)?;
+    let opsets = model.children(ONNX_OPSET);
+    if graph.bad > 0 || opsets.is_empty() || opsets.iter().any(|o| o.bad > 0) {
+        return None;
+    }
+    if graph.count(GRAPH_NODES) == 0 && graph.count(GRAPH_INPUTS) == 0 {
+        return None;
+    }
+    let nodes = graph.children(GRAPH_NODES);
+    let tensors = graph.children(GRAPH_TENSORS);
+    let first = opsets.first()?;
+    let mut rows = vec![format!(
+        "onnx\t{size}\tnodes\t{nodes}\ttensors\t{tensors}\topsets\t{opsets}\tbad\t{bad}",
+        size = bytes.len(),
+        nodes = nodes.len(),
+        tensors = tensors.len(),
+        opsets = opsets.len(),
+        bad = model.bad,
+    )];
+    rows.push(format!(
+        "ir\t{ir}\topset\t{domain}\tversion\t{version}",
+        ir = model.one(ONNX_IR).unwrap_or(0),
+        domain = onnx_label(first.text(OPSET_DOMAIN)),
+        version = first.one(OPSET_VERSION).unwrap_or(0),
+    ));
+    let mut producer = format!(
+        "producer\t{name}",
+        name = onnx_label(model.text(ONNX_PRODUCER))
+    );
+    if let Some(value) = model.text(ONNX_PRODUCER_VERSION) {
+        producer.push_str(&format!("\tversion\t{value}"));
+    }
+    if let Some(value) = model.text(ONNX_DOMAIN) {
+        producer.push_str(&format!("\tdomain\t{value}"));
+    }
+    if let Some(value) = model.one(ONNX_MODEL_VERSION) {
+        producer.push_str(&format!("\tmodel_version\t{value}"));
+    }
+    if let Some(value) = model.text(ONNX_DOC) {
+        producer.push_str(&format!("\tdoc\t{value}"));
+    }
+    rows.push(producer);
+    for (i, opset) in opsets.iter().enumerate() {
+        rows.push(format!(
+            "opset\t{i}\tdomain\t{domain}\tversion\t{version}",
+            domain = onnx_label(opset.text(OPSET_DOMAIN)),
+            version = opset.one(OPSET_VERSION).unwrap_or(0),
+        ));
+    }
+    rows.push(format!(
+        "graph\t{name}\tnodes\t{nodes}\tinputs\t{inputs}\toutputs\t{outputs}\ttensors\t{tensors}",
+        name = onnx_label(graph.text(GRAPH_NAME)),
+        nodes = nodes.len(),
+        inputs = graph.count(GRAPH_INPUTS),
+        outputs = graph.count(GRAPH_OUTPUTS),
+        tensors = tensors.len(),
+    ));
+    for (i, node) in nodes.iter().enumerate() {
+        rows.push(format!(
+            "node\t{i}\top\t{op}\tname\t{name}\tinputs\t{inputs}\toutputs\t{outputs}",
+            op = node.text(NODE_OP).unwrap_or_default(),
+            name = onnx_label(node.text(NODE_NAME)),
+            inputs = node.count(NODE_INPUTS),
+            outputs = node.count(NODE_OUTPUTS),
+        ));
+    }
+    onnx_io(&graph, GRAPH_INPUTS, "input", &mut rows);
+    onnx_io(&graph, GRAPH_OUTPUTS, "output", &mut rows);
+    for (i, tensor) in tensors.iter().enumerate() {
+        let kind = tensor.one(TENSOR_TYPE).unwrap_or(0);
+        let dims = tensor.elements(TENSOR_DIMS, 0);
+        let dims: Vec<String> = dims.iter().map(|value| value.to_string()).collect();
+        let mut line = format!(
+            "tensor\t{i}\t{name}\ttype\t{kind}\ttype_name\t{}\tdims\t{dims}",
+            onnx_element(kind),
+            name = onnx_label(tensor.text(TENSOR_NAME)),
+            dims = if dims.is_empty() {
+                "-".to_owned()
+            } else {
+                dims.join("x")
+            },
+        );
+        for (field, label, width) in [
+            (TENSOR_FLOATS, "float", 4),
+            (TENSOR_INT32S, "int32", 0),
+            (TENSOR_INT64S, "int64", 0),
+            (TENSOR_DOUBLES, "double", 8),
+            (TENSOR_UINT64S, "uint64", 0),
+        ] {
+            let found = tensor.elements(field, width);
+            if !found.is_empty() {
+                line.push_str(&format!("\t{label}\t{n}", n = found.len()));
+            }
+        }
+        let strings = tensor.count(TENSOR_STRINGS);
+        if strings > 0 {
+            line.push_str(&format!("\tbytes\t{strings}"));
+        }
+        let raw = match tensor.one_region(TENSOR_RAW) {
+            Some((begin, end)) => end - begin,
+            None => 0,
+        };
+        line.push_str(&format!("\traw\t{raw}"));
+        if let Some(location) = tensor.one(TENSOR_LOCATION) {
+            line.push_str(&format!("\tlocation\t{location}"));
+        }
+        rows.push(line);
+    }
+    rows.push("walked\tend".to_owned());
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -4178,8 +4649,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_parquet(bytes) {
         return accept(FORMAT_PARQUET, lines);
     }
+    if let Some(lines) = read_onnx(bytes) {
+        return accept(FORMAT_ONNX, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream or Parquet file",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file or ONNX model",
         -2,
     )
 }
