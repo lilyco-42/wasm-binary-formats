@@ -308,6 +308,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
     ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['tiny.icns', 30],
     ['tiny.bplist', 31], ['keyed.bplist', 31],
+    ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -326,6 +327,14 @@ test('a binary plist keeps its object graph and its text across the ABI', () => 
   assert.ok(tiny.includes('obj\t50\tutf16\t7\théllo世界'), `utf16 row: ${tiny.find((r) => r.startsWith('obj\t50'))}`);
   assert.ok(tiny.includes('obj\t18\tdate\t2026-09-20\t02:47:12'), 'the date walked back is not the one written');
   assert.ok(tiny.includes('obj\t24\tint\t-7\t8'), 'a negative integer came back unsigned');
+});
+
+test('a QOI chunk stream arrives with its six classes apart', () => {
+  const rows = assertReadable('container', 'all6.qoi', 32).rows;
+  assert.equal(rows[0], 'qoi	64	8	4	1');
+  assert.equal(rows[1], 'chunks	296	rgb	11	argb	14	index	162	diff	28	luma	1	run	80');
+  assert.equal(rows[2], 'pixels	512	walked	512	terminator	1');
+  assert.ok(rows.includes('walked	end'), rows.join(' | '));
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
@@ -372,7 +381,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

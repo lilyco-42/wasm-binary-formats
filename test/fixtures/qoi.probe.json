@@ -1,0 +1,82 @@
+{
+ "all6": {
+  "channels": 4,
+  "chunks": 296,
+  "claimed": 512,
+  "colorspace": 1,
+  "corner": [
+   7,
+   7,
+   7,
+   255
+  ],
+  "height": 8,
+  "kinds": {
+   "argb": 14,
+   "diff": 28,
+   "index": 162,
+   "luma": 1,
+   "rgb": 11,
+   "run": 80
+  },
+  "length": 408,
+  "mode_after_decode": "RGBA",
+  "pixels": 512,
+  "stopped": "none",
+  "terminator": "0000000000000001",
+  "width": 64
+ },
+ "srgb": {
+  "channels": 3,
+  "chunks": 2,
+  "claimed": 48,
+  "colorspace": 0,
+  "corner": [
+   10,
+   20,
+   30
+  ],
+  "height": 6,
+  "kinds": {
+   "argb": 0,
+   "diff": 0,
+   "index": 0,
+   "luma": 0,
+   "rgb": 1,
+   "run": 1
+  },
+  "length": 27,
+  "mode_after_decode": "RGB",
+  "pixels": 48,
+  "stopped": "none",
+  "terminator": "0000000000000001",
+  "width": 8
+ },
+ "tiny": {
+  "channels": 4,
+  "chunks": 2,
+  "claimed": 48,
+  "colorspace": 1,
+  "corner": [
+   10,
+   20,
+   30,
+   255
+  ],
+  "height": 6,
+  "kinds": {
+   "argb": 0,
+   "diff": 0,
+   "index": 0,
+   "luma": 0,
+   "rgb": 1,
+   "run": 1
+  },
+  "length": 27,
+  "mode_after_decode": "RGBA",
+  "pixels": 48,
+  "stopped": "none",
+  "terminator": "0000000000000001",
+  "width": 8
+ }
+}

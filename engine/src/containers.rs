@@ -12,6 +12,8 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   qoi   "qoif", u32 width, u32 height, u8 channels, u8 colourspace, then one-byte-tagged
+//!         chunks and an eight-byte terminator
 //!   bplist "bplist00", objects, then `num` big-endian offsets of `offset_size` each, then a
 //!         32-byte trailer; references inside an object are `object_ref_size` wide, which is not
 //!         the same number (see `read_bplist`)
@@ -79,6 +81,7 @@ pub fn name() -> &'static str {
         FORMAT_WOFF => "woff",
         FORMAT_ICNS => "icns",
         FORMAT_BPLIST => "bplist",
+        FORMAT_QOI => "qoi",
         _ => "unknown",
     }
 }
@@ -2367,6 +2370,86 @@ fn read_bplist(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Quick Open Image: the header, and a walk of the chunk stream that accounts for every pixel that
+/// header claims. 32, after the property list at 31.
+///
+/// `qoif`, then width and height as big-endian u32, then two *single* bytes for channels and
+/// colourspace. Every byte of the body starts a chunk: `0xFE` RGB (three colour bytes follow),
+/// `0xFF` RGBA (four), `0x00..=0x3F` an index into the last 64 pixels, `0x40..=0x7F` a per-channel
+/// difference, `0x80..=0xBF` a luma delta, and `0xC0..=0xFD` a run of `(byte & 0x3F) + 1` repeats.
+/// Those ranges cover the whole byte, so a stream cannot hold an unknown tag - the only way it can be
+/// wrong is its length. Hence the read is an accounting: pixels walked against `width * height`, and
+/// whether the walk lands exactly on the eight terminator bytes.
+pub const FORMAT_QOI: i32 = 32;
+
+/// How many chunks a walk will classify before it calls the file too big to read here. A run of 62
+/// identical pixels is one chunk, so this only binds on images far past what the browser holds.
+const QOI_CHUNKS: i64 = 1 << 20;
+
+fn read_qoi(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 22 || !bytes.starts_with(b"qoif") {
+        return None;
+    }
+    let width = be_u32_at(bytes, 4)?;
+    let height = be_u32_at(bytes, 8)?;
+    let channels = i64::from(bytes[12]);
+    let colorspace = i64::from(bytes[13]);
+    let claimed = u64::from(width.max(0) as u32).saturating_mul(u64::from(height.max(0) as u32));
+    let body = bytes.len() - 8;
+    // rgb, argb, index, diff, luma, run - the order the report prints them in.
+    let mut kinds = [0i64; 6];
+    let mut scan = 14usize;
+    let mut walked = 0u64;
+    let mut total = 0i64;
+    let mut stopped = "none";
+    while scan < body {
+        if total >= QOI_CHUNKS {
+            stopped = "budget";
+            break;
+        }
+        let tag = bytes[scan];
+        let (kind, step, count) = match tag {
+            0xFE => (0, 4, 1u64),
+            0xFF => (1, 5, 1),
+            0x00..=0x3F => (2, 1, 1),
+            0x40..=0x7F => (3, 1, 1),
+            0x80..=0xBF => (4, 2, 1),
+            _ => (5, 1, u64::from(tag & 0x3F) + 1),
+        };
+        if scan.saturating_add(step) > body {
+            stopped = "short";
+            break;
+        }
+        kinds[kind] += 1;
+        walked = walked.saturating_add(count);
+        total += 1;
+        scan += step;
+    }
+    let terminator = bytes
+        .get(body..)
+        .and_then(|tail| <[u8; 8]>::try_from(tail).ok())
+        == Some([0, 0, 0, 0, 0, 0, 0, 1]);
+    if walked > claimed && stopped == "none" {
+        stopped = "overrun";
+    }
+    let mut entries = vec![
+        format!("qoi\t{width}\t{height}\t{channels}\t{colorspace}"),
+        format!(
+            "chunks\t{total}\trgb\t{}\targb\t{}\tindex\t{}\tdiff\t{}\tluma\t{}\trun\t{}",
+            kinds[0], kinds[1], kinds[2], kinds[3], kinds[4], kinds[5]
+        ),
+        format!(
+            "pixels\t{claimed}\twalked\t{walked}\tterminator\t{}",
+            u8::from(terminator)
+        ),
+        format!("stopped\t{}\t{stopped}", u8::from(stopped != "none")),
+    ];
+    if stopped == "none" && walked == claimed && terminator {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -2429,8 +2512,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_bplist(bytes) {
         return accept(FORMAT_BPLIST, lines);
     }
+    if let Some(lines) = read_qoi(bytes) {
+        return accept(FORMAT_QOI, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon or property-list container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list or QOI container",
         -2,
     )
 }

@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 33 | 15.1% |
+| own Rust reader, named header fields decoded | 34 | 15.5% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **122** | 55.7% |
-| **covered, any level** | **97** | 44.3% |
+| **no parser at all - real gap** | **121** | 55.2% |
+| **covered, any level** | **98** | 44.8% |
 
-Top binary gap groups by count: unknown 57, archive 14, image 13, document 10, application 10,
+Top binary gap groups by count: unknown 57, archive 14, image 12, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here, `woff2` because writing it needs `brotli` and this
 Python refuses to install into its own environment.
 
-So the honest answer to the objective is **no, not yet**: 97 of 219 binary labels have a parser
-that runs here (33 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 122 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 98 of 219 binary labels have a parser
+that runs here (34 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 121 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -294,6 +294,7 @@ bash scripts/make-media-fixtures.sh    # ffmpeg/Pillow media, tiny.pcx, tiny.pdf
 bash scripts/make-pdf-fixtures.sh      # Pillow + headless Chromium PDFs and their probes
 python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes it back for the probe
 python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tools/plist-sim.py decodes them back
+python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and decodes them back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -384,8 +385,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **97 covered** (33 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **122 with no
+Coverage is scored against magika's 219 binary labels: **98 covered** (34 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **121 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -423,6 +424,20 @@ does not re-derive them:
   uses 2 and 1 - a reader that reuses one number for both walks off the end of every table. Sets and
   ordered sets stay unnamed: `plistlib` refuses a Python `set`, so markers 0xB and 0xC get a row quoting
   their byte and nothing else.
+  The same hunt turned up two more writers in Pillow 12.3, and one near-miss worth recording. It
+  *encodes* QOI (`scripts/make-qoi-fixtures.py`), so `tiny.qoi`/`srgb.qoi`/`all6.qoi` are an
+  independent encoder's bytes, re-decoded by Pillow's own reader in the generator before the fixture
+  was committed; and because the writer only emits colourspace 0 when the caller asks for sRGB, the
+  two single-byte header fields are both covered by real files instead of by a remembered layout -
+  which is the trap this one sprang first, since width and height are u32 and channels and colourspace
+  are u8, and reading them as four u32s prints 67239434 where the file says 4 (+1 field-level label,
+  98 covered, 121 gaps). QOI has no unknown tags - the six ranges cover every byte value - so the read
+  is an accounting of pixels walked against `width * height`, and the hostile cases are the three ways
+  a length can be wrong: an overrun, a chunk that would reach into the terminator, a terminator that is
+  not there. `all6.qoi` exists because a flat image only exercises two of the six classes. The
+  near-miss: Pillow also *writes* SGI (`\x01\xda`) and JPEG 2000 (`jP  ` boxes), and magika has no
+  `sgi` label but does have `jp2` - so SGI earns nothing here while JP2 is now reachable, and `psd`,
+  which Pillow reads but cannot write, stays a gap named rather than quietly dropped.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
