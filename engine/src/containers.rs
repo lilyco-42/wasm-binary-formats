@@ -4152,7 +4152,9 @@ fn pb_varint(bytes: &[u8], at: usize, stop: usize) -> Option<(i64, usize)> {
 }
 
 impl<'a> Pb<'a> {
-    fn empty() -> Pb<'static> {
+    /// An empty message, for a field the file does not carry: its lifetime comes from the caller,
+    /// because `&[]` is a slice of any buffer.
+    fn empty() -> Pb<'a> {
         Pb {
             bytes: &[],
             items: Vec::new(),
