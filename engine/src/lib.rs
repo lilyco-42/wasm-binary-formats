@@ -260,7 +260,7 @@ pub extern "C" fn parse_container(ptr: *const u8, len: i32) -> i32 {
 /// Which container was recognised: 0 none, 1 tar, 2 ar, 3 RIFF, 4 TIFF, 10 ISO base media,
 /// 11 EBML (Matroska/WebM), 16 PDF with a classic cross-reference table, 19 Netpbm, 20 ASF,
 /// 21 FLV, 22 CAB (file table only), 23 Debian package, 25 MPEG transport stream, 26 WebAssembly,
-/// 27 sfnt font, 28 WOFF, 30 Apple icon directory, 31 Apple binary property list, 32 QOI, 33 JPEG 2000 PCA, 34 WOFF2.
+/// 27 sfnt font, 28 WOFF, 30 Apple icon directory, 31 Apple binary property list, 32 QOI, 33 JPEG 2000 PCA, 34 WOFF2, 35 NumPy array.
 #[no_mangle]
 pub extern "C" fn container_kind() -> i32 {
     containers::kind()

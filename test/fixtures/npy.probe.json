@@ -1,0 +1,193 @@
+{
+ "bools": {
+  "data_at": 128,
+  "data_bytes": 3,
+  "descr": "|b1",
+  "fortran_order": false,
+  "header": "{'descr': '|b1', 'fortran_order': False, 'shape': (3,), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 1,
+  "length": 131,
+  "nbytes": 3,
+  "shape": [
+   3
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "bytes4": {
+  "data_at": 128,
+  "data_bytes": 8,
+  "descr": "|S4",
+  "fortran_order": false,
+  "header": "{'descr': '|S4', 'fortran_order': False, 'shape': (2,), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 4,
+  "length": 136,
+  "nbytes": 8,
+  "shape": [
+   2
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "f64": {
+  "data_at": 128,
+  "data_bytes": 48,
+  "descr": "<f8",
+  "fortran_order": false,
+  "header": "{'descr': '<f8', 'fortran_order': False, 'shape': (6,), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 8,
+  "length": 176,
+  "nbytes": 48,
+  "shape": [
+   6
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "i32": {
+  "data_at": 128,
+  "data_bytes": 48,
+  "descr": ">i4",
+  "fortran_order": false,
+  "header": "{'descr': '>i4', 'fortran_order': False, 'shape': (3, 4), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 4,
+  "length": 176,
+  "nbytes": 48,
+  "shape": [
+   3,
+   4
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "scalar": {
+  "data_at": 128,
+  "data_bytes": 8,
+  "descr": "<f8",
+  "fortran_order": false,
+  "header": "{'descr': '<f8', 'fortran_order': False, 'shape': (), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 8,
+  "length": 136,
+  "nbytes": 8,
+  "shape": [],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "uint16": {
+  "data_at": 128,
+  "data_bytes": 12,
+  "descr": "<u2",
+  "fortran_order": true,
+  "header": "{'descr': '<u2', 'fortran_order': True, 'shape': (2, 3), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 2,
+  "length": 140,
+  "nbytes": 12,
+  "shape": [
+   2,
+   3
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "unicode": {
+  "data_at": 128,
+  "data_bytes": 32,
+  "descr": "<U4",
+  "fortran_order": false,
+  "header": "{'descr': '<U4', 'fortran_order': False, 'shape': (2,), }",
+  "header_at": 10,
+  "header_len": 118,
+  "itemsize": 16,
+  "length": 160,
+  "nbytes": 32,
+  "shape": [
+   2
+  ],
+  "version": [
+   1,
+   0
+  ]
+ },
+ "v2": {
+  "data_at": 192,
+  "data_bytes": 156,
+  "descr": [
+   [
+    "alpha",
+    "<f4"
+   ],
+   [
+    "beta",
+    "|i1"
+   ],
+   [
+    "gamma",
+    "<f8"
+   ]
+  ],
+  "fortran_order": false,
+  "header": "{'descr': [('alpha', '<f4'), ('beta', '|i1'), ('gamma', '<f8')], 'fortran_order': False, 'shape': (3, 4), }",
+  "header_at": 12,
+  "header_len": 180,
+  "itemsize": 13,
+  "length": 348,
+  "nbytes": 156,
+  "shape": [
+   3,
+   4
+  ],
+  "version": [
+   2,
+   0
+  ]
+ },
+ "v3": {
+  "data_at": 128,
+  "data_bytes": 64,
+  "descr": [
+   [
+    "unicode",
+    "<U4"
+   ]
+  ],
+  "fortran_order": false,
+  "header": "{'descr': [('unicode', '<U4')], 'fortran_order': False, 'shape': (2, 2), }",
+  "header_at": 12,
+  "header_len": 116,
+  "itemsize": 16,
+  "length": 192,
+  "nbytes": 64,
+  "shape": [
+   2,
+   2
+  ],
+  "version": [
+   3,
+   0
+  ]
+ }
+}

@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 36 | 16.4% |
+| own Rust reader, named header fields decoded | 37 | 16.9% |
 | own Rust reader, container framing only | 23 | 10.5% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **119** | 54.3% |
-| **covered, any level** | **100** | 45.7% |
+| **no parser at all - real gap** | **118** | 53.9% |
+| **covered, any level** | **101** | 46.1% |
 
-Top binary gap groups by count: unknown 57, archive 14, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 57, archive 13, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 100 of 219 binary labels have a parser
-that runs here (36 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 119 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 101 of 219 binary labels have a parser
+that runs here (37 field-level and 23 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 118 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -297,6 +297,7 @@ python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tool
 python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and decodes them back
 python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; the probe walks them back
 temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
+temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -387,8 +388,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **100 covered** (36 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **119 with no
+Coverage is scored against magika's 219 binary labels: **101 covered** (37 field-level and 23
+container-level from this repo's own readers, 41 generated and mostly load-gated), **118 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -463,6 +464,16 @@ does not re-derive them:
   fontTools' own copy inside `woff2.probe.json` rather than against a recollection - the failure mode
   this repo has hit in three formats now. `glyf` and `loca` at version 0 carry a second, transformed
   length; `DSIG`-style arbitrary tags name themselves in the entry.
+  The same venv then produced nine `.npy` fixtures from numpy itself (+1 field-level label, 101
+  covered, 118 gaps), which is also the reason the reader's arithmetic is trustworthy: a NumPy header
+  spells a *type* (`'<f8'`, `'|S4'`, `'<U4'`, or a nested field list) and a shape, and the item size
+  has to be derived from that spelling before `size × product(shape)` can be compared with the bytes
+  after the header - so `make-npy-fixtures.py` records `dtype.itemsize` and `nbytes` from numpy and
+  refuses any file where they disagree with the file's own length. `'<U4'` therefore reads as sixteen
+  bytes because numpy says sixteen, not because four looked like a character width; a field list is
+  left explicitly `unknown` (the v2 fixture's real item size is 13, which only alignment rules give)
+  and earns no `walked end`. Version 1 stores the header length as a little-endian u16 and versions
+  2 and 3 as a u32, and both forms are real files rather than hand-built ones.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

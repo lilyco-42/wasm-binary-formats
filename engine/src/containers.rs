@@ -12,6 +12,8 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   npy   0x93 "NUMPY" + two version bytes, then a little-endian header length (u16 in v1, u32
+//!         in v2/v3) and a Python dictionary written as text, then the array data
 //!   woff2 "wOF2", u32 flavor/length, u16 table count, u32 sfnt size + compressed size, then a
 //!         directory of flags + UIntBase128 lengths over one brotli block
 //!   jp2   u32 length + FourCC boxes, first box `jP  ` with signature 0x0D0A870A; `ihdr` inside
@@ -88,6 +90,7 @@ pub fn name() -> &'static str {
         FORMAT_QOI => "qoi",
         FORMAT_JP2 => "jp2",
         FORMAT_WOFF2 => "woff2",
+        FORMAT_NPY => "npy",
         _ => "unknown",
     }
 }
@@ -2701,6 +2704,158 @@ fn read_woff2(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// NumPy arrays: the signature, the header dictionary, and the arithmetic that says the data area is
+/// the array the header describes. 35, after WOFF2 at 34.
+///
+/// `\x93NUMPY` + two version bytes, then the header length as a little-endian u16 in version 1 and a
+/// u32 in versions 2 and 3 - a difference that is easy to get wrong and that both `v2.npy` and
+/// `f64.npy` in the fixtures pin. The header is a Python dictionary written as text; only its three
+/// keys are read here, by matching brackets rather than by evaluating anything, so a structured
+/// descr (`[('alpha', '<f4'), ...]`) survives as the text the file holds.
+///
+/// The item size is not in the file: it is spelled by the descr, and the product of that and the
+/// shape has to equal the bytes after the header. `scripts/make-npy-fixtures.py` records numpy's own
+/// `itemsize` and `nbytes` beside each fixture, so the numbers below are the library's, not this
+/// reader's. Where the descr is a field list the size is left unknown rather than computed - one
+/// of the two fixtures has an item size of 13 that only alignment rules could justify.
+pub const FORMAT_NPY: i32 = 35;
+
+const NPY_MAGIC: [u8; 6] = [0x93, b'N', b'U', b'M', b'P', b'Y'];
+
+/// The text of one dictionary entry: quoted bodies unwrapped, bracketed bodies taken to their match.
+fn npy_value(header: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+    let at = find(header, 0, key)?.checked_add(key.len())?;
+    let mut rest = header.get(at..)?;
+    while matches!(rest.first(), Some(b' ') | Some(b'\t')) {
+        rest = rest.get(1..)?;
+    }
+    let open = *rest.first()?;
+    if open == b'[' || open == b'(' {
+        let close = if open == b'[' { b']' } else { b')' };
+        let mut depth = 0usize;
+        for (index, byte) in rest.iter().enumerate() {
+            if *byte == open {
+                depth += 1;
+            } else if *byte == close {
+                depth -= 1;
+                if depth == 0 {
+                    let body = rest.get(..=index)?;
+                    return Some(if open == b'(' {
+                        body.get(1..body.len().saturating_sub(1))?.to_vec()
+                    } else {
+                        body.to_vec()
+                    });
+                }
+            }
+        }
+        return None;
+    }
+    if open == b'\'' {
+        let tail = rest.get(1..)?;
+        let end = tail.iter().position(|byte| *byte == b'\'')?;
+        return Some(tail.get(..end)?.to_vec());
+    }
+    let end = rest
+        .iter()
+        .position(|byte| {
+            !(byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'+' | b'-'))
+        })
+        .unwrap_or(rest.len());
+    if end == 0 {
+        return None;
+    }
+    Some(rest.get(..end)?.to_vec())
+}
+
+/// `'<f8'`, `'>i4'`, `'|S4'`, `'<U4'`: a byte-order character, a kind character, then a width in
+/// bytes - except Unicode, whose width counts characters of four bytes each. Anything else (a field
+/// list, a subarray, a padding count) has no size computed here.
+fn npy_itemsize(descr: &str) -> Option<u64> {
+    let bytes = descr.as_bytes();
+    if bytes.len() < 3 || !matches!(bytes[0], b'<' | b'>' | b'|' | b'=') {
+        return None;
+    }
+    let digits = descr.get(2..)?;
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let width: u64 = digits.parse().ok()?;
+    Some(if bytes[1] == b'U' { width * 4 } else { width })
+}
+
+fn read_npy(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 10 || !bytes.starts_with(&NPY_MAGIC) {
+        return None;
+    }
+    let major = bytes[6];
+    let minor = bytes[7];
+    if !matches!(major, 1 | 2 | 3) {
+        return None;
+    }
+    // Version 1 keeps the header length in a u16, versions 2 and 3 in a u32 - and the header starts
+    // right after it, so the two differ by more than one number.
+    let length = if major == 1 {
+        i64::from(Le(bytes).u16(8)?)
+    } else {
+        Le(bytes).u32(8)?
+    };
+    let header_len = usize::try_from(length.max(0)).ok()?;
+    let header_at = if major == 1 { 10 } else { 12 };
+    let header_end = header_at.checked_add(header_len)?;
+    let header = bytes.get(header_at..header_end)?;
+    if header_len < 3 || header.first() != Some(&b'{') || header.last() != Some(&b'}') {
+        return None;
+    }
+    let descr = npy_value(header, b"'descr':")?;
+    let order = npy_value(header, b"'fortran_order':")?;
+    let shape = npy_value(header, b"'shape':")?;
+    let mut dims: Vec<u64> = Vec::new();
+    for part in shape.split(|byte| *byte == b',') {
+        let trimmed: Vec<u8> = part.iter().copied().filter(|byte| *byte != b' ').collect();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if !trimmed.iter().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        dims.push(String::from_utf8_lossy(&trimmed).parse().unwrap_or(0));
+    }
+    let elements = dims.iter().product::<u64>();
+    let available = (bytes.len() - header_end) as u64;
+    let text = String::from_utf8_lossy(&descr).into_owned();
+    let mut entries = vec![
+        format!("npy\t{major}\t{minor}\t{header_len}\t{header_end}"),
+        format!("dtype\t{}", printable(&text)),
+        dims.iter()
+            .fold(format!("shape\t{}", dims.len()), |row, dim| {
+                format!("{row}\t{dim}")
+            }),
+        format!(
+            "fortran_order\t{}",
+            if order.as_slice() == b"True".as_slice() {
+                "true"
+            } else {
+                "false"
+            }
+        ),
+    ];
+    let size = npy_itemsize(&text);
+    let expects = size.map(|each| each.saturating_mul(elements));
+    entries.push(match expects {
+        Some(wanted) => format!(
+            "sizes\t{}\telements\t{elements}\texpects\t{wanted}\tavailable\t{available}",
+            size.unwrap_or(0)
+        ),
+        None => format!(
+            "sizes\tunknown\telements\t{elements}\texpects\tunknown\tavailable\t{available}"
+        ),
+    });
+    if expects.is_some_and(|wanted| wanted == available) {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -2772,8 +2927,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_woff2(bytes) {
         return accept(FORMAT_WOFF2, lines);
     }
+    if let Some(lines) = read_npy(bytes) {
+        return accept(FORMAT_NPY, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2 or JPEG 2000 container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000 or NumPy array container",
         -2,
     )
 }
