@@ -5653,7 +5653,7 @@ fn read_emf(bytes: &[u8]) -> Option<Vec<String>> {
     let mut kinds: Vec<u32> = Vec::new();
     let mut counted = 0usize;
     let mut last = -1i64;
-    let mut complete = false;
+    let complete;
     while at + 8 <= bytes.len() {
         let kind = emf_u32(bytes, at)?;
         let size = emf_u32(bytes, at + 4)? as usize;
@@ -5743,6 +5743,19 @@ fn ps_text(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| char::from(*byte)).collect()
 }
 
+/// The length of the file without its trailing ASCII whitespace - `[u8]` has no `trim_end` yet, and
+/// a terminator followed by a newline is still a terminator.
+fn ps_trim_end(bytes: &[u8]) -> &[u8] {
+    let stop = match bytes
+        .iter()
+        .rposition(|byte| !matches!(byte, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C))
+    {
+        Some(last) => last + 1,
+        None => 0,
+    };
+    &bytes[..stop]
+}
+
 fn preview_bytes_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -5824,7 +5837,7 @@ fn read_ps(bytes: &[u8]) -> Option<Vec<String>> {
         keyed.push((key.to_owned(), value.trim().to_owned()));
     }
 
-    let has_eof = bytes.trim_end().ends_with(b"%%EOF");
+    let has_eof = ps_trim_end(bytes).ends_with(b"%%EOF");
     let claimed = keyed
         .iter()
         .find(|(key, _)| key == "Pages")
