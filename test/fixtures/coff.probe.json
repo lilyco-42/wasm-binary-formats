@@ -1,0 +1,270 @@
+{
+ "answer.obj": {
+  "bytes": 904,
+  "objdump": {
+   "architecture": "i386:x86-64",
+   "chars": 61,
+   "sections": [
+    [
+     ".text",
+     31,
+     300
+    ],
+    [
+     ".data",
+     0,
+     341
+    ],
+    [
+     ".bss",
+     0,
+     0
+    ],
+    [
+     ".xdata",
+     8,
+     341
+    ],
+    [
+     ".debug$S",
+     152,
+     349
+    ],
+    [
+     ".pdata",
+     12,
+     501
+    ],
+    [
+     ".llvm_addrsig",
+     1,
+     543
+    ]
+   ],
+   "symbols": [
+    {
+     "aux": 1,
+     "index": 0,
+     "name": ".text",
+     "scl": 3,
+     "sect": 1,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 2,
+     "name": ".data",
+     "scl": 3,
+     "sect": 2,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 4,
+     "name": ".bss",
+     "scl": 3,
+     "sect": 3,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 6,
+     "name": ".xdata",
+     "scl": 3,
+     "sect": 4,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 8,
+     "name": ".debug$S",
+     "scl": 3,
+     "sect": 5,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 10,
+     "name": ".pdata",
+     "scl": 3,
+     "sect": 6,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 12,
+     "name": ".llvm_addrsig",
+     "scl": 3,
+     "sect": 7,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 0,
+     "index": 15,
+     "name": "answer",
+     "scl": 2,
+     "sect": 1,
+     "type": 20,
+     "value": 0
+    },
+    {
+     "aux": 0,
+     "index": 16,
+     "name": "helper",
+     "scl": 2,
+     "sect": 1,
+     "type": 20,
+     "value": 16
+    }
+   ]
+  },
+  "rows": [
+   "coff\t904\tbroken\t0\tmachine\t8664(x86-64)\tsections\t7\topts\t0",
+   "layout\tstamp\t0\tsyms\t19\tat\t544\tstrings\t18@886\tchars\t0000",
+   "section\t0\t.text\tvsize\t0\tvaddr\t0\traw\t31@300\treloc\t331x1\tlines\t0x0\tchars\t60500020",
+   "section\t1\t.data\tvsize\t0\tvaddr\t0\traw\t0@341\treloc\t0x0\tlines\t0x0\tchars\tc0300040",
+   "section\t2\t.bss\tvsize\t0\tvaddr\t0\traw\t0@0\treloc\t0x0\tlines\t0x0\tchars\tc0300080",
+   "section\t3\t.xdata\tvsize\t0\tvaddr\t0\traw\t8@341\treloc\t0x0\tlines\t0x0\tchars\t40300040",
+   "section\t4\t.debug$S\tvsize\t0\tvaddr\t0\traw\t152@349\treloc\t0x0\tlines\t0x0\tchars\t42300040",
+   "section\t5\t.pdata\tvsize\t0\tvaddr\t0\traw\t12@501\treloc\t513x3\tlines\t0x0\tchars\t40300040",
+   "section\t6\t.llvm_addrsig\tvsize\t0\tvaddr\t0\traw\t1@543\treloc\t0x0\tlines\t0x0\tchars\t00100800",
+   "symbol\t0\t.text\tvalue\t0\tsect\t1\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t2\t.data\tvalue\t0\tsect\t2\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t4\t.bss\tvalue\t0\tsect\t3\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t6\t.xdata\tvalue\t0\tsect\t4\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t8\t.debug$S\tvalue\t0\tsect\t5\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t10\t.pdata\tvalue\t0\tsect\t6\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t12\t.llvm_addrsig\tvalue\t0\tsect\t7\ttype\t0000\tscl\t3\taux\t1\tbase\t4",
+   "symbol\t14\t@feat.00\tvalue\t0\tsect\t-1\ttype\t0000\tscl\t3\taux\t0\tbase\t-",
+   "symbol\t15\tanswer\tvalue\t0\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
+   "symbol\t16\thelper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
+   "symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-",
+   "walked\tend"
+  ]
+ },
+ "i686.obj": {
+  "bytes": 697,
+  "objdump": {
+   "architecture": "i386",
+   "chars": 61,
+   "sections": [
+    [
+     ".text",
+     26,
+     220
+    ],
+    [
+     ".data",
+     0,
+     256
+    ],
+    [
+     ".bss",
+     0,
+     0
+    ],
+    [
+     ".debug$S",
+     152,
+     256
+    ],
+    [
+     ".llvm_addrsig",
+     1,
+     408
+    ]
+   ],
+   "symbols": [
+    {
+     "aux": 1,
+     "index": 0,
+     "name": ".text",
+     "scl": 3,
+     "sect": 1,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 2,
+     "name": ".data",
+     "scl": 3,
+     "sect": 2,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 4,
+     "name": ".bss",
+     "scl": 3,
+     "sect": 3,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 6,
+     "name": ".debug$S",
+     "scl": 3,
+     "sect": 4,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 1,
+     "index": 8,
+     "name": ".llvm_addrsig",
+     "scl": 3,
+     "sect": 5,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 0,
+     "index": 11,
+     "name": "_answer",
+     "scl": 2,
+     "sect": 1,
+     "type": 20,
+     "value": 0
+    },
+    {
+     "aux": 0,
+     "index": 12,
+     "name": "_helper",
+     "scl": 2,
+     "sect": 1,
+     "type": 20,
+     "value": 16
+    }
+   ]
+  },
+  "rows": [
+   "coff\t697\tbroken\t0\tmachine\t014c(i386)\tsections\t5\topts\t0",
+   "layout\tstamp\t0\tsyms\t15\tat\t409\tstrings\t18@679\tchars\t0000",
+   "section\t0\t.text\tvsize\t0\tvaddr\t0\traw\t26@220\treloc\t246x1\tlines\t0x0\tchars\t60500020",
+   "section\t1\t.data\tvsize\t0\tvaddr\t0\traw\t0@256\treloc\t0x0\tlines\t0x0\tchars\tc0300040",
+   "section\t2\t.bss\tvsize\t0\tvaddr\t0\traw\t0@0\treloc\t0x0\tlines\t0x0\tchars\tc0300080",
+   "section\t3\t.debug$S\tvsize\t0\tvaddr\t0\traw\t152@256\treloc\t0x0\tlines\t0x0\tchars\t42300040",
+   "section\t4\t.llvm_addrsig\tvsize\t0\tvaddr\t0\traw\t1@408\treloc\t0x0\tlines\t0x0\tchars\t00100800",
+   "symbol\t0\t.text\tvalue\t0\tsect\t1\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t2\t.data\tvalue\t0\tsect\t2\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t4\t.bss\tvalue\t0\tsect\t3\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t6\t.debug$S\tvalue\t0\tsect\t4\ttype\t0000\tscl\t3\taux\t1\tbase\t-",
+   "symbol\t8\t.llvm_addrsig\tvalue\t0\tsect\t5\ttype\t0000\tscl\t3\taux\t1\tbase\t4",
+   "symbol\t10\t@feat.00\tvalue\t1\tsect\t-1\ttype\t0000\tscl\t3\taux\t0\tbase\t-",
+   "symbol\t11\t_answer\tvalue\t0\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
+   "symbol\t12\t_helper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
+   "symbol\t13\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-",
+   "walked\tend"
+  ]
+ }
+}

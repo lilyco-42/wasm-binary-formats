@@ -25,6 +25,10 @@
 //!   ps    no magic, a line: `%!` at byte 0 or at the offset a preview header's own two length words
 //!         add up to, then `%%Key: value` document comments whose page count is a claim rather than a
 //!         fact - LibreOffice states 0 pages for a file carrying one `%%Page:` comment
+//!   coff  a 20-byte header, 40-byte section records, 18-byte symbol records - and the names that do
+//!         not fit in eight bytes live in a string table after the last symbol, which a section points
+//!         at as `/4` and a symbol as four zero bytes followed by the offset. The symbol count is a
+//!         record count, so each entry's auxiliary records are part of the index objdump prints
 //!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
 //!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
 //!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
@@ -132,6 +136,7 @@ pub fn name() -> &'static str {
         FORMAT_ICC => "icc",
         FORMAT_EMF => "emf",
         FORMAT_PS => "postscript",
+        FORMAT_COFF => "coff",
         _ => "unknown",
     }
 }
@@ -5899,6 +5904,211 @@ fn read_ps(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// COFF object file: the header, the section table, the symbol table and the string table that makes
+/// the long names mean something.
+///
+/// This is what `clang -c` leaves behind before a linker ever runs, which makes it the object the
+/// binary-analysis lane is asked to open. Nothing in the layout below is recalled: the 20-byte header,
+/// the 40-byte section records and the 18-byte symbol records - where each entry's auxiliary records
+/// count towards the record index objdump prints, so the section symbols come out at 0, 2, 4 - are
+/// read as GNU objdump states them, and `scripts/make-coff-fixtures.py` refuses to write its probe
+/// unless its own walk agrees with `objdump -h` on every section name, size and file offset and with
+/// `objdump -t` on every symbol's name, value, section, type and storage class.
+///
+/// Two things are deliberately not claimed. The Characteristics word is printed exactly as the file
+/// holds it - zero, in both fixtures - because the `HAS_RELOC, HAS_LINENO, HAS_DEBUG, HAS_SYMS,
+/// HAS_LOCALS` that `objdump -f` lists for the same bytes is bfd's conclusion from the contents, not
+/// the header's statement. And only objects are read: an optional header means an image, which is the
+/// PE reader's whenever the file starts with `MZ`, and a COFF image without that stub is something
+/// this lab has no producer for.
+///
+/// A relocation count is two bytes while the pointer beside it is four, so the counts below are read as
+/// 16-bit words; reading them as words is also what makes `lines\t0x0` come out for clang's objects
+/// rather than the shifted-together pair a 32-bit read of the same field would give. Every bound is
+/// then computed in 64-bit integers even though each field is at most 32 bits, so the number of broken
+/// claims cannot depend on whether the reader runs in wasm32 or on a desktop host.
+pub const FORMAT_COFF: i32 = 47;
+
+const COFF_SECTIONS: usize = 96;
+const COFF_LISTED_SECTIONS: usize = 24;
+const COFF_LISTED_SYMBOLS: usize = 24;
+/// Only the machine values `objdump -f` was seen to name on this host. Anything else stays a number.
+const COFF_MACHINES: [(u16, &str); 2] = [(0x8664, "x86-64"), (0x014C, "i386")];
+
+fn coff_u32(bytes: &[u8], at: usize) -> Option<u32> {
+    let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(u32::from_le_bytes(raw))
+}
+
+fn coff_u16(bytes: &[u8], at: usize) -> Option<u16> {
+    let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+    Some(u16::from_le_bytes(raw))
+}
+
+fn coff_i16(bytes: &[u8], at: usize) -> Option<i16> {
+    let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+    Some(i16::from_le_bytes(raw))
+}
+
+fn coff_tail(bytes: &[u8], at: usize) -> String {
+    match bytes.get(at..) {
+        Some(tail) => tail
+            .iter()
+            .take_while(|byte| **byte != 0)
+            .map(|byte| char::from(*byte))
+            .collect(),
+        None => "?".to_owned(),
+    }
+}
+
+/// An eight-byte name field: the name itself, or a reference into the string table. A section spells a
+/// long name `/4`; a symbol leaves the first four bytes zero and puts the offset in the next four.
+fn coff_name(bytes: &[u8], at: usize, strings: usize) -> (String, Option<u32>) {
+    let Some(end) = at.checked_add(8) else {
+        return ("?".to_owned(), None);
+    };
+    if bytes.get(at..end).is_none() {
+        return ("?".to_owned(), None);
+    }
+    if coff_u32(bytes, at).unwrap_or(1) == 0 {
+        if let Some(offset) = coff_u32(bytes, at + 4) {
+            let where_at = strings.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX));
+            return (coff_tail(bytes, where_at), Some(offset));
+        }
+    }
+    let text: String = bytes[at..end]
+        .iter()
+        .take_while(|byte| **byte != 0)
+        .map(|byte| char::from(*byte))
+        .collect();
+    if let Some(rest) = text.strip_prefix('/') {
+        if let Ok(offset) = rest.parse::<u32>() {
+            let where_at = strings.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX));
+            return (coff_tail(bytes, where_at), Some(offset));
+        }
+    }
+    (text, None)
+}
+
+fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 20 || bytes.starts_with(b"MZ") {
+        return None;
+    }
+    let machine = coff_u16(bytes, 0)?;
+    let sections = usize::from(coff_u16(bytes, 2)?);
+    let stamp = coff_u32(bytes, 4)?;
+    let symbol_ptr = coff_u32(bytes, 8)?;
+    let symbols = coff_u32(bytes, 12)?;
+    let optional = coff_u16(bytes, 16)?;
+    let chars = coff_u16(bytes, 18)?;
+    let len = bytes.len() as u64;
+    let section_table = 20usize;
+    let table_end = section_table as u64 + 40 * sections as u64;
+    if optional != 0 || sections == 0 || sections > COFF_SECTIONS || table_end > len {
+        return None;
+    }
+    // The header's count is a record count with each symbol's auxiliary records inside it, so the span
+    // below is records times 18 bytes, not entries: an object that cannot hold its own table is not
+    // read at all rather than half claimed.
+    let records_span = 18u64 * u64::from(symbols);
+    if symbols != 0 && (symbol_ptr == 0 || u64::from(symbol_ptr) + records_span > len) {
+        return None;
+    }
+    let strings_start = u64::from(symbol_ptr) + records_span;
+    let strings_at = usize::try_from(strings_start).unwrap_or(usize::MAX);
+    let (strings_size, strings_label) = if symbols == 0 {
+        (0u32, "-".to_owned())
+    } else {
+        let size = coff_u32(bytes, strings_at).unwrap_or(0);
+        (size, format!("{size}@{strings_at}"))
+    };
+    // A table that mis-states its own length is the one broken claim the format cannot check any other
+    // way, and it is counted rather than followed.
+    let mut broken =
+        usize::from(symbols != 0 && strings_start + u64::from(strings_size) != len);
+
+    let mut section_rows = Vec::new();
+    for index in 0..sections {
+        let at = section_table + index * 40;
+        let (name, _) = coff_name(bytes, at, strings_at);
+        let virtual_size = coff_u32(bytes, at + 8)?;
+        let address = coff_u32(bytes, at + 12)?;
+        let raw_size = coff_u32(bytes, at + 16)?;
+        let raw_at = coff_u32(bytes, at + 20)?;
+        if raw_size != 0 && u64::from(raw_at) + u64::from(raw_size) > len {
+            broken += 1;
+        }
+        if index < COFF_LISTED_SECTIONS {
+            section_rows.push(format!(
+                "section\t{index}\t{name}\tvsize\t{virtual_size}\tvaddr\t{address}\traw\t{raw_size}@{raw_at}\treloc\t{}x{}\tlines\t{}x{}\tchars\t{:08x}",
+                coff_u32(bytes, at + 24)?,
+                coff_u16(bytes, at + 32)?,
+                coff_u32(bytes, at + 28)?,
+                coff_u16(bytes, at + 34)?,
+                coff_u32(bytes, at + 36)?
+            ));
+        }
+    }
+    if sections > COFF_LISTED_SECTIONS {
+        section_rows.push(format!("cut\tsections\t{sections}"));
+    }
+
+    let mut symbol_rows = Vec::new();
+    let mut at = u64::from(symbol_ptr);
+    let mut records = 0u64;
+    let mut stopped = false;
+    while records < u64::from(symbols) {
+        let Some(start) = usize::try_from(at)
+            .ok()
+            .filter(|start| start.saturating_add(18) <= bytes.len())
+        else {
+            stopped = true;
+            break;
+        };
+        let (name, base) = coff_name(bytes, start, strings_at);
+        let value = coff_u32(bytes, start + 8)?;
+        let section = coff_i16(bytes, start + 12)?;
+        let kind = coff_u16(bytes, start + 14)?;
+        let storage = u32::from(bytes[start + 16]);
+        let aux = u32::from(bytes[start + 17]);
+        if symbol_rows.len() < COFF_LISTED_SYMBOLS {
+            symbol_rows.push(format!(
+                "symbol\t{records}\t{name}\tvalue\t{value:x}\tsect\t{section}\ttype\t{kind:04x}\tscl\t{storage}\taux\t{aux}\tbase\t{}",
+                base.map_or_else(|| "-".to_owned(), |offset| offset.to_string())
+            ));
+        }
+        records += 1 + u64::from(aux);
+        at += 18 * (1 + u64::from(aux));
+    }
+    // A cut row here can only mean the walk ran off the file before the records the header counted,
+    // because listing stops at a cap while this loop runs to the claimed total.
+    if stopped {
+        symbol_rows.push(format!("cut\tsyms\t{symbols}"));
+    }
+
+    let mut rows = vec![
+        format!(
+            "coff\t{}\tbroken\t{broken}\tmachine\t{machine:04x}({})\tsections\t{sections}\topts\t{optional}",
+            bytes.len(),
+            COFF_MACHINES
+                .iter()
+                .find(|(value, _)| *value == machine)
+                .map_or("?", |(_, label)| *label)
+        ),
+        format!(
+            "layout\tstamp\t{stamp}\tsyms\t{symbols}\tat\t{symbol_ptr}\tstrings\t{strings_label}\tchars\t{chars:04x}"
+        ),
+    ];
+    rows.extend(section_rows);
+    rows.extend(symbol_rows);
+    rows.push(if broken == 0 {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\tbroken\t{broken}")
+    });
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -6007,13 +6217,16 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_ps(bytes) {
         return accept(FORMAT_PS, lines);
     }
+    if let Some(lines) = read_coff(bytes) {
+        return accept(FORMAT_COFF, lines);
+    }
     // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
     // triangle count implies, so every container with a real signature gets to answer first.
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, COFF object or binary STL",
         -2,
     )
 }

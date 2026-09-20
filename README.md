@@ -263,25 +263,26 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 46 | 21.0% |
+| own Rust reader, named header fields decoded | 47 | 21.5% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **106** | 48.4% |
-| **covered, any level** | **113** | 51.6% |
+| **no parser at all - real gap** | **105** | 47.9% |
+| **covered, any level** | **114** | 52.1% |
 
 Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 7,
-code 5, executable 5, inode 3.
+code 5, executable 4, inode 3.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
 name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, the bare `ebml` label, and `otf` -
-`otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
-reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, the bare `ebml` label, and `otf` -
+`otf` because no CFF charstring writer runs here. `woff2` and `coff` were on that list as the row
+before, the first for a reason that turned out to be about the interpreter on PATH rather than about
+the machine and the second because no Kaitai spec exists for it: see below.
 
-So the honest answer to the objective is **no, not yet**: 113 of 219 binary labels have a parser
-that runs here (46 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 106 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 114 of 219 binary labels have a parser
+that runs here (47 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 105 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -295,7 +296,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 113 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 114 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text and cross-references for x86-64, AArch64 and Thumb bytes |
 
@@ -373,6 +374,7 @@ temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via P
 temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
 temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
 temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
+temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -481,8 +483,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **113 covered** (46 field-level and 26
-container-level from this repo's own readers, 41 generated and mostly load-gated), **106 with no
+Coverage is scored against magika's 219 binary labels: **114 covered** (47 field-level and 26
+container-level from this repo's own readers, 41 generated and mostly load-gated), **105 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -705,6 +707,28 @@ does not re-derive them:
   install have been on this host the whole time. The formats recorded as "no producer here" were checked
   against the package indexes and the obvious binaries, not against everything on PATH - so re-probe
   before believing any blocked-by-producer claim, as with the PDF/Chromium and venv cases above.
+* COFF (+1 field-level label, 114 covered, 105 gaps) is the file the analysis lane is asked to open -
+  what `clang -c` leaves behind before a linker sees it - and magika's `coff` label has no Kaitai spec
+  at all, so the choice was a reader written here or a permanent gap. LLVM 22.1.8 supplied both fixtures
+  (`x86_64-w64-windows-gnu` and the i686 triple, the second included precisely because a 32-bit object
+  must read with the same code), and GNU objdump read them back: `-h` for every section name, size and
+  file offset, `-t` for every symbol's value, section, type and storage class, and
+  `scripts/make-coff-fixtures.py` writes no probe unless its own walk matches those two on all of it.
+  Two format facts are what the reader had to get right. A name longer than eight bytes is not in the
+  record: a section writes `/4` and a symbol leaves four zero bytes plus an offset, and both mean the
+  string table that follows the last symbol record - which is why `.llvm_addrsig` appears nowhere in the
+  record that names it. And the header's symbol count counts *records*, auxiliary entries included, so
+  the section symbols come out at 0, 2, 4 and a cut row can only mean the walk left the file.
+  Two traps this round turned up, neither of them a compiler error. A relocation count is two bytes wide
+  while the pointer beside it is four, so a 32-bit read of `lines` returns the pointer's neighbour
+  shifted together - 2097152 where the file says 0 - and the objdump-checked probe is what caught it.
+  And a section's raw size is a 32-bit field on a wasm32 host where `usize` is 32 bits too, so an extent
+  like `300 + 4294967295` overflows the machine word rather than exceeding the file: every bound here is
+  computed in 64-bit integers, and `test/wasm.test.mjs` patches that field on the deployed module to
+  prove the printed claim and the `broken` count come back the same from wasm32 as from a desktop build.
+  The Characteristics word is the deliberate non-claim: `objdump -f` lists HAS_RELOC, HAS_LINENO,
+  HAS_DEBUG, HAS_SYMS and HAS_LOCALS for these objects while clang writes zero into the header, so those
+  words are bfd's conclusion from the contents and the reader prints the raw word the file holds.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
@@ -718,10 +742,12 @@ does not re-derive them:
   claim, search the installed binaries as well as the package indexes.
 * The ASF/FLV/CAB group listed here as "ready to build" is built: all three walk their objects or
   records against ffmpeg's and `makecab`'s own bytes, and are credited at container level only.
-  Ready to build, still unbuilt: the compound-file Office types (`doc`, `xls`, `ppt`, `chm`) need a
-  CFB writer, and nothing installed here produces one: no Office and no `libreoffice` on PATH, no
-  `olefile` in the Python environment, so the fixture would have to be authored by hand and would
-  only test itself.
+  Two more were unbuilt for a reason that has since gone away: `doc` and `xls` were listed as needing a
+  CFB writer that this host did not have, and `scripts/make-cfb-fixtures.py` found LibreOffice plus `xlwt`
+  writing them and `olefile` reading both back, so they are credited at container level now. What is left
+  of that list is `ppt`, whose blocker is not a producer but a size - 640 KB of padding around one stream
+  name is the smallest PowerPoint the writers here emit - and `chm`, which has not been probed for a
+  writer since the lesson above.
 * Refused rather than guessed: **CAB's folder area** - the *file* table decodes exactly as documented
   and matches `expand -D`, but `makecab` gives it 8 bytes where `CFFOLDER` is specified as 16, so the
   reader stops at the file table and `cab` is credited as a container, not a field-level parser.

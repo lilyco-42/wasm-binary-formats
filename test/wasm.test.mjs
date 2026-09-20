@@ -274,9 +274,8 @@ const SHAPES = {
   document: { parse: 'parse_document', count: 'document_count', field: 'document_field', name: 'document_name' },
 };
 
-function drive(shape, file) {
+function driveBytes(shape, bytes) {
   const { parse, count, field, name } = SHAPES[shape];
-  const bytes = new Uint8Array(readFileSync(`test/fixtures/${file}`));
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
   const code = ex[parse](ptr, bytes.length);
@@ -286,6 +285,10 @@ function drive(shape, file) {
   const rows = [];
   for (let index = 0; index < total; index += 1) rows.push(readString(ex[field], index).text);
   return { code, name: readString(ex[name]).text, total, rows };
+}
+
+function drive(shape, file) {
+  return driveBytes(shape, new Uint8Array(readFileSync(`test/fixtures/${file}`)));
 }
 
 function assertReadable(shape, file, code) {
@@ -325,6 +328,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['srgb.icc', 44], ['xyz.icc', 44],
     ['page.emf', 45], ['gdi.emf', 45],
     ['preview.eps', 46], ['plain.ps', 46],
+    ['answer.obj', 47], ['i686.obj', 47],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -588,6 +592,39 @@ test('a PostScript header buried behind a preview is found by its own arithmetic
   assert.ok(plain.includes('bounds	0	0	2	2	wh	2x2'), plain.join(' | '));
 });
 
+test('a COFF object gives up its sections, its symbols and the names in the string table', () => {
+  // clang 22.1.8 wrote both objects and GNU objdump read them back: `make-coff-fixtures.py` refuses to
+  // write its probe unless its walk matches `objdump -h` and `objdump -t` on every field below. The
+  // record index steps 0, 2, 4 because a section symbol owns an auxiliary record, and `.llvm_addrsig`
+  // is not in either record - it is offset 4 of the table that follows the last one.
+  const answer = assertReadable('container', 'answer.obj', 47);
+  assert.equal(answer.name, 'coff');
+  const rows = answer.rows;
+  assert.equal(rows[0], 'coff\t904\tbroken\t0\tmachine\t8664(x86-64)\tsections\t7\topts\t0', rows.join(' | '));
+  assert.equal(rows[1], 'layout\tstamp\t0\tsyms\t19\tat\t544\tstrings\t18@886\tchars\t0000');
+  assert.ok(rows.includes('section\t0\t.text\tvsize\t0\tvaddr\t0\traw\t31@300\treloc\t331x1\tlines\t0x0\tchars\t60500020'), rows.join(' | '));
+  assert.ok(rows.includes('section\t6\t.llvm_addrsig\tvsize\t0\tvaddr\t0\traw\t1@543\treloc\t0x0\tlines\t0x0\tchars\t00100800'), rows.join(' | '));
+  assert.ok(rows.includes('symbol\t12\t.llvm_addrsig\tvalue\t0\tsect\t7\ttype\t0000\tscl\t3\taux\t1\tbase\t4'), rows.join(' | '));
+  assert.ok(rows.includes('symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-'), 'the negative section numbers are the format saying "not in a section"');
+  assert.equal(rows[rows.length - 1], 'walked\tend');
+
+  const i686 = assertReadable('container', 'i686.obj', 47).rows;
+  assert.equal(i686[0], 'coff\t697\tbroken\t0\tmachine\t014c(i386)\tsections\t5\topts\t0');
+  assert.ok(i686.includes('symbol\t12\t_helper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-'), i686.join(' | '));
+
+  // One 32-bit field is the whole reason this runs through the ABI rather than only in Rust: on wasm32
+  // `usize` is exactly as wide as a section's size word, so an extent that overflows it is where a
+  // desktop build and the deployed module would disagree. The bound is 64-bit, so both print the claim
+  // and count it broken instead of following it or losing the file.
+  const bytes = new Uint8Array(readFileSync('test/fixtures/answer.obj'));
+  new DataView(bytes.buffer).setUint32(36, 0xffffffff, true);
+  const wild = driveBytes('container', bytes);
+  assert.equal(wild.code, 47);
+  assert.equal(wild.rows[0], 'coff\t904\tbroken\t1\tmachine\t8664(x86-64)\tsections\t7\topts\t0', wild.rows.join(' | '));
+  assert.match(wild.rows[2], /^section\t0\t\.text\t.*\traw\t4294967295@300\t/);
+  assert.equal(wild.rows[wild.rows.length - 1], 'stopped\tbroken\t1');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -634,6 +671,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
     ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
+    ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

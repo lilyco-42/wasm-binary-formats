@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 46,
+    "selfFields": 47,
     "selfContainer": 26,
     "binarySpecAvailable": 0,
-    "gaps": 106,
+    "gaps": 105,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -24,7 +24,7 @@
       "archive": 11,
       "code": 5,
       "document": 7,
-      "executable": 5,
+      "executable": 4,
       "text": 2,
       "application": 9,
       "inode": 3,
@@ -766,8 +766,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "coffeescript",
