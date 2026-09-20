@@ -306,6 +306,10 @@ The third module is the reason the second one reports a `machine` and a section'
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
 to the disassembler, the same way `objdump -d` gets both from the binary. It is 1.86 MB, 601 KB
 gzipped, which is exactly why it is not in the module every visitor loads.
+One file skips the middle step: a `clang -c` object is none of the three image formats the analyser
+reads, so for `.o` the machine and the `.text` extent come from the base module's own COFF rows, and
+an object disassembles after one fetch instead of two. An i386 object says so rather than being decoded
+as something else, because the module carries x86-64, AArch64 and Thumb only.
 
 The disassembler's C can be checked on any host that has a C compiler, without emsdk and without
 linking anything: `git clone --filter=blob:none --no-checkout --depth 1 --branch 5.0.5` the Capstone

@@ -85,7 +85,7 @@ const MODULES = [
     id: 'disasm',
     file: 'apk-lens-disasm.wasm',
     title: '反汇编（x86-64 / AArch64 / Thumb）',
-    detail: '把 .text 的字节翻成指令文本；架构与 .text 的位置由上面的分析模块给出。',
+    detail: '把 .text 的字节翻成指令文本；架构与 .text 的位置由上面的分析模块给出 —— 只有 <code>.o</code> 目标文件是例外，它的机器与节位置就在基础模块的 COFF 行里。',
   },
 ];
 
@@ -141,22 +141,58 @@ function analyseHere(mod) {
 
 /* The two modules compose the way the tools they stand for do: the analyser says which instruction
  * set and where the code is, and this hands that range to the disassembler. Without the first
- * module the second one has no honest way to know either. */
-function disassembleHere(mod) {
-  if (!picked) return '还没有选中文件。先选一个 .exe / .so / 可执行文件。';
+ * module the second one has no honest way to know either.
+ *
+ * One file does not need the analyser: a `clang -c` object is none of the three image formats it
+ * reads, so `analysis` has nothing to say about it - while the base module's own COFF rows already
+ * carry the machine and every section's raw extent. For that case the range comes from the structure
+ * panel, which is why the object path is checked first and named in the message. */
+function objectCode(structure) {
+  if (!structure || structure.name !== 'coff') return null;
+  const stated = field((structure.rows[0] || '').split('\t'), 'machine') || '';
+  const machine = stated.replace(/^[^(]*\(/, '').replace(/\)$/, '');
+  if (machine !== 'x86-64') return { unsupported: machine || '未知' };
+  const wanted = structure.rows
+    .filter((row) => row.startsWith('section\t'))
+    .map((row) => row.split('\t'))
+    .find((cells) => cells[2] === '.text');
+  if (!wanted) return { unsupported: '没有 .text 节的目标文件' };
+  const raw = field(wanted, 'raw') || '';
+  const [size, start] = raw.split('@').map(Number);
+  if (!Number.isFinite(start) || !Number.isFinite(size) || size <= 0) return { unsupported: machine };
+  // An object is not loaded anywhere yet, so its code starts at address 0 - which is also what
+  // `objdump -d` prints for the same bytes.
+  return { arch: ARCHITECTURES.x86_64, start, size, address: 0, from: '目标文件的节表' };
+}
+
+function disasmPlan() {
+  const object = picked && picked.structure ? objectCode(picked.structure) : null;
+  if (object) return object;
   const rows = (toolState.get('analysis') || {}).rows;
-  if (!rows || !rows.length) return '先加载上面的「对象文件分析」模块 —— 架构和 .text 位置由它给出。';
+  if (!rows || !rows.length) return null;
   const machine = field((rows[0] || '').split('\t'), 'machine');
   const arch = ARCHITECTURES[machine];
-  if (arch === undefined) return `这个模块不含「${machine || '未知'}」指令集。`;
+  if (arch === undefined) return { unsupported: machine || '未知' };
   const sections = rows.filter((row) => row.startsWith('section\t')).map((row) => row.split('\t'));
   const wanted = sections.find((cells) => cells[2] === '.text')
     || sections.find((cells) => (cells[2] || '').includes('text'));
-  if (!wanted) return '分析模块没有给出代码节（.text），所以没有字节可翻。';
+  if (!wanted) return { unsupported: `${machine}（但没有代码节）` };
   const start = Number(field(wanted, 'off'));
   const size = Number(field(wanted, 'disk')) || Number(field(wanted, 'size')) || 0;
   const address = Number(field(wanted, 'addr')) || 0;
-  if (!Number.isFinite(start) || start >= picked.bytes.length) return '分析模块给出的节位置在文件之外。';
+  if (!Number.isFinite(start)) return { unsupported: machine };
+  return { arch, start, size, address, from: '分析模块' };
+}
+
+function disassembleHere(mod) {
+  if (!picked) return '还没有选中文件。先选一个 .exe / .so / 可执行文件。';
+  const plan = disasmPlan();
+  if (!plan) {
+    return '先加载上面的「对象文件分析」模块 —— 架构和 .text 位置由它给出；只有 .o 目标文件是例外，它的节表就在基础模块里。';
+  }
+  if (plan.unsupported) return `这个模块不含「${plan.unsupported}」指令集。`;
+  const { arch, start, size, address } = plan;
+  if (start >= picked.bytes.length) return `${plan.from}给出的节位置在文件之外。`;
   const slice = picked.bytes.subarray(start, Math.min(start + Math.min(size, WINDOW), picked.bytes.length));
   const ptr = mod.malloc(slice.length);
   new Uint8Array(mod.memory.buffer, ptr, slice.length).set(slice);
@@ -556,6 +592,9 @@ function renderLines(rows) {
 function showStructure(bytes, label) {
   const found = structureOf(bytes);
   if (!found || !found.rows.length) return false;
+  // Kept for the disassembler: an object file's machine and section extents are in these rows, and no
+  // other module can produce them. Only the file this call is about gets the note.
+  if (picked && picked.bytes === bytes) picked.structure = found;
   viewerEl.textContent = '';
   const family = found.name || `格式代码 ${found.code}`;
   const head = document.createElement('p');
