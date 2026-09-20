@@ -1,0 +1,56 @@
+name: Toolchain probe
+
+# What a browser-side binary-analysis module would have to be built with. This answers the question
+# by running it: the job prints the compilers, linkers and SDKs that are really on the runner, and
+# whether the package manager can add the one that is missing. Nothing here is a claim about what
+# the engine does - see engine.yml for that.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: rust and wasm targets
+        run: |
+          rustc -vV
+          cargo -V
+          rustup target list --installed
+          ls ~/.cargo/registry/cache/*/ 2>/dev/null | head -3 || true
+
+      - name: c and llvm tools
+        run: |
+          for tool in cc gcc clang clang-14 clang-15 clang-16 clang-17 llvm-config wasm-ld ld.lld; do
+            printf '%-14s ' "$tool"
+            if command -v "$tool" >/dev/null 2>&1; then "$tool" --version 2>&1 | head -1; else echo absent; fi
+          done
+
+      - name: emscripten on the runner or in apt
+        run: |
+          for tool in emcc em-config emmake; do
+            printf '%-10s ' "$tool"
+            if command -v "$tool" >/dev/null 2>&1; then "$tool" --version 2>&1 | head -1; else echo absent; fi
+          done
+          ls -d /usr/local/lib/emsdk /usr/local/emsdk /opt/emsdk "$HOME/emsdk" 2>/dev/null || echo "no emsdk directory"
+          apt-cache policy emscripten 2>/dev/null | head -4 || echo "apt has no emscripten entry"
+
+      - name: node and python
+        run: |
+          node -v
+          npm -v
+          python3 -V
+          pip3 --version 2>/dev/null | head -1 || true
+
+      - name: can a wasm crate be built here at all
+        run: |
+          cargo new --lib /tmp/wasmprobe >/dev/null
+          cd /tmp/wasmprobe
+          printf '[profile.release]\nopt-level = "z"\nlto = true\npanic = "abort"\n' >> Cargo.toml
+          cargo add --quiet wasm-bindgen 2>/dev/null || printf 'wasm-bindgen = "0.2"\n' >> Cargo.toml
+          rustup target add wasm32-unknown-unknown >/dev/null
+          cargo build --release --target wasm32-unknown-unknown 2>&1 | tail -3
+          ls -l target/wasm32-unknown-unknown/release/*.wasm 2>/dev/null | awk '{print "wasm artifact:", $5, "bytes", $9}'
