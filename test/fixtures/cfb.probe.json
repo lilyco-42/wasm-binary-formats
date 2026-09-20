@@ -1,0 +1,43 @@
+{
+ "excel97.xls": {
+  "bytes": 5632,
+  "rows": [
+   "cfb\t5632\tbroken\t0\tversion\t3.62\tsector\t512\tmini\t64",
+   "layout\tfat\t1\tdifat\t0\tdir\t1\tminifat\t0\tsectors\t10",
+   "root\tstart\t4294967294\tsize\t0\tsectors\t0\tholds\t0\tmini\t0\tclsid\t-",
+   "stream\t1\tWorkbook\tsize\t4096\tstart\t0\twhere\tregular\tsectors\t8\tholds\t4096",
+   "inventory\tstreams\t1\tstorages\t0\tfree\t2\tbytes\t4096\tcollisions\t0\thint\texcel",
+   "walked\tend"
+  ],
+  "streams": 1
+ },
+ "wide97.xls": {
+  "bytes": 96256,
+  "rows": [
+   "cfb\t96256\tbroken\t0\tversion\t3.62\tsector\t512\tmini\t64",
+   "layout\tfat\t2\tdifat\t0\tdir\t1\tminifat\t0\tsectors\t187",
+   "root\tstart\t4294967294\tsize\t0\tsectors\t0\tholds\t0\tmini\t0\tclsid\t-",
+   "stream\t1\tWorkbook\tsize\t94208\tstart\t0\twhere\tregular\tsectors\t184\tholds\t94208",
+   "inventory\tstreams\t1\tstorages\t0\tfree\t2\tbytes\t94208\tcollisions\t0\thint\texcel",
+   "walked\tend"
+  ],
+  "streams": 1
+ },
+ "word97.doc": {
+  "bytes": 18432,
+  "rows": [
+   "cfb\t18432\tbroken\t0\tversion\t3.59\tsector\t512\tmini\t64",
+   "layout\tfat\t1\tdifat\t0\tdir\t2\tminifat\t1\tsectors\t35",
+   "root\tstart\t3\tsize\t4352\tsectors\t9\tholds\t4608\tmini\t68\tclsid\t0609020000000000C000000000000046",
+   "stream\t1\t.CompObj\tsize\t106\tstart\t0\twhere\tmini\tsectors\t2\tholds\t128",
+   "stream\t2\t.Ole\tsize\t20\tstart\t2\twhere\tmini\tsectors\t1\tholds\t64",
+   "stream\t3\t1Table\tsize\t10485\tstart\t4\twhere\tregular\tsectors\t21\tholds\t10752",
+   "stream\t4\t.SummaryInformation\tsize\t272\tstart\t3\twhere\tmini\tsectors\t5\tholds\t320",
+   "stream\t5\tWordDocument\tsize\t3645\tstart\t8\twhere\tmini\tsectors\t57\tholds\t3648",
+   "stream\t6\t.DocumentSummaryInformation\tsize\t172\tstart\t65\twhere\tmini\tsectors\t3\tholds\t192",
+   "inventory\tstreams\t6\tstorages\t0\tfree\t1\tbytes\t14700\tcollisions\t0\thint\tword",
+   "walked\tend"
+  ],
+  "streams": 6
+ }
+}

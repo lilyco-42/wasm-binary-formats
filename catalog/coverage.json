@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 42,
-    "selfContainer": 24,
+    "selfContainer": 26,
     "binarySpecAvailable": 0,
-    "gaps": 112,
+    "gaps": 110,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -23,7 +23,7 @@
       "image": 10,
       "archive": 11,
       "code": 5,
-      "document": 10,
+      "document": 8,
       "executable": 5,
       "text": 2,
       "application": 10,
@@ -1098,10 +1098,12 @@
       "extensions": [
         "doc"
       ],
-      "kaitaiSpecs": [],
-      "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": true,
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "dockerfile",
@@ -4583,10 +4585,12 @@
       "extensions": [
         "xls"
       ],
-      "kaitaiSpecs": [],
-      "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "kaitaiSpecs": [
+        "microsoft_cfb"
+      ],
+      "generatedHere": true,
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "xlsb",

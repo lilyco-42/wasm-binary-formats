@@ -320,6 +320,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['nodict.parquet', 39], ['nulls.parquet', 39], ['groups.parquet', 39], ['typed.parquet', 39],
     ['add.onnx', 40], ['symbolic.onnx', 40], ['types.onnx', 40],
     ['photo.heic', 41], ['block.heic', 41], ['seq.heic', 41], ['container.heif', 41],
+    ['word97.doc', 42], ['excel97.xls', 42], ['wide97.xls', 42],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -476,6 +477,25 @@ test('a HEIF keeps the coded size and the visible size apart across the ABI', ()
   assert.ok(sequence.includes('items	3	primary	1	descs	3'), sequence.join(' | '));
 });
 
+test('a compound file keeps its mini streams apart from its sectors across the ABI', () => {
+  const word = assertReadable('container', 'word97.doc', 42).rows;
+  assert.equal(word[0], 'cfb	18432	broken	0	version	3.59	sector	512	mini	64', word.join(' | '));
+  assert.ok(word.includes('root	start	3	size	4352	sectors	9	holds	4608	mini	68'
+    + '	clsid	0609020000000000C000000000000046'), word.join(' | '));
+  assert.ok(word.includes('stream	5	WordDocument	size	3645	start	8	where	mini	sectors	57'
+    + '	holds	3648'), 'the Word stream is chained through the mini FAT');
+  assert.ok(word.includes('stream	3	1Table	size	10485	start	4	where	regular	sectors	21'
+    + '	holds	10752'), 'and the table stream through the real one');
+  assert.ok(word.includes('inventory	streams	6	storages	0	free	1	bytes	14700'
+    + '	collisions	0	hint	word'), word.join(' | '));
+  assert.equal(word[word.length - 1], 'walked	end');
+  const workbook = assertReadable('container', 'wide97.xls', 42).rows;
+  assert.ok(workbook.includes('layout	fat	2	difat	0	dir	1	minifat	0	sectors	187'),
+    workbook.join(' | '));
+  assert.ok(workbook.includes('stream	1	Workbook	size	94208	start	0	where	regular'
+    + '	sectors	184	holds	94208'), workbook.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -520,7 +540,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

@@ -16,6 +16,9 @@
 //!         and length, and addresses that sign the structure they point at
 //!   heif  ISO base-media boxes (`ftyp` brand `heic`) whose `meta` carries the item
 //!         inventory; `ispe` is the coded size and `clap` the visible one, which differ
+//!   cfb   D0CF11E0A1B11AE1 + a 512-byte header naming the sector size as a shift, a FAT whose own
+//!         sector list is the 109-slot DIFAT, 128-byte directory entries, and streams under the
+//!         0x1000 cutoff chained through a second FAT inside the root entry's own data
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
@@ -109,6 +112,7 @@ pub fn name() -> &'static str {
         FORMAT_PARQUET => "parquet",
         FORMAT_ONNX => "onnx",
         FORMAT_HEIF => "heif",
+        FORMAT_CFB => "cfb",
         _ => "unknown",
     }
 }
@@ -4851,6 +4855,361 @@ fn read_heif(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Compound File Binary - the OLE container the legacy Office formats and Windows installer packages
+/// are built out of. Three linked tables are walked here: the sector FAT (whose own sector list is
+/// the DIFAT), the directory of 128-byte entries, and for streams under the cutoff a second FAT and
+/// a second stream carried inside the root entry's data.
+///
+/// Nothing inside a stream is interpreted; this says how the compound file is built, not what the
+/// document says. Two header details carry the footnotes they earned, both confirmed against files
+/// LibreOffice and xlwt wrote and olefile read back (`scripts/make-cfb-fixtures.py`): the word at
+/// 0x38 is `Mini Stream Size` - always 0x1000 - and not a sector count, and the DIFAT array starts
+/// at 0x4C, the only offset that leaves room for all 109 slots inside the 512-byte header.
+pub const FORMAT_CFB: i32 = 42;
+
+const CFB_MAGIC: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+const CFB_HEADER: usize = 512;
+const CFB_END: u32 = 0xFFFF_FFFE;
+const CFB_FREE: u32 = 0xFFFF_FFFF;
+const CFB_CUTOFF: u32 = 4096;
+const CFB_ENTRIES: usize = 64;
+const CFB_CHAIN: usize = 65_536;
+const CFB_HOPS: usize = 1_024;
+
+fn cfb_u16(bytes: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from(u16::from_le_bytes(
+        *bytes.get(at..at.checked_add(2)?)?.try_into().ok()?,
+    )))
+}
+
+fn cfb_u32(bytes: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(
+        bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
+    ))
+}
+
+fn cfb_u64(bytes: &[u8], at: usize) -> Option<u64> {
+    Some(u64::from_le_bytes(
+        bytes.get(at..at.checked_add(8)?)?.try_into().ok()?,
+    ))
+}
+
+/// One sector of the file, addressed the only way CFB addresses anything.
+fn cfb_page(bytes: &[u8], sector: u32, size: usize) -> Option<&[u8]> {
+    let offset = CFB_HEADER.checked_add(usize::from(sector).checked_mul(size)?)?;
+    bytes.get(offset..offset.checked_add(size)?)
+}
+
+/// A chain of sector ids, ending the way a chain has to. Repeats are caught because a cycle would
+/// otherwise turn a small file into a loop that never reports.
+fn cfb_chain(table: &[u32], start: u32) -> (Vec<u32>, bool) {
+    let mut seen = vec![false; table.len()];
+    let mut list = Vec::new();
+    let mut at = start;
+    loop {
+        if at == CFB_END || at == CFB_FREE {
+            return (list, true);
+        }
+        let index = at as usize;
+        if index >= table.len() || seen[index] || list.len() >= CFB_CHAIN {
+            return (list, false);
+        }
+        seen[index] = true;
+        list.push(at);
+        at = table[index];
+    }
+}
+
+/// Directory names are UTF-16LE with a length that counts the terminating NUL. Only printable
+/// ASCII survives: a 0x01 or 0x05 stream prefix becomes a dot, which is how `.CompObj` gets its
+/// name, and so does any character the report cannot carry. No fixture here has ever named a stream
+/// with a non-ASCII character, so the reader does not pretend to decode one - it prints a dot.
+fn cfb_name(bytes: &[u8], at: usize) -> String {
+    let Some(length) = cfb_u16(bytes, at + 64) else {
+        return String::new();
+    };
+    if length < 2 || length > 64 {
+        return String::new();
+    }
+    let stop = at + 64 + length as usize - 2;
+    let mut out = String::new();
+    let mut walk = at + 64;
+    while walk < stop {
+        // A character has to lie wholly inside the declared length; half of one does not exist.
+        let value = if walk + 2 <= stop {
+            cfb_u16(bytes, walk)
+        } else {
+            None
+        };
+        walk += 2;
+        out.push(match value {
+            Some(word) if (0x20..0x7F).contains(&word) => char::from(word as u8),
+            _ => '.',
+        });
+    }
+    out
+}
+
+/// Which document family the directory names, from the stream names this reader has seen written.
+fn cfb_hint(name: &str) -> &'static str {
+    let bare = name.trim_start_matches('.');
+    if bare == "WordDocument" {
+        "word"
+    } else if bare == "Workbook" {
+        "excel"
+    } else {
+        "-"
+    }
+}
+
+fn read_cfb(bytes: &[u8]) -> Option<Vec<String>> {
+    if !bytes.starts_with(&CFB_MAGIC) {
+        return None;
+    }
+    if cfb_u16(bytes, 28)? != 0xFFFE {
+        // Every compound file ever written is little-endian; a big-endian one is not worth guessing.
+        return None;
+    }
+    let sector_shift = cfb_u16(bytes, 30)?;
+    let mini_shift = cfb_u16(bytes, 32)?;
+    if sector_shift < 9 || sector_shift > 16 || mini_shift > 16 {
+        return None;
+    }
+    let ss = 1usize << sector_shift;
+    let mss = 1usize << mini_shift;
+    if mss > ss || bytes.len() <= CFB_HEADER + ss {
+        return None;
+    }
+    let top = (bytes.len() - CFB_HEADER) / ss;
+    let first_dir = cfb_u32(bytes, 48)?;
+    let per = ss / 4;
+
+    // The DIFAT keeps its slot positions even when a slot is free: slot k describes the sectors
+    // numbered k*per .. (k+1)*per, so dropping a free slot would shift every later one.
+    let mut difat: Vec<u32> = Vec::with_capacity(109);
+    for i in 0..109 {
+        difat.push(cfb_u32(bytes, 76 + i * 4).unwrap_or(CFB_FREE));
+    }
+    let mut broken = 0usize;
+    let declared_difat = cfb_u32(bytes, 72)?;
+    let mut at = cfb_u32(bytes, 68)?;
+    let mut hops = 0usize;
+    while at != CFB_END && at != CFB_FREE {
+        let Some(page) = cfb_page(bytes, at, ss) else {
+            broken += 1;
+            break;
+        };
+        for i in 0..per.saturating_sub(1) {
+            difat.push(u32::from_le_bytes(page[i * 4..i * 4 + 4].try_into().ok()?));
+        }
+        at = u32::from_le_bytes(page[(per - 1) * 4..per * 4].try_into().ok()?);
+        hops += 1;
+        if hops >= CFB_HOPS {
+            broken += 1;
+            break;
+        }
+    }
+
+    let mut fat = vec![CFB_FREE; top];
+    let mut fat_sectors = 0usize;
+    for (pos, sector) in difat.iter().enumerate() {
+        if *sector == CFB_FREE {
+            continue;
+        }
+        fat_sectors += 1;
+        let Some(page) = cfb_page(bytes, *sector, ss) else {
+            broken += 1;
+            continue;
+        };
+        for i in 0..per {
+            let Some(index) = pos.checked_mul(per).and_then(|base| base.checked_add(i)) else {
+                break;
+            };
+            if index >= fat.len() {
+                break;
+            }
+            fat[index] = u32::from_le_bytes(page[i * 4..i * 4 + 4].try_into().ok()?);
+        }
+    }
+
+    let (dir_sectors, dir_ok) = cfb_chain(&fat, first_dir);
+    if !dir_ok {
+        broken += 1;
+    }
+    if dir_sectors.is_empty() {
+        return None;
+    }
+    let per_entry = ss / 128;
+    let entry_at = |index: usize| -> Option<&[u8]> {
+        let sector = *dir_sectors.get(index / per_entry)?;
+        let base = CFB_HEADER.checked_add(usize::from(sector).checked_mul(ss)?)?;
+        let start = base.checked_add((index % per_entry).checked_mul(128)?)?;
+        bytes.get(start..start.checked_add(128)?)
+    };
+
+    // The root entry is both the storage that owns everything and the header of the mini stream.
+    let root = entry_at(0)?;
+    if root[66] != 5 {
+        return None;
+    }
+    let root_start = cfb_u32(root, 116)?;
+    let root_size = cfb_u64(root, 120)?;
+
+    let mut mini_fat: Vec<u32> = Vec::new();
+    let mut mini_sectors = 0usize;
+    let first_mini = cfb_u32(bytes, 60)?;
+    if first_mini != CFB_END && first_mini != CFB_FREE {
+        let (list, ok) = cfb_chain(&fat, first_mini);
+        if !ok {
+            broken += 1;
+        }
+        mini_sectors = list.len();
+        mini_fat = vec![CFB_FREE; mini_sectors * per];
+        for (pos, sector) in list.iter().enumerate() {
+            let Some(page) = cfb_page(bytes, *sector, ss) else {
+                broken += 1;
+                continue;
+            };
+            for i in 0..per {
+                if pos * per + i < mini_fat.len() {
+                    mini_fat[pos * per + i] =
+                        u32::from_le_bytes(page[i * 4..i * 4 + 4].try_into().ok()?);
+                }
+            }
+        }
+    }
+    // The one structural promise a compound file makes: no sector belongs to two owners. Chains are
+    // linked lists, so sector numbers interleave freely - a repeat is the file contradicting itself.
+    let mut owners = vec![0u8; top];
+    let mut mini_owners = vec![0u8; mini_fat.len()];
+    let mut collisions = 0usize;
+    let root_row = if root_size > 0 {
+        let (list, ok) = cfb_chain(&fat, root_start);
+        if !ok {
+            broken += 1;
+        }
+        for sector in &list {
+            let slot = &mut owners[*sector as usize];
+            *slot += 1;
+            collisions += usize::from(*slot > 1);
+        }
+        (list.len(), list.len() * ss)
+    } else {
+        (0, 0)
+    };
+    let cutoff = cfb_u32(bytes, 56)
+        .filter(|value| *value > 0)
+        .unwrap_or(CFB_CUTOFF);
+
+    let mut rows: Vec<String> = Vec::new();
+    let mut streams = 0usize;
+    let mut storages = 0usize;
+    let mut free = 0usize;
+    let mut total = 0u64;
+    let mut hint = "-";
+    for index in 1..CFB_ENTRIES {
+        let Some(entry) = entry_at(index) else {
+            break;
+        };
+        let kind = entry[66];
+        let name = cfb_name(entry, 0);
+        let start = cfb_u32(entry, 116)?;
+        let size = cfb_u64(entry, 120)?;
+        match kind {
+            0 => free += 1,
+            1 => {
+                storages += 1;
+                let child = cfb_u32(entry, 76)?;
+                rows.push(format!("storage\t{index}\t{name}\tchild\t{child}"));
+            }
+            2 => {
+                streams += 1;
+                total = total.saturating_add(size);
+                let named = cfb_hint(&name);
+                if named != "-" && hint == "-" {
+                    hint = named;
+                }
+            }
+            // Only 0, 1, 2 and 5 exist, and a second root entry is a container lying about itself.
+            _ => broken += 1,
+        }
+        if kind != 2 || size == 0 {
+            continue;
+        }
+        let below = size < u64::from(cutoff);
+        let (list, ok) = if below {
+            cfb_chain(&mini_fat, start)
+        } else {
+            cfb_chain(&fat, start)
+        };
+        if !ok {
+            broken += 1;
+        }
+        for sector in &list {
+            let slot = if below {
+                mini_owners.get_mut(*sector as usize)
+            } else {
+                owners.get_mut(*sector as usize)
+            };
+            if let Some(cell) = slot {
+                *cell += 1;
+                collisions += usize::from(*cell > 1);
+            }
+        }
+        rows.push(format!(
+            "stream\t{index}\t{name}\tsize\t{size}\tstart\t{start}\twhere\t{}\tsectors\t{}\tholds\t{}",
+            if below { "mini" } else { "regular" },
+            list.len(),
+            list.len() * if below { mss } else { ss }
+        ));
+    }
+    let clsid = root
+        .get(80..96)
+        .map(|value| {
+            if value.iter().all(|byte| *byte == 0) {
+                "-".to_owned()
+            } else {
+                value.iter().map(|byte| format!("{byte:02X}")).collect()
+            }
+        })
+        .unwrap_or_else(|| "?".to_owned());
+    rows.push(format!(
+        "inventory\tstreams\t{streams}\tstorages\t{storages}\tfree\t{free}\tbytes\t{total}\tcollisions\t{collisions}\thint\t{hint}"
+    ));
+    broken += collisions;
+    rows.insert(
+        0,
+        format!(
+            "root\tstart\t{root_start}\tsize\t{root_size}\tsectors\t{}\tholds\t{}\tmini\t{}\tclsid\t{clsid}",
+            root_row.0,
+            root_row.1,
+            root_size / mss as u64
+        ),
+    );
+    rows.insert(
+        0,
+        format!(
+            "layout\tfat\t{fat_sectors}\tdifat\t{declared_difat}\tdir\t{}\tminifat\t{mini_sectors}\tsectors\t{top}",
+            dir_sectors.len()
+        ),
+    );
+    rows.insert(
+        0,
+        format!(
+            "cfb\t{}\tbroken\t{broken}\tversion\t{}.{}\tsector\t{ss}\tmini\t{mss}",
+            bytes.len(),
+            bytes[26],
+            cfb_u16(bytes, 24)?
+        ),
+    );
+    if broken == 0 {
+        rows.push("walked\tend".to_owned());
+    } else {
+        rows.push(format!("stopped\tbroken\t{broken}"));
+    }
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -4945,8 +5304,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_onnx(bytes) {
         return accept(FORMAT_ONNX, lines);
     }
+    if let Some(lines) = read_cfb(bytes) {
+        return accept(FORMAT_CFB, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model or HEIF image",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image or compound file",
         -2,
     )
 }

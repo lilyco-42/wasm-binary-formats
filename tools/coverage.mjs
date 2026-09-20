@@ -39,6 +39,9 @@ const SELF = {
   flac: ['fields'], mp3: ['fields'], mp2: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['fields'], pbm: ['fields'], wasm: ['fields'], ttf: ['fields'], woff: ['fields'], icns: ['fields'],
   applebplist: ['fields'], qoi: ['fields'], jp2: ['fields'], woff2: ['fields'], npy: ['fields'], h5: ['container'], avro: ['fields'],
+  // Only the two labels a generated `microsoft_cfb` reader does not carry: magika names the Word and
+  // Excel documents by what is inside the compound file, and this reader stops at the container.
+  doc: ['container'], xls: ['container'],
   arrow: ['fields'], parquet: ['fields'], onnx: ['fields'], heif: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
@@ -53,7 +56,7 @@ const ALIAS = {
   gzip: ['gzip'], zlibstream: ['gzip'], tar: ['tar'], ar: ['ar'], cpio: ['cpio_old_le'], rar: ['rar'], sevenzip: ['seven_z'], xar: ['xar'], rpm: ['rpm'], deb: ['deb'],
   png: ['png'], jpeg: ['jpeg'], gif: ['gif'], bmp: ['bmp'], tiff: ['tiff'], ico: ['ico'], icns: ['icns'], tga: ['tga'], pcx: ['pcx'], wmf: ['wmf'], dicom: ['dicom'], xcf: ['xcf'], psd: ['psd'], qoi: ['qoi'],
   wav: ['wav'], riff: ['riff'], au: ['au'], avi: ['avi'], mp4: ['quicktime_mov'], qt: ['quicktime_mov'], mkv: ['matroska'], webm: ['matroska'], ebml: ['ebml'], ogg: ['ogg'], flac: ['flac'], mp3: ['id3v2_3'], midi: ['standard_midi_file'], aac: ['adts'], asf: ['asf'], flv: ['flv'], wma: ['asf'], wmv: ['asf'], webp: ['webp'], heif: ['heif'], avif: ['avif'],
-  sqlite: ['sqlite3'], dbf: ['dbf'], jsonl: ['json'], protobuf: ['google_protobuf'], bson: ['bson'], msgpack: ['msgpack'], pickle: ['python_pickle'], marshal: ['ruby_marshal'], php: ['php_serialized_value'], ole: ['microsoft_cfb'], msi: ['microsoft_cfb'], cdf: ['microsoft_cfb'], visio: ['microsoft_cfb'],
+  sqlite: ['sqlite3'], dbf: ['dbf'], jsonl: ['json'], protobuf: ['google_protobuf'], bson: ['bson'], msgpack: ['msgpack'], pickle: ['python_pickle'], marshal: ['ruby_marshal'], php: ['php_serialized_value'], ole: ['microsoft_cfb'], msi: ['microsoft_cfb'], cdf: ['microsoft_cfb'], visio: ['microsoft_cfb'], doc: ['microsoft_cfb'], xls: ['microsoft_cfb'],
   iso: ['iso9660'], udf: ['udf'], img: ['raw'], hfs: ['hfsplus'], ext2: ['ext2'], fat: ['vfat'], ntfs: ['ntfs'], squashfs: ['squashfs'], erofs: ['erofs'], vhd: ['vhd'], dmg: ['dmg'], wim: ['wim'], vmdk: ['vmware_vmdk'], mbr: ['dos_mbr'], gpt: ['gpt_partition_table'], lnk: ['windows_lnk_file'], winregistry: ['regf'], dsstore: ['ds_store'], thumbsdb: ['thumbs_db'], chm: ['chm'], pcap: ['pcap'],
   bzip: ['bz2'], bzip3: ['bz3'], xz: ['xz'], lz4: ['lz4'], zstd: ['zst'], compress: ['unix_compress'], lha: ['lzh'], arc: ['arc'], arj: ['arj'], cab: ['cab'], lz: ['lzma'], lzx: ['lzx'], mscompress: ['xxx'], rzip: ['rzip'], zisofs: ['zisofs'],
   android_sparse: ['android_sparse'], odex: ['dex'], ocx2: ['dex'], smali: ['smali'], wasm: ['wasm'], swf: ['swf'], pdf: ['pdf'], rtf: ['rtf'], postscript: ['postscript'], ps: ['postscript'], onnx: ['onnx'], parquet: ['parquet'], avro: ['avro'], h5: ['hdf5'], arrow: ['arrow'], npy: ['npy'],

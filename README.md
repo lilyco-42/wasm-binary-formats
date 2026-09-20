@@ -264,23 +264,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 42 | 19.2% |
-| own Rust reader, container framing only | 24 | 11.0% |
+| own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **112** | 51.1% |
-| **covered, any level** | **107** | 48.9% |
+| **no parser at all - real gap** | **110** | 50.2% |
+| **covered, any level** | **109** | 49.8% |
 
-Top binary gap groups by count: unknown 54, archive 11, image 10, document 10, application 10,
+Top binary gap groups by count: unknown 54, archive 11, image 10, application 10, document 8,
 code 5, executable 5, inode 3.
-Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
-and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `h5`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf` -
+Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
+because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
+name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`,
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 107 of 219 binary labels have a parser
-that runs here (42 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 112 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 109 of 219 binary labels have a parser
+that runs here (42 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 110 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -304,6 +305,7 @@ temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow write
 temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
 temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
 temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
+temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -547,6 +549,19 @@ does not re-derive them:
   equal its colour profile; `block.heic`, written at an exact block size, is the control - same coded
   64x64, no `clap` box at all, so the two files together show that reporting `ispe` alone would print a
   size one of the two pictures does not have.
+  Compound File Binary (+2 container-level labels, 109 covered, 110 gaps) is the container Word and
+  Excel 97 are stored in, and walking it is three linked tables rather than one header: a sector FAT
+  whose own sector list is the DIFAT, a directory of 128-byte entries, and - for streams under
+  0x1000 bytes - a second FAT and a second stream carried inside the root entry's own data. Two
+  things only the cross-check settled: the header word at `0x38` is `Mini Stream Size`, always
+  0x1000, and not the sector count an older reading of the layout suggested, and the DIFAT starts at
+  `0x4C`, which is the only offset that leaves all 109 slots inside the 512-byte header.
+  `scripts/make-cfb-fixtures.py` writes `word97.doc` with LibreOffice from a document python-docx
+  generated and the two `.xls` files with xlwt (which owns its own compound-file writer), then walks
+  each output itself and refuses to commit unless olefile, reading the same bytes, agrees on every
+  stream name and size. The invariant the reader actually claims is the one a document does not need:
+  chains are linked lists, so sector numbers interleave freely, but no sector may belong to two
+  owners - `collisions` counts the ones that do, and it is 0 in all three real files.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
