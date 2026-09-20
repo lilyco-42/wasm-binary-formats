@@ -350,6 +350,7 @@ temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif 
 temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
 temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
 temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
+temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -439,11 +440,27 @@ builds the wasm target and runs both test layers on CI.
   unwritten rather than guessed from one sample, so `cab` is a container-level credit. Revisit with a
   second cabinet (a larger one, and one from another writer) before coding against either
   interpretation.
+* Two little-endian reads sat inside a big-endian format, and no file in the tree could say so.
+  `box_extent` took the 64-bit length of a size-1 box from `Le`, and so did the version-1 `mvhd`
+  duration - both wrong, since 14496-12 lays every integer in this family out big-endian. Nothing
+  looked broken, because a 64-bit box means a file over 4 GB and a version-1 `mvhd` means a muxer that
+  bothered to widen its timestamps, and the ffmpeg output that is our fixture has neither: the arms
+  that handle them were written and never executed. `test/fixtures/wide.mov` carries both and is
+  labelled as hand-built, because this lab cannot produce either form. Two other implementations are
+  asked the same question about the same bytes before the fixture is committed, so it is not a
+  self-assertion: `mutagen` - installed, with its own `struct.unpack(">Q", ...)` at box + 8 - reports
+  the box as 48 bytes at 148, and byte-swapping those eight bytes makes it report
+  3,458,764,513,820,540,928, which is the number this reader used to print; `ffprobe` reads the
+  version-1 64-bit creation stamp back as the date written into it. The row now says which form it read
+  (`box  mdat  48  148  wide`), because a bare number cannot tell a 64-bit length from a 32-bit one.
+  Lesson, and it is the same one as every other untested arm: a format being *covered* is not the same
+  as its branches being run - the way to find these is to ask which fields a real writer would rarely
+  emit, then hand-build exactly those and get a third program to read them back.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **107 covered** (42 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **112 with no
+Coverage is scored against magika's 219 binary labels: **111 covered** (44 field-level and 26
+container-level from this repo's own readers, 41 generated and mostly load-gated), **108 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 

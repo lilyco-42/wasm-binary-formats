@@ -303,7 +303,7 @@ function assertReadable(shape, file, code) {
 test('every container the demo offers answers with the code the page prints', () => {
   const cases = [
     ['gnu.tar', 1], ['plain.ar', 2], ['lab-fixture.deb', 23], ['media.wav', 3], ['media.avi', 3],
-    ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10],
+    ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10], ['wide.mov', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
     ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['tiny.icns', 30],
@@ -542,6 +542,21 @@ test('an ICC profile keeps its table inside its own stated length across the ABI
   assert.ok(xyz[1].startsWith('profile\tclass\tabst'), 'an abstract profile, not a display one');
 });
 
+test('a 64-bit box length is read where the format puts it', () => {
+  // No ordinary file carries this form - a 64-bit length means a box past 4 GB - so the fixture is
+  // hand-built and the byte order is checked against mutagen, not against this reader's own opinion.
+  const wide = assertReadable('container', 'wide.mov', 10).rows;
+  assert.equal(wide[wide.length - 2], 'box\tmdat\t48\t148\twide', wide.join(' | '));
+  assert.equal(wide[wide.length - 1], 'walked\tend');
+  assert.ok(wide.includes('duration\t44100\t110250\t2500'), 'the version-1 mvhd times');
+
+  // The ffmpeg-written control says nothing about wide boxes: the row only grows when the header does.
+  const ordinary = assertReadable('container', 'media.mp4', 10).rows;
+  assert.ok(!ordinary.some((row) => row.endsWith('\twide')), ordinary.join(' | '));
+  assert.equal(ordinary[0], 'ftyp\tisom\t512');
+  assert.ok(ordinary.includes('duration\t1000\t1000\t1000'), ordinary.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -584,7 +599,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
   // for gnu.tar. The name has to come from the reader that accepted the bytes.
   const cases = [
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
-    ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
+    ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
     ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],

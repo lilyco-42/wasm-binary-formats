@@ -1,0 +1,44 @@
+{
+ "bytes": 196,
+ "duration": 110250,
+ "ffprobe_creation_time": "2023-12-31T16\\:00\\:00.000000Z",
+ "mutagen": {
+  "ftyp": [
+   20,
+   0
+  ],
+  "mdat": [
+   48,
+   148
+  ],
+  "moov": [
+   128,
+   20
+  ]
+ },
+ "mutagen_swapped": {
+  "ftyp": [
+   20,
+   0
+  ],
+  "mdat": [
+   3458764513820540928,
+   148
+  ],
+  "moov": [
+   128,
+   20
+  ]
+ },
+ "rows": [
+  "ftyp\tisom\t512",
+  "brand\tisom",
+  "box\tftyp\t20\t0",
+  "box\tmoov\t128\t20",
+  "child\tmvhd\t120\t28",
+  "duration\t44100\t110250\t2500",
+  "box\tmdat\t48\t148\twide",
+  "walked\tend"
+ ],
+ "timescale": 44100
+}

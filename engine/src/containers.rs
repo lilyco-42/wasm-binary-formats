@@ -134,8 +134,8 @@ pub fn at(index: i32) -> Option<String> {
     RESULT.with(|slot| slot.borrow().get(index.max(0) as usize).cloned())
 }
 
-/// Endianness-aware field reader. Big-endian TIFF is the only reason this exists, so it is
-/// implemented once here rather than branching at every call site.
+/// Endianness-aware field reader, because two families here are big-endian (TIFF and the ISO base
+/// media boxes) while the rest are little-endian. One reader rather than a branch at every call site.
 struct Fields<'a> {
     bytes: &'a [u8],
     little: bool,
@@ -164,6 +164,18 @@ impl Fields<'_> {
         } else {
             u32::from_be_bytes(quad)
         }))
+    }
+
+    fn u64(&self, at: usize) -> Option<i64> {
+        if at + 8 > self.bytes.len() {
+            return None;
+        }
+        let octet: [u8; 8] = self.bytes[at..at + 8].try_into().unwrap();
+        Some(if self.little {
+            u64::from_le_bytes(octet)
+        } else {
+            u64::from_be_bytes(octet)
+        } as i64)
     }
 }
 
@@ -356,22 +368,26 @@ fn read_bmff(bytes: &[u8]) -> Option<Vec<String>> {
             break;
         };
         let kind = fourcc(&bytes[cursor + 4..cursor + 8]);
-        entries.push(format!("box\t{kind}\t{size}\t{cursor}"));
+        let wide = if header == 16 { "\twide" } else { "" };
+        entries.push(format!("box\t{kind}\t{size}\t{cursor}{wide}"));
         boxes += 1;
         let body = cursor + header;
         if kind == "moov" {
             let mut inner = body;
-            let limit = (cursor + size).min(bytes.len());
+            let limit = cursor.saturating_add(size).min(bytes.len());
             while inner + 8 <= limit {
-                let Some((inner_size, _)) = box_extent(bytes, &be, inner) else {
+                let Some((inner_size, inner_header)) = box_extent(bytes, &be, inner) else {
                     break;
                 };
                 let inner_kind = fourcc(&bytes[inner + 4..inner + 8]);
-                entries.push(format!("child\t{inner_kind}\t{inner_size}\t{inner}"));
+                let inner_wide = if inner_header == 16 { "\twide" } else { "" };
+                entries.push(format!(
+                    "child\t{inner_kind}\t{inner_size}\t{inner}{inner_wide}"
+                ));
                 if inner_kind == "mvhd" {
                     let version = usize::from(bytes[inner + 8]);
                     let (timescale, duration) = if version == 1 {
-                        (be.u32(inner + 28)?, Le(bytes).u64(inner + 32)?)
+                        (be.u32(inner + 28)?, be.u64(inner + 32)?)
                     } else {
                         (be.u32(inner + 20)?, i64::from(be.u32(inner + 24)?))
                     };
@@ -382,13 +398,13 @@ fn read_bmff(bytes: &[u8]) -> Option<Vec<String>> {
                     };
                     entries.push(format!("duration\t{timescale}\t{duration}\t{millis}"));
                 }
-                if inner_size < 8 || inner + inner_size > limit {
+                if inner_size < 8 || inner.saturating_add(inner_size) > limit {
                     break;
                 }
                 inner += inner_size;
             }
         }
-        if size < 8 || cursor + size > bytes.len() {
+        if size < 8 || cursor.saturating_add(size) > bytes.len() {
             break;
         }
         cursor += size;
@@ -405,7 +421,16 @@ fn box_extent(bytes: &[u8], be: &Fields, at: usize) -> Option<(usize, usize)> {
     let first = be.u32(at)?.max(0) as usize;
     match first {
         0 => Some((bytes.len() - at, 8)),
-        1 => Some((Le(bytes).u64(at + 8)?.max(0) as usize, 16)),
+        // `test/fixtures/wide.mov` is the box this arm reads: 14496-12 puts the 64-bit length where
+        // the 32-bit one was, *after* the type, and big-endian like every other integer in the
+        // family. Two implementations here agree on that and neither is ours - the pinned Kaitai
+        // reader does `len64 - 16` off a `readU8be`, and mutagen unpacks `">Q"` from box + 8. On the
+        // fixture's bytes the little-endian reading mutagen computes is 3,458,764,513,820,540,928,
+        // which is not a box in a 196-byte file.
+        1 => Some((
+            usize::try_from(be.u64(at + 8)?.max(0)).unwrap_or(usize::MAX),
+            16,
+        )),
         other => Some((other, 8)),
     }
 }
