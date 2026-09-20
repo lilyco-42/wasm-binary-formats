@@ -53,7 +53,11 @@ fn reads_the_certificate_openssl_signed_and_listed() {
         lines[3],
         "name\tissuer\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid"
     );
-    assert_eq!(lines[4], lines[3], "the certificate is self-signed, and both names are in the file in full");
+    assert_eq!(
+        lines[4],
+        "name\tsubject\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid",
+        "self-signed, so the two names hold the same strings - compared as two rows, not as one"
+    );
     assert_eq!(
         lines[5],
         "key\talgorithm\trsaEncryption(1.2.840.113549.1.1.1)\tbits\t2048\tpoint\t270"
