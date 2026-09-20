@@ -31,6 +31,17 @@ fn report() -> Vec<String> {
     (0..count()).filter_map(at).collect()
 }
 
+/// Everything before the file's last terminator, which is the one edit that turns a finished program
+/// into an unfinished one without touching any other byte.
+fn without_terminator(bytes: &[u8]) -> Vec<u8> {
+    let width = b"%%EOF".len();
+    let last = (0..=(bytes.len() - width))
+        .rev()
+        .find(|at| bytes[*at..*at + width] == b"%%EOF"[..])
+        .expect("the fixture ends with a terminator");
+    bytes[..last].to_vec()
+}
+
 fn rows(bytes: &[u8]) -> Vec<String> {
     assert_eq!(parse(bytes), FORMAT_PS, "{} bytes", bytes.len());
     assert_eq!(kind(), FORMAT_PS, "kind() must agree with the return code");
@@ -117,11 +128,7 @@ fn a_preview_whose_lengths_do_not_add_up_is_not_believed() {
 
 #[test]
 fn a_missing_terminator_and_an_unparsable_box_are_counted_separately() {
-    let plain = fixture("plain.ps");
-    let cut = plain
-        .rsplit_once(b"%%EOF")
-        .map_or_else(Vec::new, |(head, _)| Vec::from(head));
-    let lines = rows(&cut);
+    let lines = rows(&without_terminator(&fixture("plain.ps")));
     assert_eq!(
         lines[0],
         "ps\t5714\tbroken\t1\tpreview\tnone\tstart\t0\tdsc\tPS-Adobe-3.0"
