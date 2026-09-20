@@ -2803,8 +2803,15 @@ fn read_npy(bytes: &[u8]) -> Option<Vec<String>> {
     let header_len = usize::try_from(length.max(0)).ok()?;
     let header_at: usize = if major == 1 { 10 } else { 12 };
     let header_end = header_at.checked_add(header_len)?;
-    let header = bytes.get(header_at..header_end)?;
-    if header_len < 3 || header.first() != Some(&b'{') || header.last() != Some(&b'}') {
+    // numpy pads the header with spaces and ends it with a newline, so the dictionary's own closing
+    // brace is not the last byte of the area - trim to it before checking anything else.
+    let raw = bytes.get(header_at..header_end)?;
+    let mut stop = raw.len();
+    while stop > 0 && matches!(raw[stop - 1], b' ' | b'\n' | b'\r' | b'\t') {
+        stop -= 1;
+    }
+    let header = raw.get(..stop)?;
+    if header_len < 3 || !header.starts_with(b"{") || !header.ends_with(b"}") {
         return None;
     }
     let descr = npy_value(header, b"'descr':")?;
