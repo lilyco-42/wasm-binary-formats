@@ -241,8 +241,12 @@ int disasm_xrefs(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
  * the instruction after the call. `objdump -d` splits at symbol names instead, which an object keeps in
  * its symbol table and a window of bytes does not have. */
 #define MAX_TARGETS 1024
-#define MAX_BLOCKS 512
-#define MAX_FUNCS 256
+/* Both caps are bounded by ROW_MAX_SEEN on purpose: a function row is emitted per start and a block row
+ * per block, so the two together plus the summary and a cut row have to fit the row buffer the caller
+ * reads. 128 + 300 + 2 leaves room; a window that wants more reports a cut instead of writing past the
+ * end. */
+#define MAX_BLOCKS 300
+#define MAX_FUNCS 128
 
 static uint64_t targets[MAX_TARGETS];
 static int target_count;
@@ -406,7 +410,7 @@ int disasm_funcs(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
         inner++;
       }
     }
-    if (funcs < MAX_FUNCS) {
+    if (funcs < MAX_FUNCS && listed < ROW_MAX_SEEN - 4) {
       snprintf(rows[listed], ROW_MAX,
                "func\t%d\tstart\t0x%llx\tend\t0x%llx\tinsns\t%d\tblocks\t%d\tcalls\t%d\tjumps\t%d\trets\t%d",
                funcs, (unsigned long long)from, (unsigned long long)to, inside, inner, calls, jumps,
@@ -424,6 +428,10 @@ int disasm_funcs(const uint8_t *code, uint32_t len, uint64_t pc, int arch) {
       if (starts[k] <= block_from[b]) {
         owner = k;
       }
+    }
+    if (listed >= ROW_MAX_SEEN - 2) {
+      blocks_cut = 1;
+      break;
     }
     snprintf(rows[listed], ROW_MAX,
              "block\t%d\tfunc\t%d\tstart\t0x%llx\tend\t0x%llx\tinsns\t%d\tterm\t%s",
