@@ -48,6 +48,11 @@ code{background:#f4f6f8;padding:1px 5px;border-radius:4px;font-size:13px}
     <div class="pane"><h2>预览 / 运行</h2><div id="viewer" style="color:var(--dim);font-size:13px">选中左侧一个条目。HTML 条目会在隔离 iframe 中运行。</div></div>
   </div>
   <div id="status"></div>
+  <div class="pane" style="margin-top:14px">
+    <h2>按需加载的分析模块</h2>
+    <p class="note" style="margin-top:0">结构解析随 <code>apk-lens.wasm</code> 一起到位；反汇编、反编译这类分析引擎不在里面 —— 它们只在点下面这一行时才下载，没点就不占流量、不占内存，页面里也不存在实例。</p>
+    <ul class="list" id="tools"></ul>
+  </div>
   <p class="note">隔离方式：<code>sandbox="allow-scripts"</code> 且不给 <code>allow-same-origin</code>，因此被解出来的页面拿到的是独立的不透明源，读不到本站的 cookie、localStorage 或同源文档。相对引用一律改写成 <code>data:</code> URL —— <code>blob:</code> 在 Chromium 里会被存储键规则挡住，隔离中的页面取不到宿主生成的 blob。勾选"允许运行脚本"关闭时，脚本一并禁用。Chrome 还会额外执行帧内 CSP，把 <code>fetch</code>/XHR、嵌套 frame 与 worker 禁掉；不支持 <code>csp</code> 属性的浏览器只剩 sandbox 这一层，脚本仍可自行发起网络请求。</p>
 </div>
 
@@ -64,6 +69,115 @@ const ex = await (async () => {
   const bytes = await (await fetch('apk-lens.wasm', { cache: 'no-cache' })).arrayBuffer();
   return (await WebAssembly.instantiate(bytes, {})).instance.exports;
 })();
+
+// An analyser is a different order of magnitude from the structural readers above, and most
+// visitors never want one. So they ship as their own modules, fetched only on the click below -
+// before that the page has neither the bytes nor an instance of them.
+const MODULES = [
+  {
+    id: 'analysis',
+    file: 'apk-lens-analysis.wasm',
+    title: '对象文件分析（节表 / 符号表）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样。',
+  },
+];
+
+// The last file the visitor picked, kept so a module loaded afterwards can be pointed at it instead
+// of making them choose again.
+let picked = null;
+const toolState = new Map();
+const toolList = document.getElementById('tools');
+
+function moduleText(mod, fn, ...args) {
+  let cap = 4096;
+  for (;;) {
+    const ptr = mod.alloc(cap);
+    const written = mod[fn](...args, ptr, cap);
+    const keep = Math.max(Math.min(written, cap), 0);
+    const text = new TextDecoder().decode(new Uint8Array(mod.memory.buffer.slice(ptr, ptr + keep)));
+    mod.dealloc(ptr, cap);
+    if (written < 0 || written <= cap || cap >= 1 << 22) return text;
+    cap *= 8;
+  }
+}
+
+function analyseHere(mod) {
+  if (!picked || typeof mod.analyse_run !== 'function') return;
+  const bytes = picked.bytes;
+  const ptr = mod.alloc(bytes.length);
+  new Uint8Array(mod.memory.buffer, ptr, bytes.length).set(bytes);
+  const rc = mod.analyse_run(ptr, bytes.length);
+  mod.dealloc(ptr, bytes.length);
+  return { rc, rows: rc === 0
+    ? Array.from({ length: mod.analyse_count() }, (_, i) => moduleText(mod, 'analyse_at', i))
+    : [] };
+}
+
+function toolLine(spec, state) {
+  if (!state) return '未加载 —— 这个模块一个字节都还没取过。';
+  if (state.error) return `取不到：${state.error}`;
+  const names = state.exports.slice(0, 4).join(', ');
+  return `已加载 ${state.bytes.toLocaleString('en-US')} 字节 · ${state.exports.length} 个导出 · `
+    + `${Math.round(state.ms)} ms 内实例化 · 自检 ${state.selftest}`
+    + `${names ? ` · ${names}…` : ''}`;
+}
+
+async function loadModule(spec, button, line, out) {
+  button.disabled = true;
+  button.textContent = '取…';
+  const state = {};
+  toolState.set(spec.id, state);
+  try {
+    const response = await fetch(spec.file, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const started = performance.now();
+    const { instance } = await WebAssembly.instantiate(bytes, {});
+    state.bytes = bytes.length;
+    state.ms = performance.now() - started;
+    state.exports = Object.keys(instance.exports).sort();
+    state.selftest = typeof instance.exports.self_test === 'function'
+      ? instance.exports.self_test()
+      : '无';
+    const seen = analyseHere(instance.exports);
+    if (seen) {
+      state.report = seen.rc === 0
+        ? `${picked.name}：${seen.rows.length} 行\n${seen.rows.join('\n')}`
+        : `${picked.name}：这个文件不是对象文件（返回 ${seen.rc}）`;
+    } else {
+      state.report = '还没有选中文件。先选一个 .exe / .so / 可执行文件，再加载本模块。';
+    }
+  } catch (error) {
+    // A module this build does not ship is a normal state of the page, not a failure to report as a
+    // crash: name the missing file and let the button stand.
+    state.error = `${spec.file} ${error.message || error}`;
+    button.disabled = false;
+    line.textContent = `${spec.title} —— ${toolLine(spec, state)} 再试一次？`;
+    return;
+  }
+  button.textContent = '已加载';
+  line.textContent = `${spec.title} —— ${toolLine(spec, state)}`;
+  out.textContent = state.report;
+}
+
+function renderTools() {
+  toolList.textContent = '';
+  for (const spec of MODULES) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.textContent = '加载';
+    const line = document.createElement('span');
+    const out = document.createElement('pre');
+    out.className = 'rows';
+    out.style.cssText = 'margin:6px 0 0;white-space:pre-wrap;font-size:12px;color:var(--dim)';
+    line.textContent = `${spec.title} —— ${spec.detail} ${toolLine(spec, toolState.get(spec.id))}`;
+    button.addEventListener('click', () => loadModule(spec, button, line, out));
+    item.append(button, ' ', line, out);
+    toolList.append(item);
+  }
+}
+
+renderTools();
 
 function readAt(fn, ...args) {
   // copy_str returns the full length, so a value larger than the buffer means truncation.
@@ -455,6 +569,7 @@ async function openFile(file) {
   render();
   releaseBlobs();
   const bytes = new Uint8Array(await file.arrayBuffer());
+  picked = { name: file.name, bytes };
 
   // An .exe arriving on its own takes the PE path instead of the archive path, and a classes.dex
   // pulled out of an AAB takes the DEX path.

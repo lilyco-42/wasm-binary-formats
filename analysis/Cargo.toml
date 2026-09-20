@@ -1,0 +1,23 @@
+[package]
+name = "apk-lens-analysis"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# cdylib for the wasm artifact the browser loads on request; rlib so the host tests link it.
+name = "apk_lens_analysis"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Apache-2.0 or MIT, at the reader's option. This is the unified section/symbol layer that
+# objdump-style tools sit on, so the page gets the same view of a binary's layout that a native
+# analyser has, without shipping a native analyser. `read` without the default `compression` keeps
+# flate2 and ruzstd out of a module that is only downloaded when a visitor asks for it.
+# Pinned: the row text below is the API's Debug output, and a minor version is free to reword it.
+object = { version = "=0.32.2", default-features = false, features = ["read", "std"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

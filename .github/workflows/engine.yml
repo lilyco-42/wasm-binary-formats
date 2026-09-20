@@ -31,7 +31,17 @@ jobs:
       - name: Build wasm
         run: cargo build --release --target wasm32-unknown-unknown
 
+      # The optional analysis module is a separate crate and a separate artifact: nothing in the
+      # structural readers depends on it, and the page only downloads it when a visitor asks.
+      - name: Build analysis module
+        working-directory: analysis
+        run: cargo build --release --target wasm32-unknown-unknown
+
       - name: Host tests
+        run: cargo test
+
+      - name: Analysis host tests
+        working-directory: analysis
         run: cargo test
 
       # cargo needs cwd = engine/ so it picks up engine/.cargo/config.toml; the JS test
@@ -40,10 +50,19 @@ jobs:
         working-directory: .
         run: node test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 
+      - name: Module-level tests
+        working-directory: .
+        run: |
+          node test/module.test.mjs \
+            analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm \
+            engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+
       - uses: actions/upload-artifact@v4
         with:
           name: apk-lens-wasm
-          path: engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+          path: |
+            engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+            analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm
 
   pages:
     needs: engine
@@ -65,6 +84,7 @@ jobs:
         run: |
           mkdir -p site
           cp artifact/apk_lens.wasm site/apk-lens.wasm
+          cp artifact/analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm site/apk-lens-analysis.wasm
           cp demo/index.html site/index.html
       - uses: actions/configure-pages@v5
         with:
