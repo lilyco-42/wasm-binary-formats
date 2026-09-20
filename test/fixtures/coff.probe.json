@@ -107,11 +107,20 @@
     },
     {
      "aux": 0,
+     "index": 14,
+     "name": "@feat.00",
+     "scl": 3,
+     "sect": -1,
+     "type": 0,
+     "value": 0
+    },
+    {
+     "aux": 0,
      "index": 15,
      "name": "answer",
      "scl": 2,
      "sect": 1,
-     "type": 20,
+     "type": 32,
      "value": 0
     },
     {
@@ -120,11 +129,46 @@
      "name": "helper",
      "scl": 2,
      "sect": 1,
-     "type": 20,
+     "type": 32,
      "value": 16
+    },
+    {
+     "aux": 1,
+     "index": 17,
+     "name": "answer.c",
+     "scl": 103,
+     "sect": -2,
+     "type": 0,
+     "value": 0
     }
    ]
   },
+  "objdump_relocs": [
+   [
+    ".text",
+    21,
+    "IMAGE_REL_AMD64_REL32",
+    "answer"
+   ],
+   [
+    ".pdata",
+    0,
+    "IMAGE_REL_AMD64_ADDR32NB",
+    ".text"
+   ],
+   [
+    ".pdata",
+    4,
+    "IMAGE_REL_AMD64_ADDR32NB",
+    ".text"
+   ],
+   [
+    ".pdata",
+    8,
+    "IMAGE_REL_AMD64_ADDR32NB",
+    ".xdata"
+   ]
+  ],
   "rows": [
    "coff\t904\tbroken\t0\tmachine\t8664(x86-64)\tsections\t7\topts\t0",
    "layout\tstamp\t0\tsyms\t19\tat\t544\tstrings\t18@886\tchars\t0000",
@@ -146,6 +190,10 @@
    "symbol\t15\tanswer\tvalue\t0\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
    "symbol\t16\thelper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
    "symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-",
+   "reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(answer)",
+   "reloc\t5\t0\toffset\t0\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+   "reloc\t5\t1\toffset\t4\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+   "reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)",
    "walked\tend"
   ]
  },
@@ -229,11 +277,20 @@
     },
     {
      "aux": 0,
+     "index": 10,
+     "name": "@feat.00",
+     "scl": 3,
+     "sect": -1,
+     "type": 0,
+     "value": 1
+    },
+    {
+     "aux": 0,
      "index": 11,
      "name": "_answer",
      "scl": 2,
      "sect": 1,
-     "type": 20,
+     "type": 32,
      "value": 0
     },
     {
@@ -242,11 +299,28 @@
      "name": "_helper",
      "scl": 2,
      "sect": 1,
-     "type": 20,
+     "type": 32,
      "value": 16
+    },
+    {
+     "aux": 1,
+     "index": 13,
+     "name": "answer.c",
+     "scl": 103,
+     "sect": -2,
+     "type": 0,
+     "value": 0
     }
    ]
   },
+  "objdump_relocs": [
+   [
+    ".text",
+    20,
+    "DISP32",
+    "_answer"
+   ]
+  ],
   "rows": [
    "coff\t697\tbroken\t0\tmachine\t014c(i386)\tsections\t5\topts\t0",
    "layout\tstamp\t0\tsyms\t15\tat\t409\tstrings\t18@679\tchars\t0000",
@@ -264,6 +338,7 @@
    "symbol\t11\t_answer\tvalue\t0\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
    "symbol\t12\t_helper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
    "symbol\t13\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-",
+   "reloc\t0\t0\toffset\t14\ttype\t14(DISP32)\tsym\t11(_answer)",
    "walked\tend"
   ]
  }

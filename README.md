@@ -729,6 +729,19 @@ does not re-derive them:
   The Characteristics word is the deliberate non-claim: `objdump -f` lists HAS_RELOC, HAS_LINENO,
   HAS_DEBUG, HAS_SYMS and HAS_LOCALS for these objects while clang writes zero into the header, so those
   words are bfd's conclusion from the contents and the reader prints the raw word the file holds.
+  Relocation records came next in the same reader - **depth, not a label, so the counts above do not
+  move** - because they are the only place an object uses a symbol index as an index: ten bytes of
+  offset, record number and type, and the number counts auxiliary entries, which is why the `answer`
+  call site is `sym 15(answer)` rather than the sixteenth entry of the table. The type names are the
+  part nobody may recall: `objdump -r` prints 4 as `IMAGE_REL_AMD64_REL32`, 3 as `..._ADDR32NB` and
+  0x14 as bare `DISP32` for the i386 object, and the fixture script compares its walk with that listing
+  record by record - section grouping, offset, type and resolved symbol - and writes no probe unless all
+  four agree. Two facts fell out of that comparison.
+  `objdump -t` names a storage-class-103 symbol by the path in its auxiliary record (`answer.c`) while
+  the entry itself carries `.file`; the row prints the entry and the script asserts the aux bytes spell
+  what bfd prints, rather than waiving the mismatch. And the earlier check had been reading `ty` as
+  decimal digits while bfd prints them as hex, which agrees by accident for every type whose digits are
+  all below 10 - a witness that is subtly wrong looks exactly like a witness that passed.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

@@ -3,16 +3,19 @@
 //! `test/fixtures/answer.obj` and `test/fixtures/i686.obj` are written by LLVM 22.1.8 - `clang -target
 //! x86_64-w64-windows-gnu -c` and the i686 triple - by `scripts/make-coff-fixtures.py`, which then runs
 //! GNU objdump over the same bytes and refuses to write the probe unless its own walk agrees with
-//! `objdump -h` on every section name, size and file offset, and with `objdump -t` on every symbol's
-//! name, value, section, type and storage class. That is the only reason the field offsets below are
+//! `objdump -h` on every section name, size and file offset, with `objdump -t` on every symbol's name,
+//! value, section, type and storage class, and with `objdump -r` on every relocation's section, offset,
+//! type and resolved symbol. That is the only reason the field offsets and the type names below are
 //! trustworthy: they came out of a second implementation's output rather than anyone's memory of a
 //! specification.
 //!
-//! Two properties of the format are what the reader has to get right. A name longer than eight bytes
+//! Three properties of the format are what the reader has to get right. A name longer than eight bytes
 //! is not in the record at all - a section writes `/4` and a symbol leaves four zero bytes plus an
 //! offset, and both mean the string table that follows the last symbol record. And the header's symbol
 //! count counts *records*, auxiliary entries included, which is why the indices step 0, 2, 4 and why a
-//! walk that runs out of file before those records is the only thing a cut row can mean here.
+//! walk that runs out of file before those records is the only thing a cut row can mean here. And the
+//! same record index reappears inside a relocation, where it is the whole point: 15 there is `answer`,
+//! sixteenth record rather than sixteenth entry.
 
 use apk_lens::containers::{at, count, kind, name, parse, FORMAT_COFF, FORMAT_ICC, FORMAT_STL};
 use std::fs;
@@ -66,9 +69,77 @@ fn reads_the_x86_64_object_clang_wrote() {
             "symbol\t15\tanswer\tvalue\t0\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
             "symbol\t16\thelper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
             "symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-",
+            "reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(answer)",
+            "reloc\t5\t0\toffset\t0\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+            "reloc\t5\t1\toffset\t4\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+            "reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)",
             "walked\tend",
         ]
     );
+}
+
+#[test]
+fn a_relocation_names_the_symbol_by_record_and_the_type_as_objdump_spells_it() {
+    // The index in a relocation record counts auxiliary entries, so 15 is `answer` - the sixteenth
+    // record, not the sixteenth entry - and the type values are only named here because `objdump -r`
+    // named them for these bytes: 4 and 3 for the AMD64 forms, which bfd spells
+    // `IMAGE_REL_AMD64_REL32`/`_ADDR32NB`, and 0x14 for the i386 `DISP32` it prints bare. The fixture
+    // script compares its own walk with that listing record by record and refuses to write the probe if
+    // a section grouping, an offset, a type or a resolved symbol disagrees.
+    let lines = rows(&fixture("answer.obj"));
+    assert_eq!(
+        lines[lines.len() - 5..lines.len() - 1].to_vec(),
+        vec![
+            "reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(answer)",
+            "reloc\t5\t0\toffset\t0\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+            "reloc\t5\t1\toffset\t4\ttype\t3(ADDR32NB)\tsym\t0(.text)",
+            "reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)",
+        ]
+    );
+    let i686 = rows(&fixture("i686.obj"));
+    assert_eq!(
+        i686[i686.len() - 2],
+        "reloc\t0\t0\toffset\t14\ttype\t14(DISP32)\tsym\t11(_answer)"
+    );
+    // The .pdata records point at the unwind info for the two functions, which is what a linker uses
+    // to build the table - the same rows, read as data rather than as instructions.
+    assert_eq!(i686[i686.len() - 1], "walked\tend");
+}
+
+#[test]
+fn a_relocation_table_that_does_not_fit_is_counted_and_its_records_stay_unread() {
+    // Section zero claims 600 records at 331: nine bytes short of the file, so none of them are read,
+    // but they are still what the header claims - which is the difference between this row and `broken`.
+    let mut bytes = fixture("answer.obj");
+    patch(&mut bytes, 52, 600);
+    let lines = rows(&bytes);
+    assert_eq!(
+        lines[0],
+        "coff\t904\tbroken\t1\tmachine\t8664(x86-64)\tsections\t7\topts\t0"
+    );
+    assert!(
+        lines[2].contains("reloc\t331x600"),
+        "the claim is printed as stated: {}",
+        lines[2]
+    );
+    assert_eq!(
+        lines[lines.len() - 3],
+        "reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)",
+        "the table that does fit is still read"
+    );
+    assert_eq!(lines[lines.len() - 2], "cut\trelocs\t603");
+    assert_eq!(lines[lines.len() - 1], "stopped\tbroken\t1");
+
+    // The other way to fail: a pointer outside the file with a count that would fit anywhere.
+    let mut stray = fixture("answer.obj");
+    patch(&mut stray, 44, 5000);
+    let lines = rows(&stray);
+    assert_eq!(
+        lines[0],
+        "coff\t904\tbroken\t1\tmachine\t8664(x86-64)\tsections\t7\topts\t0"
+    );
+    assert_eq!(lines[lines.len() - 2], "cut\trelocs\t4");
+    assert_eq!(lines[lines.len() - 1], "stopped\tbroken\t1");
 }
 
 #[test]
@@ -108,6 +179,23 @@ fn the_i686_object_reads_the_same_way_under_underscored_names() {
         !lines.iter().any(|line| line.contains(".pdata") || line.contains(".xdata")),
         "{lines:?}"
     );
+}
+
+#[test]
+fn a_file_symbol_keeps_the_name_its_record_holds_and_not_the_path_next_door() {
+    let lines = rows(&fixture("answer.obj"));
+    assert_eq!(
+        lines
+            .iter()
+            .find(|line| line.starts_with("symbol\t17\t"))
+            .unwrap(),
+        "symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-"
+    );
+    // objdump -t prints `answer.c` for this very record: bfd names a storage-class-103 (FILE) symbol by
+    // the string in the auxiliary record that follows it, not by the `.file` the entry itself carries.
+    // The row prints the entry, and the fixture script asserts the rule against the aux bytes instead of
+    // waiving the disagreement - so if a future object spells it otherwise, the probe stops being
+    // written rather than the reader quietly changing its mind.
 }
 
 #[test]

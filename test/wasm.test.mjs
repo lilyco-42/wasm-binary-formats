@@ -606,6 +606,12 @@ test('a COFF object gives up its sections, its symbols and the names in the stri
   assert.ok(rows.includes('section\t6\t.llvm_addrsig\tvsize\t0\tvaddr\t0\traw\t1@543\treloc\t0x0\tlines\t0x0\tchars\t00100800'), rows.join(' | '));
   assert.ok(rows.includes('symbol\t12\t.llvm_addrsig\tvalue\t0\tsect\t7\ttype\t0000\tscl\t3\taux\t1\tbase\t4'), rows.join(' | '));
   assert.ok(rows.includes('symbol\t17\t.file\tvalue\t0\tsect\t-2\ttype\t0000\tscl\t103\taux\t1\tbase\t-'), 'the negative section numbers are the format saying "not in a section"');
+  // The relocation rows are the ones that use a symbol index as an index, so they are worth pinning on
+  // their own: 15 has to come back as `answer`, sixteenth record rather than sixteenth entry, and the
+  // type names are only here because objdump -r spells them for these bytes.
+  assert.ok(rows.includes('reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(answer)'), rows.join(' | '));
+  assert.ok(rows.includes('reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)'), rows.join(' | '));
+  assert.equal(rows[rows.length - 5], 'reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(answer)');
   assert.equal(rows[rows.length - 1], 'walked\tend');
 
   const i686 = assertReadable('container', 'i686.obj', 47).rows;
@@ -623,6 +629,18 @@ test('a COFF object gives up its sections, its symbols and the names in the stri
   assert.equal(wild.rows[0], 'coff\t904\tbroken\t1\tmachine\t8664(x86-64)\tsections\t7\topts\t0', wild.rows.join(' | '));
   assert.match(wild.rows[2], /^section\t0\t\.text\t.*\traw\t4294967295@300\t/);
   assert.equal(wild.rows[wild.rows.length - 1], 'stopped\tbroken\t1');
+
+  // And the same shape on a claimed table that does not fit: 600 records at 331 would run nine bytes
+  // past the end of the file, so none are read, the three that do fit still are, and the cut row says
+  // what the sections claimed in total.
+  const tooFar = new Uint8Array(readFileSync('test/fixtures/answer.obj'));
+  new DataView(tooFar.buffer).setUint16(52, 600, true);
+  const cut = driveBytes('container', tooFar);
+  assert.equal(cut.code, 47);
+  assert.equal(cut.rows[0], 'coff\t904\tbroken\t1\tmachine\t8664(x86-64)\tsections\t7\topts\t0', cut.rows.join(' | '));
+  assert.equal(cut.rows[cut.rows.length - 3], 'reloc\t5\t2\toffset\t8\ttype\t3(ADDR32NB)\tsym\t6(.xdata)');
+  assert.equal(cut.rows[cut.rows.length - 2], 'cut\trelocs\t603');
+  assert.equal(cut.rows[cut.rows.length - 1], 'stopped\tbroken\t1');
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {

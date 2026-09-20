@@ -5927,13 +5927,27 @@ fn read_ps(bytes: &[u8]) -> Option<Vec<String>> {
 /// rather than the shifted-together pair a 32-bit read of the same field would give. Every bound is
 /// then computed in 64-bit integers even though each field is at most 32 bits, so the number of broken
 /// claims cannot depend on whether the reader runs in wasm32 or on a desktop host.
+///
+/// Relocation records are read too, because they are the only place an object uses a symbol index as an
+/// index: ten bytes of offset, record number and type, where the number counts auxiliary entries and so
+/// points at the sixteenth *record* rather than the sixteenth entry. A third thing is not claimed there:
+/// `objdump -t` names a storage-class-103 (FILE) symbol by the path held in its auxiliary record - it
+/// prints `answer.c` - while the entry itself says `.file`, and the row prints the entry.
 pub const FORMAT_COFF: i32 = 47;
 
 const COFF_SECTIONS: usize = 96;
 const COFF_LISTED_SECTIONS: usize = 24;
 const COFF_LISTED_SYMBOLS: usize = 24;
+const COFF_LISTED_RELOCS: usize = 24;
 /// Only the machine values `objdump -f` was seen to name on this host. Anything else stays a number.
 const COFF_MACHINES: [(u16, &str); 2] = [(0x8664, "x86-64"), (0x014C, "i386")];
+/// Relocation type names, one table per machine, holding only what `objdump -r` was seen to print for
+/// these bytes: the value comes out of the record and the name out of that listing, and the fixture
+/// script refuses to write its probe unless the two agree. bfd spells the AMD64 types as their whole
+/// macro (`IMAGE_REL_AMD64_REL32`) and the i386 one bare (`DISP32`), so what is kept here is the tail
+/// both print.
+const COFF_RELOC_AMD64: [(u16, &str); 2] = [(0x0003, "ADDR32NB"), (0x0004, "REL32")];
+const COFF_RELOC_I386: [(u16, &str); 1] = [(0x0014, "DISP32")];
 
 fn coff_u32(bytes: &[u8], at: usize) -> Option<u32> {
     let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
@@ -5990,6 +6004,45 @@ fn coff_name(bytes: &[u8], at: usize, strings: usize) -> (String, Option<u32>) {
     (text, None)
 }
 
+/// The name of a relocation type as objdump spells it, for the machine that owns the object. A value
+/// outside the table stays unnamed rather than borrowed from the other machine's list.
+fn coff_reloc_kind(machine: u16, value: u16) -> &'static str {
+    let named: &[(u16, &str)] = match machine {
+        0x8664 => &COFF_RELOC_AMD64,
+        0x014C => &COFF_RELOC_I386,
+        _ => &[],
+    };
+    named
+        .iter()
+        .find(|(got, _)| *got == value)
+        .map_or("?", |(_, name)| *name)
+}
+
+/// The name at a symbol *record* index, with each entry's auxiliary records stepped over. That is what
+/// makes a relocation's index 15 mean `answer` rather than the sixteenth entry of the table, and it is
+/// the only place the index is used as an index - which is also why it is resolved by walking rather
+/// than by keeping a table of names for an object that may state millions of records.
+fn coff_symbol(bytes: &[u8], symbols_at: u32, symbols: u32, want: u32, strings: usize) -> String {
+    let mut at = u64::from(symbols_at);
+    let mut records = 0u64;
+    let target = u64::from(want);
+    while records < u64::from(symbols) {
+        let Some(start) = usize::try_from(at)
+            .ok()
+            .filter(|start| start.saturating_add(18) <= bytes.len())
+        else {
+            break;
+        };
+        if records == target {
+            return coff_name(bytes, start, strings).0;
+        }
+        let aux = u64::from(bytes[start + 17]);
+        records += 1 + aux;
+        at += 18 * (1 + aux);
+    }
+    "?".to_owned()
+}
+
 fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
     if bytes.len() < 20 || bytes.starts_with(b"MZ") {
         return None;
@@ -6028,6 +6081,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
         usize::from(symbols != 0 && strings_start + u64::from(strings_size) != len);
 
     let mut section_rows = Vec::new();
+    let mut tables: Vec<(usize, u32, u16)> = Vec::new();
     for index in 0..sections {
         let at = section_table + index * 40;
         let (name, _) = coff_name(bytes, at, strings_at);
@@ -6035,17 +6089,26 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
         let address = coff_u32(bytes, at + 12)?;
         let raw_size = coff_u32(bytes, at + 16)?;
         let raw_at = coff_u32(bytes, at + 20)?;
+        let reloc_at = coff_u32(bytes, at + 24)?;
+        let relocs = coff_u16(bytes, at + 32)?;
+        let lines_at = coff_u32(bytes, at + 28)?;
+        let lines = coff_u16(bytes, at + 34)?;
+        let flags = coff_u32(bytes, at + 36)?;
         if raw_size != 0 && u64::from(raw_at) + u64::from(raw_size) > len {
             broken += 1;
         }
+        if relocs != 0 {
+            // Ten bytes a record, claimed by the section rather than by the file, so a table that does
+            // not fit is a failed claim and its records stay unread - but they are still counted, which
+            // is what makes the cut row below mean what it says.
+            if u64::from(reloc_at) + 10u64 * u64::from(relocs) > len {
+                broken += 1;
+            }
+            tables.push((index, reloc_at, relocs));
+        }
         if index < COFF_LISTED_SECTIONS {
             section_rows.push(format!(
-                "section\t{index}\t{name}\tvsize\t{virtual_size}\tvaddr\t{address}\traw\t{raw_size}@{raw_at}\treloc\t{}x{}\tlines\t{}x{}\tchars\t{:08x}",
-                coff_u32(bytes, at + 24)?,
-                coff_u16(bytes, at + 32)?,
-                coff_u32(bytes, at + 28)?,
-                coff_u16(bytes, at + 34)?,
-                coff_u32(bytes, at + 36)?
+                "section\t{index}\t{name}\tvsize\t{virtual_size}\tvaddr\t{address}\traw\t{raw_size}@{raw_at}\treloc\t{reloc_at}x{relocs}\tlines\t{lines_at}x{lines}\tchars\t{flags:08x}"
             ));
         }
     }
@@ -6086,6 +6149,38 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
         symbol_rows.push(format!("cut\tsyms\t{symbols}"));
     }
 
+    // The records themselves: VirtualAddress, SymbolTableIndex and Type, ten bytes each, which is the
+    // only place in an object that uses a symbol index as an index and a type as something to name. It
+    // is also what a linker consumes, so it is the second half of what makes this file an analysis
+    // target rather than a blob.
+    let mut reloc_rows = Vec::new();
+    let mut listed = 0usize;
+    let mut total = 0u64;
+    for (index, pointer, number) in tables {
+        total += u64::from(number);
+        if u64::from(pointer) + 10u64 * u64::from(number) > len {
+            continue;
+        }
+        for record in 0..u64::from(number) {
+            if listed >= COFF_LISTED_RELOCS {
+                break;
+            }
+            let at = usize::try_from(u64::from(pointer) + 10 * record).unwrap_or(usize::MAX);
+            let offset = coff_u32(bytes, at).unwrap_or(0);
+            let symlink = coff_u32(bytes, at + 4).unwrap_or(0);
+            let kind = coff_u16(bytes, at + 8).unwrap_or(0);
+            reloc_rows.push(format!(
+                "reloc\t{index}\t{record}\toffset\t{offset:x}\ttype\t{kind:x}({})\tsym\t{symlink}({})",
+                coff_reloc_kind(machine, kind),
+                coff_symbol(bytes, symbol_ptr, symbols, symlink, strings_at)
+            ));
+            listed += 1;
+        }
+    }
+    if total > listed as u64 {
+        reloc_rows.push(format!("cut\trelocs\t{total}"));
+    }
+
     let mut rows = vec![
         format!(
             "coff\t{}\tbroken\t{broken}\tmachine\t{machine:04x}({})\tsections\t{sections}\topts\t{optional}",
@@ -6101,6 +6196,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
     ];
     rows.extend(section_rows);
     rows.extend(symbol_rows);
+    rows.extend(reloc_rows);
     rows.push(if broken == 0 {
         "walked\tend".to_owned()
     } else {
