@@ -329,6 +329,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['page.emf', 45], ['gdi.emf', 45],
     ['preview.eps', 46], ['plain.ps', 46],
     ['answer.obj', 47], ['i686.obj', 47],
+    ['rsa.crt', 48], ['ec.crt', 48],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -643,6 +644,38 @@ test('a COFF object gives up its sections, its symbols and the names in the stri
   assert.equal(cut.rows[cut.rows.length - 1], 'stopped\tbroken\t1');
 });
 
+test('an X.509 certificate keeps its tree and its names through the wasm ABI', () => {
+  // OpenSSL 3.5.7 signed both files and read them back: `make-der-fixtures.py` writes no probe unless
+  // `asn1parse -i` lists the same objects in the same order and `x509 -text` states the same version,
+  // serial, algorithm names, validity strings and - for the RSA one - the same key size.
+  const rsa = assertReadable('container', 'rsa.crt', 48);
+  assert.equal(rsa.name, 'der');
+  const rows = rsa.rows;
+  assert.equal(rows[0], 'der\t856\tbroken\t0\ttlvs\t58\tdepth\t5\tend\tyes', rows.join(' | '));
+  assert.equal(rows[1], 'cert\tversion\t3\tserial\t2a\tsig\tsha256WithRSAEncryption(1.2.840.113549.1.1.11)\tpub\trsaEncryption(1.2.840.113549.1.1.1)');
+  assert.ok(rows.includes('name\tissuer\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid'), rows.join(' | '));
+  assert.ok(rows.includes('key\talgorithm\trsaEncryption(1.2.840.113549.1.1.1)\tbits\t2048\tpoint\t270'), rows.join(' | '));
+  assert.ok(rows.includes('tlv\t0\td0\t0\thl\t4\tl\t852\t30(cons|SEQUENCE)'), rows.join(' | '));
+  assert.ok(rows.includes('tlv\t2\td2\t8\thl\t2\tl\t3\ta0(cons|cont [ 0 ])'), 'the context tag around the version');
+  assert.equal(rows[rows.length - 2], 'cut\ttlvs\t58');
+  assert.equal(rows[rows.length - 1], 'walked\tend');
+  assert.equal(rows.length, 48);
+
+  // The EC certificate is the second shape: same tree walk, and no key size, because "256 bit" is a
+  // fact about the named curve rather than one the bytes state.
+  const ec = assertReadable('container', 'ec.crt', 48).rows;
+  assert.equal(ec[0], 'der\t459\tbroken\t0\ttlvs\t56\tdepth\t5\tend\tyes');
+  assert.equal(ec[5], 'key\talgorithm\tid-ecPublicKey(1.2.840.10045.2.1)\tbits\t-\tpoint\t65');
+
+  // One byte past the end is a claim about framing, not a reason to refuse: wasm32 and the host build
+  // have to say the same thing, so this goes through the ABI rather than only through the Rust test.
+  const bytes = new Uint8Array(readFileSync('test/fixtures/rsa.crt'));
+  const wild = driveBytes('container', new Uint8Array([...bytes, 0]));
+  assert.equal(wild.code, 48);
+  assert.equal(wild.rows[0], 'der\t857\tbroken\t2\ttlvs\t58\tdepth\t5\tend\tno', wild.rows.join(' | '));
+  assert.equal(wild.rows[wild.rows.length - 1], 'stopped\tbroken\t2');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -690,6 +723,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
+    ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

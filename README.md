@@ -263,26 +263,28 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 47 | 21.5% |
+| own Rust reader, named header fields decoded | 48 | 21.9% |
 | own Rust reader, container framing only | 26 | 11.9% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **105** | 47.9% |
-| **covered, any level** | **114** | 52.1% |
+| **no parser at all - real gap** | **104** | 47.5% |
+| **covered, any level** | **115** | 52.5% |
 
 Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 7,
-code 5, executable 4, inode 3.
+code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
 because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
 name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, the bare `ebml` label, and `otf` -
-`otf` because no CFF charstring writer runs here. `woff2` and `coff` were on that list as the row
-before, the first for a reason that turned out to be about the interpreter on PATH rather than about
-the machine and the second because no Kaitai spec exists for it: see below.
+`otf` because no CFF charstring writer runs here. `woff2`, `coff` and `crt` were on that list as the row
+before: the first for a reason that turned out to be about the interpreter on PATH rather than about
+the machine, the second because no Kaitai spec covers it, and the third because the earlier sweep for
+"cheap specs to generate" keyed on label names and so never matched `crt` to the `asn1_der` spec that
+does exist upstream - see below.
 
-So the honest answer to the objective is **no, not yet**: 114 of 219 binary labels have a parser
-that runs here (47 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 105 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 115 of 219 binary labels have a parser
+that runs here (48 field-level and 26 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 104 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -296,7 +298,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 114 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 115 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text and cross-references for x86-64, AArch64 and Thumb bytes |
 
@@ -375,6 +377,7 @@ temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-
 temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
 temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
 temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
+temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -483,8 +486,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **114 covered** (47 field-level and 26
-container-level from this repo's own readers, 41 generated and mostly load-gated), **105 with no
+Coverage is scored against magika's 219 binary labels: **115 covered** (48 field-level and 26
+container-level from this repo's own readers, 41 generated and mostly load-gated), **104 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -745,6 +748,25 @@ does not re-derive them:
   came from a hand-built case rather than from a witness: patch the symbol count to zero and there is no
   string table to resolve with, so the section keeps the literal `/4` its record holds - the alternative
   is reading four bytes past the header and calling the result a name.
+* X.509 in DER (+1 field-level label, 115 covered, 104 gaps) is the second format the coverage sweep
+  mis-filed as unreachable: it looked like a gap needing a self-written reader with no producer, while
+  OpenSSL 3.5.7 has been on PATH the whole time and both writes **and** lists these files. The producer
+  is `genpkey` + `req -new -x509` with the serial and both validity dates fixed - run through
+  `subprocess`, because Git Bash rewrites `-subj /C=CN/...` into a Windows path before openssl sees it -
+  and the witnesses are `asn1parse -inform DER -i`, whose list of offset, depth, header length, content
+  length and type name the walk has to match **item for item in order**, and `x509 -text`, which states
+  the version, serial, both algorithm names, the two times, the issuer and subject strings and the RSA
+  key size. So the tree rows are somebody else's listing, and so are the names: `sha256WithRSAEncryption`
+  for `1.2.840.113549.1.1.11` is what asn1parse printed beside those bytes, and the script checks its
+  table in both directions, so a name that is wrong fails as loudly as one that is missing.
+  A DER file makes exactly one claim about its own size - the top SEQUENCE's length - and the reader
+  states whether it accounts for the file (`end yes` / `end no`) instead of deciding that a mismatch
+  means there is no file; a certificate with one byte past the end is still read and reports
+  `broken 2`, while one truncated by a byte cannot be walked at all and is not claimed. Two absences are
+  deliberate: an EC key's `256 bit` comes from the *name* of its curve, so the row prints `bits -`
+  rather than a size borrowed from a curve table, and the validity strings are printed as DER holds
+  them (`260101000000Z`) because parsing a `UTCTime` needs a two-digit-year rule that nobody here has
+  vouched for. Two fixtures, RSA and EC, because one sample of a shape is one shape.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

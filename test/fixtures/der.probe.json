@@ -1,0 +1,1189 @@
+{
+ "ec.crt": {
+  "asn1": [
+   {
+    "depth": 0,
+    "hl": 4,
+    "kind": "cons",
+    "length": 455,
+    "name": "SEQUENCE",
+    "offset": 0,
+    "value": ""
+   },
+   {
+    "depth": 1,
+    "hl": 4,
+    "kind": "cons",
+    "length": 366,
+    "name": "SEQUENCE",
+    "offset": 4,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 3,
+    "name": "cont [ 0 ]",
+    "offset": 8,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "INTEGER",
+    "offset": 10,
+    "value": "02"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "INTEGER",
+    "offset": 13,
+    "value": "2A"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 10,
+    "name": "SEQUENCE",
+    "offset": 16,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 8,
+    "name": "OBJECT",
+    "offset": 18,
+    "value": "ecdsa-with-SHA256"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 67,
+    "name": "SEQUENCE",
+    "offset": 28,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 11,
+    "name": "SET",
+    "offset": 30,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 9,
+    "name": "SEQUENCE",
+    "offset": 32,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 34,
+    "value": "countryName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 2,
+    "name": "PRINTABLESTRING",
+    "offset": 39,
+    "value": "CN"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 21,
+    "name": "SET",
+    "offset": 43,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 19,
+    "name": "SEQUENCE",
+    "offset": 45,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 47,
+    "value": "organizationName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 12,
+    "name": "UTF8STRING",
+    "offset": 52,
+    "value": "apk-lens lab"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SET",
+    "offset": 66,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 27,
+    "name": "SEQUENCE",
+    "offset": 68,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 70,
+    "value": "commonName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 20,
+    "name": "UTF8STRING",
+    "offset": 75,
+    "value": "test.example.invalid"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 30,
+    "name": "SEQUENCE",
+    "offset": 97,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 13,
+    "name": "UTCTIME",
+    "offset": 99,
+    "value": "260101000000Z"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 13,
+    "name": "UTCTIME",
+    "offset": 114,
+    "value": "360101000000Z"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 67,
+    "name": "SEQUENCE",
+    "offset": 129,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 11,
+    "name": "SET",
+    "offset": 131,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 9,
+    "name": "SEQUENCE",
+    "offset": 133,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 135,
+    "value": "countryName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 2,
+    "name": "PRINTABLESTRING",
+    "offset": 140,
+    "value": "CN"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 21,
+    "name": "SET",
+    "offset": 144,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 19,
+    "name": "SEQUENCE",
+    "offset": 146,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 148,
+    "value": "organizationName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 12,
+    "name": "UTF8STRING",
+    "offset": 153,
+    "value": "apk-lens lab"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SET",
+    "offset": 167,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 27,
+    "name": "SEQUENCE",
+    "offset": 169,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 171,
+    "value": "commonName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 20,
+    "name": "UTF8STRING",
+    "offset": 176,
+    "value": "test.example.invalid"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 89,
+    "name": "SEQUENCE",
+    "offset": 198,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 19,
+    "name": "SEQUENCE",
+    "offset": 200,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "prim",
+    "length": 7,
+    "name": "OBJECT",
+    "offset": 202,
+    "value": "id-ecPublicKey"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "prim",
+    "length": 8,
+    "name": "OBJECT",
+    "offset": 211,
+    "value": "prime256v1"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 66,
+    "name": "BIT STRING",
+    "offset": 221,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 83,
+    "name": "cont [ 3 ]",
+    "offset": 289,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 81,
+    "name": "SEQUENCE",
+    "offset": 291,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SEQUENCE",
+    "offset": 293,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 295,
+    "value": "X509v3 Subject Key Identifier"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 22,
+    "name": "OCTET STRING",
+    "offset": 300,
+    "value": "0414FCBF60E25ED22F8E21F7871E87856C3068C0D47A"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 31,
+    "name": "SEQUENCE",
+    "offset": 324,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 326,
+    "value": "X509v3 Authority Key Identifier"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 24,
+    "name": "OCTET STRING",
+    "offset": 331,
+    "value": "30168014FCBF60E25ED22F8E21F7871E87856C3068C0D47A"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 15,
+    "name": "SEQUENCE",
+    "offset": 357,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 359,
+    "value": "X509v3 Basic Constraints"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "BOOLEAN",
+    "offset": 364,
+    "value": "255"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 5,
+    "name": "OCTET STRING",
+    "offset": 367,
+    "value": "30030101FF"
+   },
+   {
+    "depth": 1,
+    "hl": 2,
+    "kind": "cons",
+    "length": 10,
+    "name": "SEQUENCE",
+    "offset": 374,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "prim",
+    "length": 8,
+    "name": "OBJECT",
+    "offset": 376,
+    "value": "ecdsa-with-SHA256"
+   },
+   {
+    "depth": 1,
+    "hl": 2,
+    "kind": "prim",
+    "length": 71,
+    "name": "BIT STRING",
+    "offset": 386,
+    "value": ""
+   }
+  ],
+  "bytes": 459,
+  "rows": [
+   "der\t459\tbroken\t0\ttlvs\t56\tdepth\t5\tend\tyes",
+   "cert\tversion\t3\tserial\t2a\tsig\tecdsa-with-SHA256(1.2.840.10045.4.3.2)\tpub\tid-ecPublicKey(1.2.840.10045.2.1)",
+   "valid\tkind\t17(UTCTIME)\tnot_before\t260101000000Z\tnot_after\t360101000000Z",
+   "name\tissuer\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid",
+   "name\tsubject\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid",
+   "key\talgorithm\tid-ecPublicKey(1.2.840.10045.2.1)\tbits\t-\tpoint\t65",
+   "tlv\t0\td0\t0\thl\t4\tl\t455\t30(cons|SEQUENCE)",
+   "tlv\t1\td1\t4\thl\t4\tl\t366\t30(cons|SEQUENCE)",
+   "tlv\t2\td2\t8\thl\t2\tl\t3\ta0(cons|cont [ 0 ])",
+   "tlv\t3\td3\t10\thl\t2\tl\t1\t02(prim|INTEGER)",
+   "tlv\t4\td2\t13\thl\t2\tl\t1\t02(prim|INTEGER)",
+   "tlv\t5\td2\t16\thl\t2\tl\t10\t30(cons|SEQUENCE)",
+   "tlv\t6\td3\t18\thl\t2\tl\t8\t06(prim|OBJECT)",
+   "tlv\t7\td2\t28\thl\t2\tl\t67\t30(cons|SEQUENCE)",
+   "tlv\t8\td3\t30\thl\t2\tl\t11\t31(cons|SET)",
+   "tlv\t9\td4\t32\thl\t2\tl\t9\t30(cons|SEQUENCE)",
+   "tlv\t10\td5\t34\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t11\td5\t39\thl\t2\tl\t2\t13(prim|PRINTABLESTRING)",
+   "tlv\t12\td3\t43\thl\t2\tl\t21\t31(cons|SET)",
+   "tlv\t13\td4\t45\thl\t2\tl\t19\t30(cons|SEQUENCE)",
+   "tlv\t14\td5\t47\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t15\td5\t52\thl\t2\tl\t12\t0c(prim|UTF8STRING)",
+   "tlv\t16\td3\t66\thl\t2\tl\t29\t31(cons|SET)",
+   "tlv\t17\td4\t68\thl\t2\tl\t27\t30(cons|SEQUENCE)",
+   "tlv\t18\td5\t70\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t19\td5\t75\thl\t2\tl\t20\t0c(prim|UTF8STRING)",
+   "tlv\t20\td2\t97\thl\t2\tl\t30\t30(cons|SEQUENCE)",
+   "tlv\t21\td3\t99\thl\t2\tl\t13\t17(prim|UTCTIME)",
+   "tlv\t22\td3\t114\thl\t2\tl\t13\t17(prim|UTCTIME)",
+   "tlv\t23\td2\t129\thl\t2\tl\t67\t30(cons|SEQUENCE)",
+   "tlv\t24\td3\t131\thl\t2\tl\t11\t31(cons|SET)",
+   "tlv\t25\td4\t133\thl\t2\tl\t9\t30(cons|SEQUENCE)",
+   "tlv\t26\td5\t135\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t27\td5\t140\thl\t2\tl\t2\t13(prim|PRINTABLESTRING)",
+   "tlv\t28\td3\t144\thl\t2\tl\t21\t31(cons|SET)",
+   "tlv\t29\td4\t146\thl\t2\tl\t19\t30(cons|SEQUENCE)",
+   "tlv\t30\td5\t148\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t31\td5\t153\thl\t2\tl\t12\t0c(prim|UTF8STRING)",
+   "tlv\t32\td3\t167\thl\t2\tl\t29\t31(cons|SET)",
+   "tlv\t33\td4\t169\thl\t2\tl\t27\t30(cons|SEQUENCE)",
+   "tlv\t34\td5\t171\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t35\td5\t176\thl\t2\tl\t20\t0c(prim|UTF8STRING)",
+   "tlv\t36\td2\t198\thl\t2\tl\t89\t30(cons|SEQUENCE)",
+   "tlv\t37\td3\t200\thl\t2\tl\t19\t30(cons|SEQUENCE)",
+   "tlv\t38\td4\t202\thl\t2\tl\t7\t06(prim|OBJECT)",
+   "tlv\t39\td4\t211\thl\t2\tl\t8\t06(prim|OBJECT)",
+   "cut\ttlvs\t56",
+   "walked\tend"
+  ],
+  "tag_names": [
+   "01:BOOLEAN",
+   "02:INTEGER",
+   "03:BIT STRING",
+   "04:OCTET STRING",
+   "06:OBJECT",
+   "0c:UTF8STRING",
+   "13:PRINTABLESTRING",
+   "17:UTCTIME",
+   "30:SEQUENCE",
+   "31:SET",
+   "a0:cont [ 0 ]",
+   "a3:cont [ 3 ]"
+  ],
+  "x509": {
+   "issuer": "C=CN, O=apk-lens lab, CN=test.example.invalid",
+   "not_after": "Jan  1 00:00:00 2036 GMT",
+   "not_before": "Jan  1 00:00:00 2026 GMT",
+   "pubalg": "id-ecPublicKey",
+   "pubbits": "256",
+   "serial": "0x2a",
+   "sigalg": "ecdsa-with-SHA256",
+   "subject": "C=CN, O=apk-lens lab, CN=test.example.invalid",
+   "version": "3"
+  }
+ },
+ "rsa.crt": {
+  "asn1": [
+   {
+    "depth": 0,
+    "hl": 4,
+    "kind": "cons",
+    "length": 852,
+    "name": "SEQUENCE",
+    "offset": 0,
+    "value": ""
+   },
+   {
+    "depth": 1,
+    "hl": 4,
+    "kind": "cons",
+    "length": 572,
+    "name": "SEQUENCE",
+    "offset": 4,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 3,
+    "name": "cont [ 0 ]",
+    "offset": 8,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "INTEGER",
+    "offset": 10,
+    "value": "02"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "INTEGER",
+    "offset": 13,
+    "value": "2A"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 13,
+    "name": "SEQUENCE",
+    "offset": 16,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 9,
+    "name": "OBJECT",
+    "offset": 18,
+    "value": "sha256WithRSAEncryption"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 0,
+    "name": "NULL",
+    "offset": 29,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 67,
+    "name": "SEQUENCE",
+    "offset": 31,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 11,
+    "name": "SET",
+    "offset": 33,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 9,
+    "name": "SEQUENCE",
+    "offset": 35,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 37,
+    "value": "countryName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 2,
+    "name": "PRINTABLESTRING",
+    "offset": 42,
+    "value": "CN"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 21,
+    "name": "SET",
+    "offset": 46,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 19,
+    "name": "SEQUENCE",
+    "offset": 48,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 50,
+    "value": "organizationName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 12,
+    "name": "UTF8STRING",
+    "offset": 55,
+    "value": "apk-lens lab"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SET",
+    "offset": 69,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 27,
+    "name": "SEQUENCE",
+    "offset": 71,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 73,
+    "value": "commonName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 20,
+    "name": "UTF8STRING",
+    "offset": 78,
+    "value": "test.example.invalid"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 30,
+    "name": "SEQUENCE",
+    "offset": 100,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 13,
+    "name": "UTCTIME",
+    "offset": 102,
+    "value": "260101000000Z"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "prim",
+    "length": 13,
+    "name": "UTCTIME",
+    "offset": 117,
+    "value": "360101000000Z"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 67,
+    "name": "SEQUENCE",
+    "offset": 132,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 11,
+    "name": "SET",
+    "offset": 134,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 9,
+    "name": "SEQUENCE",
+    "offset": 136,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 138,
+    "value": "countryName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 2,
+    "name": "PRINTABLESTRING",
+    "offset": 143,
+    "value": "CN"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 21,
+    "name": "SET",
+    "offset": 147,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 19,
+    "name": "SEQUENCE",
+    "offset": 149,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 151,
+    "value": "organizationName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 12,
+    "name": "UTF8STRING",
+    "offset": 156,
+    "value": "apk-lens lab"
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SET",
+    "offset": 170,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 27,
+    "name": "SEQUENCE",
+    "offset": 172,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 174,
+    "value": "commonName"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 20,
+    "name": "UTF8STRING",
+    "offset": 179,
+    "value": "test.example.invalid"
+   },
+   {
+    "depth": 2,
+    "hl": 4,
+    "kind": "cons",
+    "length": 290,
+    "name": "SEQUENCE",
+    "offset": 201,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 13,
+    "name": "SEQUENCE",
+    "offset": 205,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "prim",
+    "length": 9,
+    "name": "OBJECT",
+    "offset": 207,
+    "value": "rsaEncryption"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "prim",
+    "length": 0,
+    "name": "NULL",
+    "offset": 218,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 4,
+    "kind": "prim",
+    "length": 271,
+    "name": "BIT STRING",
+    "offset": 220,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "cons",
+    "length": 83,
+    "name": "cont [ 3 ]",
+    "offset": 495,
+    "value": ""
+   },
+   {
+    "depth": 3,
+    "hl": 2,
+    "kind": "cons",
+    "length": 81,
+    "name": "SEQUENCE",
+    "offset": 497,
+    "value": ""
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 29,
+    "name": "SEQUENCE",
+    "offset": 499,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 501,
+    "value": "X509v3 Subject Key Identifier"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 22,
+    "name": "OCTET STRING",
+    "offset": 506,
+    "value": "04140B2C4FF653D361041870FD129A1FA0EFDBCABB83"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 31,
+    "name": "SEQUENCE",
+    "offset": 530,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 532,
+    "value": "X509v3 Authority Key Identifier"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 24,
+    "name": "OCTET STRING",
+    "offset": 537,
+    "value": "301680140B2C4FF653D361041870FD129A1FA0EFDBCABB83"
+   },
+   {
+    "depth": 4,
+    "hl": 2,
+    "kind": "cons",
+    "length": 15,
+    "name": "SEQUENCE",
+    "offset": 563,
+    "value": ""
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 3,
+    "name": "OBJECT",
+    "offset": 565,
+    "value": "X509v3 Basic Constraints"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 1,
+    "name": "BOOLEAN",
+    "offset": 570,
+    "value": "255"
+   },
+   {
+    "depth": 5,
+    "hl": 2,
+    "kind": "prim",
+    "length": 5,
+    "name": "OCTET STRING",
+    "offset": 573,
+    "value": "30030101FF"
+   },
+   {
+    "depth": 1,
+    "hl": 2,
+    "kind": "cons",
+    "length": 13,
+    "name": "SEQUENCE",
+    "offset": 580,
+    "value": ""
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "prim",
+    "length": 9,
+    "name": "OBJECT",
+    "offset": 582,
+    "value": "sha256WithRSAEncryption"
+   },
+   {
+    "depth": 2,
+    "hl": 2,
+    "kind": "prim",
+    "length": 0,
+    "name": "NULL",
+    "offset": 593,
+    "value": ""
+   },
+   {
+    "depth": 1,
+    "hl": 4,
+    "kind": "prim",
+    "length": 257,
+    "name": "BIT STRING",
+    "offset": 595,
+    "value": ""
+   }
+  ],
+  "bytes": 856,
+  "rows": [
+   "der\t856\tbroken\t0\ttlvs\t58\tdepth\t5\tend\tyes",
+   "cert\tversion\t3\tserial\t2a\tsig\tsha256WithRSAEncryption(1.2.840.113549.1.1.11)\tpub\trsaEncryption(1.2.840.113549.1.1.1)",
+   "valid\tkind\t17(UTCTIME)\tnot_before\t260101000000Z\tnot_after\t360101000000Z",
+   "name\tissuer\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid",
+   "name\tsubject\t3\t2.5.4.6=CN,2.5.4.10=apk-lens lab,2.5.4.3=test.example.invalid",
+   "key\talgorithm\trsaEncryption(1.2.840.113549.1.1.1)\tbits\t2048\tpoint\t270",
+   "tlv\t0\td0\t0\thl\t4\tl\t852\t30(cons|SEQUENCE)",
+   "tlv\t1\td1\t4\thl\t4\tl\t572\t30(cons|SEQUENCE)",
+   "tlv\t2\td2\t8\thl\t2\tl\t3\ta0(cons|cont [ 0 ])",
+   "tlv\t3\td3\t10\thl\t2\tl\t1\t02(prim|INTEGER)",
+   "tlv\t4\td2\t13\thl\t2\tl\t1\t02(prim|INTEGER)",
+   "tlv\t5\td2\t16\thl\t2\tl\t13\t30(cons|SEQUENCE)",
+   "tlv\t6\td3\t18\thl\t2\tl\t9\t06(prim|OBJECT)",
+   "tlv\t7\td3\t29\thl\t2\tl\t0\t05(prim|NULL)",
+   "tlv\t8\td2\t31\thl\t2\tl\t67\t30(cons|SEQUENCE)",
+   "tlv\t9\td3\t33\thl\t2\tl\t11\t31(cons|SET)",
+   "tlv\t10\td4\t35\thl\t2\tl\t9\t30(cons|SEQUENCE)",
+   "tlv\t11\td5\t37\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t12\td5\t42\thl\t2\tl\t2\t13(prim|PRINTABLESTRING)",
+   "tlv\t13\td3\t46\thl\t2\tl\t21\t31(cons|SET)",
+   "tlv\t14\td4\t48\thl\t2\tl\t19\t30(cons|SEQUENCE)",
+   "tlv\t15\td5\t50\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t16\td5\t55\thl\t2\tl\t12\t0c(prim|UTF8STRING)",
+   "tlv\t17\td3\t69\thl\t2\tl\t29\t31(cons|SET)",
+   "tlv\t18\td4\t71\thl\t2\tl\t27\t30(cons|SEQUENCE)",
+   "tlv\t19\td5\t73\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t20\td5\t78\thl\t2\tl\t20\t0c(prim|UTF8STRING)",
+   "tlv\t21\td2\t100\thl\t2\tl\t30\t30(cons|SEQUENCE)",
+   "tlv\t22\td3\t102\thl\t2\tl\t13\t17(prim|UTCTIME)",
+   "tlv\t23\td3\t117\thl\t2\tl\t13\t17(prim|UTCTIME)",
+   "tlv\t24\td2\t132\thl\t2\tl\t67\t30(cons|SEQUENCE)",
+   "tlv\t25\td3\t134\thl\t2\tl\t11\t31(cons|SET)",
+   "tlv\t26\td4\t136\thl\t2\tl\t9\t30(cons|SEQUENCE)",
+   "tlv\t27\td5\t138\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t28\td5\t143\thl\t2\tl\t2\t13(prim|PRINTABLESTRING)",
+   "tlv\t29\td3\t147\thl\t2\tl\t21\t31(cons|SET)",
+   "tlv\t30\td4\t149\thl\t2\tl\t19\t30(cons|SEQUENCE)",
+   "tlv\t31\td5\t151\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t32\td5\t156\thl\t2\tl\t12\t0c(prim|UTF8STRING)",
+   "tlv\t33\td3\t170\thl\t2\tl\t29\t31(cons|SET)",
+   "tlv\t34\td4\t172\thl\t2\tl\t27\t30(cons|SEQUENCE)",
+   "tlv\t35\td5\t174\thl\t2\tl\t3\t06(prim|OBJECT)",
+   "tlv\t36\td5\t179\thl\t2\tl\t20\t0c(prim|UTF8STRING)",
+   "tlv\t37\td2\t201\thl\t4\tl\t290\t30(cons|SEQUENCE)",
+   "tlv\t38\td3\t205\thl\t2\tl\t13\t30(cons|SEQUENCE)",
+   "tlv\t39\td4\t207\thl\t2\tl\t9\t06(prim|OBJECT)",
+   "cut\ttlvs\t58",
+   "walked\tend"
+  ],
+  "tag_names": [
+   "01:BOOLEAN",
+   "02:INTEGER",
+   "03:BIT STRING",
+   "04:OCTET STRING",
+   "05:NULL",
+   "06:OBJECT",
+   "0c:UTF8STRING",
+   "13:PRINTABLESTRING",
+   "17:UTCTIME",
+   "30:SEQUENCE",
+   "31:SET",
+   "a0:cont [ 0 ]",
+   "a3:cont [ 3 ]"
+  ],
+  "x509": {
+   "issuer": "C=CN, O=apk-lens lab, CN=test.example.invalid",
+   "not_after": "Jan  1 00:00:00 2036 GMT",
+   "not_before": "Jan  1 00:00:00 2026 GMT",
+   "pubalg": "rsaEncryption",
+   "pubbits": "2048",
+   "serial": "0x2a",
+   "sigalg": "sha256WithRSAEncryption",
+   "subject": "C=CN, O=apk-lens lab, CN=test.example.invalid",
+   "version": "3"
+  }
+ }
+}

@@ -43,7 +43,7 @@ const SELF = {
   // Excel documents by what is inside the compound file, and this reader stops at the container.
   doc: ['container'], xls: ['container'],
   arrow: ['fields'], parquet: ['fields'], onnx: ['fields'], heif: ['fields'], stlbinary: ['fields'],
-  icc: ['fields'], emf: ['fields'], postscript: ['fields'], coff: ['fields'],
+  icc: ['fields'], emf: ['fields'], postscript: ['fields'], coff: ['fields'], crt: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };

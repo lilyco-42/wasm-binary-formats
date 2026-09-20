@@ -29,6 +29,9 @@
 //!         not fit in eight bytes live in a string table after the last symbol, which a section points
 //!         at as `/4` and a symbol as four zero bytes followed by the offset. The symbol count is a
 //!         record count, so each entry's auxiliary records are part of the index objdump prints
+//!   der   one length-prefixed object per file, which for a certificate means the top SEQUENCE's
+//!         own length is the only claim about its size - and a tree the reader lists and names
+//!         against what openssl's asn1parse printed for the same bytes
 //!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
 //!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
 //!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
@@ -137,6 +140,7 @@ pub fn name() -> &'static str {
         FORMAT_EMF => "emf",
         FORMAT_PS => "postscript",
         FORMAT_COFF => "coff",
+        FORMAT_DER => "der",
         _ => "unknown",
     }
 }
@@ -6222,6 +6226,384 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// ASN.1 DER, gated on the shape an X.509 certificate has: one length-prefixed object that is a
+/// SEQUENCE, holding the three parts every certificate states - the to-be-signed block, the signature
+/// algorithm and the signature itself.
+///
+/// The walk is honest about what it is: a DER file claims nothing about itself beyond its own framing,
+/// so the only self-check available is that the top object's extent accounts for the file, and the
+/// reader prints `end yes` or `end no` rather than deciding a mismatch means there is no file. What the
+/// rows then carry is a tree - offset, header length and content length for every object - plus the
+/// seven fields a certificate's own structure fixes the positions of.
+///
+/// Nothing about those positions is trusted to memory, and nothing about the names is either.
+/// `scripts/make-der-fixtures.py` produces the fixtures with OpenSSL 3.5.7 and then reads them back with
+/// two of OpenSSL's own commands: `asn1parse -i`, whose list of offset, depth, header length, content
+/// length and type name has to be *the same list in the same order* as the walk's, and `x509 -text`,
+/// which states the version, serial, both algorithm names, the two validity times, the issuer and
+/// subject strings and - for RSA - the key size. The probe is not written unless every number and name
+/// below agrees with one of those two. The tag names are `asn1parse`'s spellings, uppercase and all,
+/// because that is what a witness prints; the OID names likewise come from the `OBJECT` value column.
+///
+/// Two things are deliberately not claimed. The key size is derived for an RSA public key only, from
+/// the modulus INTEGER: an EC certificate's `256 bit` is a property of the curve named by an object
+/// identifier, and copying curve sizes in from a table would be a recalled number dressed as an
+/// observation - so the row prints `bits -` and the probe records what x509 said. And the validity
+/// strings are printed exactly as DER holds them (`260101000000Z`): the reader does not parse a date,
+/// so there is no two-digit-year rule to get wrong.
+pub const FORMAT_DER: i32 = 48;
+
+const DER_LISTED_TLVS: usize = 40;
+const DER_MAX_TLVS: usize = 2048;
+const DER_MAX_DEPTH: usize = 24;
+/// Tag names as `asn1parse` renders them, for the tags these certificates use. A tag outside this list
+/// still gets its byte printed, unnamed.
+const DER_TAGS: [(u8, &str); 11] = [
+    (0x01, "BOOLEAN"),
+    (0x02, "INTEGER"),
+    (0x03, "BIT STRING"),
+    (0x04, "OCTET STRING"),
+    (0x05, "NULL"),
+    (0x06, "OBJECT"),
+    (0x0C, "UTF8STRING"),
+    (0x13, "PRINTABLESTRING"),
+    (0x17, "UTCTIME"),
+    (0x30, "SEQUENCE"),
+    (0x31, "SET"),
+];
+/// OID names, keyed by the dotted form the reader computes from the value bytes, taken from what
+/// `asn1parse` printed beside those same bytes. The fixture script checks this table in both directions,
+/// so an entry that is wrong and an entry that is missing both stop the probe from being written.
+const DER_OIDS: [(&str, &str); 8] = [
+    ("2.5.4.3", "commonName"),
+    ("2.5.4.6", "countryName"),
+    ("2.5.4.10", "organizationName"),
+    ("1.2.840.113549.1.1.1", "rsaEncryption"),
+    ("1.2.840.113549.1.1.11", "sha256WithRSAEncryption"),
+    ("1.2.840.10045.2.1", "id-ecPublicKey"),
+    ("1.2.840.10045.4.3.2", "ecdsa-with-SHA256"),
+    ("1.2.840.10045.3.1.7", "prime256v1"),
+];
+/// The one OID whose key size the reader is allowed to state, because the size is in the bytes: rsaEncryption.
+const DER_RSA: &str = "1.2.840.113549.1.1.1";
+
+fn der_u8(bytes: &[u8], at: usize) -> Option<u8> {
+    bytes.get(at).copied()
+}
+
+/// Tag, header length and content length of the object starting at `at`. The high-tag-number form and
+/// the indefinite form are not produced by any writer here, so they end the walk rather than being
+/// guessed at.
+fn der_header(bytes: &[u8], at: usize) -> Option<(u8, usize, usize)> {
+    let tag = der_u8(bytes, at)?;
+    if tag & 0x1F == 0x1F {
+        return None;
+    }
+    let first = der_u8(bytes, at + 1)?;
+    if first & 0x80 == 0 {
+        return Some((tag, 2, usize::from(first & 0x7F)));
+    }
+    let digits = usize::from(first & 0x7F);
+    if digits == 0 || digits > 4 {
+        return None;
+    }
+    let stop = at.checked_add(2)?.checked_add(digits)?;
+    if stop > bytes.len() {
+        return None;
+    }
+    let mut length = 0usize;
+    for byte in &bytes[at + 2..stop] {
+        length = (length << 8) | usize::from(*byte);
+    }
+    Some((tag, 2 + digits, length))
+}
+
+fn der_body(bytes: &[u8], at: usize) -> Option<(usize, usize)> {
+    let (_tag, header, length) = der_header(bytes, at)?;
+    let start = at.checked_add(header)?;
+    let end = start.checked_add(length)?;
+    if end > bytes.len() {
+        return None;
+    }
+    Some((start, end))
+}
+
+/// The immediate children of one constructed object, in the order they are stored.
+fn der_children(bytes: &[u8], at: usize) -> Vec<(usize, u8, usize)> {
+    let mut rows = Vec::new();
+    let Some((_tag, header, length)) = der_header(bytes, at) else {
+        return rows;
+    };
+    let Some(end) = at.checked_add(header).and_then(|start| start.checked_add(length)) else {
+        return rows;
+    };
+    let mut cursor = at + header;
+    while cursor < end {
+        let Some((tag, head, sub)) = der_header(bytes, cursor) else {
+            break;
+        };
+        let Some(next) = cursor.checked_add(head).and_then(|body| body.checked_add(sub)) else {
+            break;
+        };
+        if next > end {
+            break;
+        }
+        rows.push((cursor, tag, head));
+        cursor = next;
+    }
+    rows
+}
+
+/// A dotted OID from its value bytes: the first component is `40 * a + b` split back in the only way it
+/// can be, the rest are base-128 with the high bit as a continuation flag.
+fn der_oid(raw: &[u8]) -> String {
+    let Some(head) = raw.first() else {
+        return "?".to_owned();
+    };
+    let mut parts: Vec<u64> = vec![u64::from(head / 40), u64::from(head % 40)];
+    let mut value: u64 = 0;
+    for byte in &raw[1..] {
+        value = (value << 7) | u64::from(byte & 0x7F);
+        if byte & 0x80 == 0 {
+            parts.push(value);
+            value = 0;
+        }
+    }
+    parts
+        .iter()
+        .map(|part| part.to_string())
+        .collect::<Vec<String>>()
+        .join(".")
+}
+
+fn der_oid_name(dotted: &str) -> Option<&'static str> {
+    DER_OIDS
+        .iter()
+        .find(|(value, _)| *value == dotted)
+        .map(|(_, name)| *name)
+}
+
+/// `asn1parse`'s spelling for a tag byte: the universal name if it has one, and `cont [ n ]` for the
+/// context-specific tags a certificate uses around its version and its extensions.
+fn der_tag_name(tag: u8) -> String {
+    if let Some((_, name)) = DER_TAGS.iter().find(|(value, _)| *value == tag) {
+        return (*name).to_owned();
+    }
+    if tag & 0xC0 == 0x80 {
+        return format!("cont [ {} ]", tag & 0x1F);
+    }
+    "?".to_owned()
+}
+
+/// One object and everything under it, appended as (offset, depth, header, length, tag).
+#[allow(clippy::type_complexity)]
+fn der_walk(bytes: &[u8], at: usize, end: usize, depth: usize, out: &mut Vec<(usize, usize, usize, usize, u8)>, broken: &mut usize) {
+    let mut cursor = at;
+    while cursor < end {
+        if depth > DER_MAX_DEPTH || out.len() >= DER_MAX_TLVS {
+            *broken += 1;
+            return;
+        }
+        let Some((tag, header, length)) = der_header(bytes, cursor) else {
+            *broken += 1;
+            return;
+        };
+        let Some(body) = cursor.checked_add(header).and_then(|start| start.checked_add(length)) else {
+            *broken += 1;
+            return;
+        };
+        if body > end {
+            *broken += 1;
+            return;
+        }
+        out.push((cursor, depth, header, length, tag));
+        if tag & 0x20 != 0 {
+            der_walk(bytes, cursor + header, body, depth + 1, out, broken);
+        }
+        cursor = body;
+    }
+}
+
+/// The `oid=value` parts of a certificate Name, and how many RDNs it holds.
+fn der_name(bytes: &[u8], at: usize) -> (Vec<String>, usize) {
+    let mut parts = Vec::new();
+    let sets = der_children(bytes, at);
+    for (set_at, _tag, _head) in &sets {
+        for (pair_at, _tag2, _head2) in der_children(bytes, *set_at) {
+            let inner = der_children(bytes, pair_at);
+            if inner.len() < 2 {
+                continue;
+            }
+            let (type_start, type_end) = match der_body(bytes, inner[0].0) {
+                Some(span) => span,
+                None => continue,
+            };
+            let (value_start, value_end) = match der_body(bytes, inner[1].0) {
+                Some(span) => span,
+                None => continue,
+            };
+            let dotted = der_oid(bytes.get(type_start..type_end).unwrap_or(&[]));
+            let value: String = bytes
+                .get(value_start..value_end)
+                .unwrap_or(&[])
+                .iter()
+                .map(|byte| char::from(*byte))
+                .collect();
+            parts.push(format!("{dotted}={value}"));
+        }
+    }
+    (parts, sets.len())
+}
+
+fn read_der(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 8 || bytes[0] != 0x30 {
+        return None;
+    }
+    let mut objects: Vec<(usize, usize, usize, usize, u8)> = Vec::new();
+    let mut broken = 0usize;
+    der_walk(bytes, 0, bytes.len(), 0, &mut objects, &mut broken);
+    if objects.is_empty() {
+        return None;
+    }
+    let (top_offset, top_depth, top_header, top_length, top_tag) = objects[0];
+    if top_offset != 0 || top_depth != 0 || top_tag != 0x30 {
+        return None;
+    }
+    // The framing claim: the header's own length has to account for the file. A certificate with bytes
+    // left over, or one whose stated length runs past the end, is still read - and says so.
+    let spans = top_header + top_length == bytes.len();
+    if !spans {
+        broken += 1;
+    }
+    let outer = der_children(bytes, 0);
+    if outer.len() != 3 {
+        return None;
+    }
+    let inner = der_children(bytes, outer[0].0);
+    let mut cursor = 0usize;
+    let mut version = 1usize;
+    if inner.first()?.1 == 0xA0 {
+        let inside = der_children(bytes, inner[0].0);
+        let (start, end) = der_body(bytes, *inside.first()?.0)?;
+        let stated = bytes
+            .get(start..end)?
+            .iter()
+            .fold(0u64, |acc, byte| (acc << 8) + u64::from(*byte));
+        version = usize::try_from(stated).unwrap_or(0) + 1;
+        cursor = 1;
+    }
+    if inner.len() < cursor + 7 {
+        return None;
+    }
+    let (serial_start, serial_end) = der_body(bytes, inner[cursor].0)?;
+    let serial: String = bytes
+        .get(serial_start..serial_end)?
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let sig_at = inner[cursor + 1].0;
+    let sig_obj = *der_children(bytes, sig_at).first()?.0;
+    let (sig_start, sig_end) = der_body(bytes, sig_obj)?;
+    let sig_oid = der_oid(bytes.get(sig_start..sig_end)?);
+    let validity_at = inner[cursor + 3].0;
+    let spki_at = inner[cursor + 5].0;
+    let times = der_children(bytes, validity_at);
+    if times.len() != 2 {
+        return None;
+    }
+    let (nb_start, nb_end) = der_body(bytes, times[0].0)?;
+    let (na_start, na_end) = der_body(bytes, times[1].0)?;
+    let text = |start: usize, end: usize| -> Option<String> {
+        Some(
+            bytes
+                .get(start..end)?
+                .iter()
+                .map(|byte| char::from(*byte))
+                .collect(),
+        )
+    };
+    let not_before = text(nb_start, nb_end)?;
+    let not_after = text(na_start, na_end)?;
+    let algs = der_children(bytes, spki_at);
+    if algs.len() != 2 {
+        return None;
+    }
+    let pub_obj = *der_children(bytes, algs[0].0).first()?.0;
+    let (pub_start, pub_end) = der_body(bytes, pub_obj)?;
+    let pub_oid = der_oid(bytes.get(pub_start..pub_end)?);
+    let (key_start, key_end) = der_body(bytes, algs[1].0)?;
+    // Only an RSA key states its own size, as the modulus INTEGER inside the BIT STRING's payload. Any
+    // other algorithm's size lives in the name of its curve, which is a table this reader does not have.
+    let mut bits = String::from("-");
+    if pub_oid == DER_RSA {
+        if let Some(modulus) = der_children(bytes, key_start + 1).first() {
+            if let Some((m_start, m_end)) = der_body(bytes, modulus.0) {
+                let raw = bytes.get(m_start..m_end)?;
+                let trimmed = usize::from(raw.first().copied() == Some(0));
+                bits = ((raw.len() - trimmed) * 8).to_string();
+            }
+        }
+    }
+    let (issuer_parts, issuer_count) = der_name(bytes, inner[cursor + 2].0);
+    let (subject_parts, subject_count) = der_name(bytes, inner[cursor + 4].0);
+    // An unnamed OID still goes out in its dotted form; the parenthesised name is only ever one the
+    // witness printed for the same bytes. The match rather than `unwrap_or` is a lifetime matter: the
+    // table's entries are `'static` and the caller's string is not.
+    let label = |oid: &str| -> String {
+        match der_oid_name(oid) {
+            Some(name) => format!("{name}({oid})"),
+            None => format!("{oid}({oid})"),
+        }
+    };
+    let sig_label = label(&sig_oid);
+    let pub_label = label(&pub_oid);
+    let depth = objects.iter().map(|(_, each, _, _, _)| *each).max().unwrap_or(0);
+    let mut rows = vec![
+        format!(
+            "der\t{}\tbroken\t{broken}\ttlvs\t{}\tdepth\t{depth}\tend\t{}",
+            bytes.len(),
+            objects.len(),
+            if spans { "yes" } else { "no" }
+        ),
+        format!(
+            "cert\tversion\t{version}\tserial\t{serial}\tsig\t{sig_label}\tpub\t{pub_label}"
+        ),
+        format!(
+            "valid\tkind\t{:02x}({})\tnot_before\t{not_before}\tnot_after\t{not_after}",
+            times[0].1,
+            der_tag_name(times[0].1)
+        ),
+        format!(
+            "name\tissuer\t{issuer_count}\t{}",
+            if issuer_parts.is_empty() { "-".to_owned() } else { issuer_parts.join(",") }
+        ),
+        format!(
+            "name\tsubject\t{subject_count}\t{}",
+            if subject_parts.is_empty() { "-".to_owned() } else { subject_parts.join(",") }
+        ),
+        format!(
+            "key\talgorithm\t{pub_label}\tbits\t{bits}\tpoint\t{}",
+            key_end.saturating_sub(key_start + 1)
+        ),
+    ];
+    for (index, (offset, each, header, length, tag)) in objects.iter().enumerate().take(DER_LISTED_TLVS) {
+        rows.push(format!(
+            "tlv\t{index}\td{each}\t{offset}\thl\t{header}\tl\t{length}\t{tag:02x}({}|{})",
+            if tag & 0x20 != 0 { "cons" } else { "prim" },
+            der_tag_name(*tag)
+        ));
+    }
+    if objects.len() > DER_LISTED_TLVS {
+        rows.push(format!("cut\ttlvs\t{}", objects.len()));
+    }
+    rows.push(if broken == 0 {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\tbroken\t{broken}")
+    });
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -6333,13 +6715,19 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_coff(bytes) {
         return accept(FORMAT_COFF, lines);
     }
+    // After COFF, whose records it does not read, and before STL: a certificate is claimed only
+    // when the seven fixed positions inside its to-be-signed block hold what the format puts
+    // there, so a file that merely starts with 0x30 does not get a certificate report.
+    if let Some(lines) = read_der(bytes) {
+        return accept(FORMAT_DER, lines);
+    }
     // Last, because nothing here has a magic: an STL is only recognised by the arithmetic its own
     // triangle count implies, so every container with a real signature gets to answer first.
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, COFF object or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }
