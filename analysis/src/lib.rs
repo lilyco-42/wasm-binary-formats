@@ -69,9 +69,12 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
             continue;
         }
         rows.push(format!(
-            "section\t{index}\t{}\taddr\t{}\tsize\t{}\talign\t{}",
+            "section\t{index}\t{}\taddr\t{}\toff\t{}\tsize\t{}\talign\t{}",
             clean(section.name().unwrap_or("?")),
             section.address(),
+            // The file offset, not just the address: the disassembler module is handed bytes from
+            // here, and an address says nothing about where the section lies in the file.
+            section.offset().unwrap_or(u64::MAX),
             section.size(),
             section.align()
         ));
@@ -105,11 +108,14 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     rows.insert(
         0,
         format!(
-            "file\t{}\tbits\t{}\tendian\t{}\tkind\t{}\tsections\t{sections}\tsymbols\t{symbols}\tdynsym\t{imported}\tentry\t{}",
+            "file\t{}\tbits\t{}\tendian\t{}\tkind\t{}\tmachine\t{}\tsections\t{sections}\tsymbols\t{symbols}\tdynsym\t{imported}\tentry\t{}",
             label(&file.format()),
             if file.is_64() { 64 } else { 32 },
             if file.is_little_endian() { "little" } else { "big" },
             label(&file.kind()),
+            // Named by the reader's own enum, lower-cased: the disassembler module has to be told
+            // which instruction set to open, and this is the only place that says so.
+            label(&file.machine()),
             file.entry()
         ),
     );

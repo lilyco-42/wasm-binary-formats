@@ -72,13 +72,20 @@ const ex = await (async () => {
 
 // An analyser is a different order of magnitude from the structural readers above, and most
 // visitors never want one. So they ship as their own modules, fetched only on the click below -
-// before that the page has neither the bytes nor an instance of them.
+// before that the page has neither the bytes nor an instance of them. The disassembler is Capstone
+// (BSD-3) compiled by emscripten; the analyser is the `object` reader. Neither is in `apk-lens.wasm`.
 const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
     title: '对象文件分析（节表 / 符号表）',
     detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样。',
+  },
+  {
+    id: 'disasm',
+    file: 'apk-lens-disasm.wasm',
+    title: '反汇编（x86-64 / AArch64 / Thumb）',
+    detail: '把 .text 的字节翻成指令文本；架构与 .text 的位置由上面的分析模块给出。',
   },
 ];
 
@@ -87,30 +94,85 @@ const MODULES = [
 let picked = null;
 const toolState = new Map();
 const toolList = document.getElementById('tools');
+const ARCHITECTURES = { x86_64: 0, aarch64: 1, arm: 2 };
+const WINDOW = 4096;
 
 function moduleText(mod, fn, ...args) {
   let cap = 4096;
   for (;;) {
-    const ptr = mod.alloc(cap);
+    const ptr = (mod.alloc || mod.malloc)(cap);
     const written = mod[fn](...args, ptr, cap);
     const keep = Math.max(Math.min(written, cap), 0);
     const text = new TextDecoder().decode(new Uint8Array(mod.memory.buffer.slice(ptr, ptr + keep)));
-    mod.dealloc(ptr, cap);
+    (mod.dealloc || mod.free)(ptr, cap);
     if (written < 0 || written <= cap || cap >= 1 << 22) return text;
     cap *= 8;
   }
 }
 
+// Emscripten's standalone output imports a few wasi_snapshot_preview1 entry points even though the
+// code paths here never reach them; they are answered by name from the module's own import list, so
+// a change in what it asks for shows up rather than being guessed at.
+async function instantiate(bytes) {
+  const compiled = await WebAssembly.compile(bytes);
+  const namespaces = {};
+  for (const wanted of WebAssembly.Module.imports(compiled)) {
+    namespaces[wanted.module] ||= new Proxy({}, { get: () => () => 0, has: () => true });
+  }
+  return new WebAssembly.Instance(compiled, namespaces).exports;
+}
+
+function field(cells, key) {
+  const at = cells.indexOf(key);
+  return at >= 0 ? cells[at + 1] : null;
+}
+
 function analyseHere(mod) {
-  if (!picked || typeof mod.analyse_run !== 'function') return;
+  if (!picked || typeof mod.analyse_run !== 'function') return null;
   const bytes = picked.bytes;
   const ptr = mod.alloc(bytes.length);
   new Uint8Array(mod.memory.buffer, ptr, bytes.length).set(bytes);
   const rc = mod.analyse_run(ptr, bytes.length);
   mod.dealloc(ptr, bytes.length);
-  return { rc, rows: rc === 0
+  return rc === 0
     ? Array.from({ length: mod.analyse_count() }, (_, i) => moduleText(mod, 'analyse_at', i))
-    : [] };
+    : [];
+}
+
+/* The two modules compose the way the tools they stand for do: the analyser says which instruction
+ * set and where the code is, and this hands that range to the disassembler. Without the first
+ * module the second one has no honest way to know either. */
+function disassembleHere(mod) {
+  if (!picked) return '还没有选中文件。先选一个 .exe / .so / 可执行文件。';
+  const rows = (toolState.get('analysis') || {}).rows;
+  if (!rows || !rows.length) return '先加载上面的「对象文件分析」模块 —— 架构和 .text 位置由它给出。';
+  const machine = field((rows[0] || '').split('\t'), 'machine');
+  const arch = ARCHITECTURES[machine];
+  if (arch === undefined) return `这个模块不含「${machine || '未知'}」指令集。`;
+  const sections = rows.filter((row) => row.startsWith('section\t')).map((row) => row.split('\t'));
+  const wanted = sections.find((cells) => cells[2] === '.text')
+    || sections.find((cells) => (cells[2] || '').includes('text'));
+  if (!wanted) return '分析模块没有给出代码节（.text），所以没有字节可翻。';
+  const start = Number(field(wanted, 'off'));
+  const size = Number(field(wanted, 'size')) || 0;
+  const address = Number(field(wanted, 'addr')) || 0;
+  if (!Number.isFinite(start) || start >= picked.bytes.length) return '分析模块给出的节位置在文件之外。';
+  const slice = picked.bytes.subarray(start, Math.min(start + Math.min(size, WINDOW), picked.bytes.length));
+  const ptr = mod.malloc(slice.length);
+  new Uint8Array(mod.memory.buffer, ptr, slice.length).set(slice);
+  const rc = mod.disasm_run(ptr, slice.length, BigInt(address), arch);
+  mod.free(ptr);
+  if (rc < 0) return `反汇编拒绝了这个节（返回 ${rc}）。`;
+  const lines = Array.from({ length: mod.disasm_count() },
+    (_, i) => cString(mod, mod.disasm_at(i)));
+  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}`;
+}
+
+function cString(mod, pointer) {
+  const memory = new Uint8Array(mod.memory.buffer);
+  let end = pointer;
+  while (end < memory.length && memory[end] !== 0) end++;
+  return new TextDecoder().decode(memory.subarray(pointer, end));
 }
 
 function toolLine(spec, state) {
@@ -118,8 +180,7 @@ function toolLine(spec, state) {
   if (state.error) return `取不到：${state.error}`;
   const names = state.exports.slice(0, 4).join(', ');
   return `已加载 ${state.bytes.toLocaleString('en-US')} 字节 · ${state.exports.length} 个导出 · `
-    + `${Math.round(state.ms)} ms 内实例化 · 自检 ${state.selftest}`
-    + `${names ? ` · ${names}…` : ''}`;
+    + `${Math.round(state.ms)} ms 内实例化 · 自检 ${state.selftest}${names ? ` · ${names}…` : ''}`;
 }
 
 async function loadModule(spec, button, line, out) {
@@ -132,20 +193,20 @@ async function loadModule(spec, button, line, out) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     const started = performance.now();
-    const { instance } = await WebAssembly.instantiate(bytes, {});
+    const mod = await instantiate(bytes);
     state.bytes = bytes.length;
     state.ms = performance.now() - started;
-    state.exports = Object.keys(instance.exports).sort();
-    state.selftest = typeof instance.exports.self_test === 'function'
-      ? instance.exports.self_test()
-      : '无';
-    const seen = analyseHere(instance.exports);
-    if (seen) {
-      state.report = seen.rc === 0
-        ? `${picked.name}：${seen.rows.length} 行\n${seen.rows.join('\n')}`
-        : `${picked.name}：这个文件不是对象文件（返回 ${seen.rc}）`;
+    state.exports = Object.keys(mod).sort();
+    state.selftest = typeof mod.self_test === 'function' ? mod.self_test() : '无';
+    if (spec.id === 'analysis') {
+      state.rows = analyseHere(mod) || [];
+      state.report = !picked
+        ? '还没有选中文件。先选一个 .exe / .so / 可执行文件，再加载本模块。'
+        : (state.rows.length
+          ? `${picked.name}：${state.rows.length} 行\n${state.rows.join('\n')}`
+          : `${picked.name}：这个文件不是对象文件。`);
     } else {
-      state.report = '还没有选中文件。先选一个 .exe / .so / 可执行文件，再加载本模块。';
+      state.report = disassembleHere(mod);
     }
   } catch (error) {
     // A module this build does not ship is a normal state of the page, not a failure to report as a

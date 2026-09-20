@@ -12,6 +12,8 @@ permissions:
 jobs:
   engine:
     runs-on: ubuntu-latest
+    env:
+      CAPSTONE_REF: 5.0.5
     defaults:
       run:
         working-directory: engine
@@ -37,6 +39,27 @@ jobs:
         working-directory: analysis
         run: cargo build --release --target wasm32-unknown-unknown
 
+      # The disassembler is a C engine on a C toolchain, and it belongs here rather than in a side
+      # workflow: an artefact nobody publishes is an experiment, not a feature. Capstone is BSD-3,
+      # emscripten installs from apt in about twenty seconds, and only x86 / AArch64 / Thumb are
+      # enabled because every architecture added is another megabyte a visitor has to opt into.
+      - name: Build disassembler module
+        working-directory: .
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q emscripten cmake ninja-build
+          git clone --depth 1 --branch "$CAPSTONE_REF" https://github.com/capstone-engine/capstone.git vendor/capstone
+          emcmake cmake -S vendor/capstone -B build-capstone -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_SHARED_LIBS=0 -DCAPSTONE_BUILD_TESTS=0 \
+            -DCAPSTONE_ARCHITECTURE_DEFAULT=0 -DCAPSTONE_X86_SUPPORT=1 \
+            -DCAPSTONE_ARM_SUPPORT=1 -DCAPSTONE_ARM64_SUPPORT=1
+          cmake --build build-capstone -j3
+          emcc -O2 -I vendor/capstone/include disasm/shim.c build-capstone/libcapstone.a \
+            -o apk-lens-disasm.wasm -s STANDALONE_WASM \
+            -s EXPORTED_FUNCTIONS=_disasm_run,_disasm_count,_disasm_at,_self_test,_malloc,_free \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=0
+          ls -l apk-lens-disasm.wasm | awk '{print "disassembler module:", $5, "bytes"}'
+
       - name: Host tests
         run: cargo test
 
@@ -56,6 +79,7 @@ jobs:
           node test/module.test.mjs \
             analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm \
             engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+          node test/disasm.test.mjs apk-lens-disasm.wasm
 
       # One artifact per module, and each with a single path: an upload that lists two files keeps
       # their directories, which is exactly what broke the site assembly the first time.
@@ -68,6 +92,11 @@ jobs:
         with:
           name: apk-lens-analysis-wasm
           path: analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-lens-disasm-wasm
+          path: apk-lens-disasm.wasm
 
   pages:
     needs: engine
@@ -89,11 +118,16 @@ jobs:
         with:
           name: apk-lens-analysis-wasm
           path: artifact-analysis
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-lens-disasm-wasm
+          path: artifact-disasm
       - name: Assemble site
         run: |
           mkdir -p site
           cp artifact/apk_lens.wasm site/apk-lens.wasm
           cp artifact-analysis/apk_lens_analysis.wasm site/apk-lens-analysis.wasm
+          cp artifact-disasm/apk-lens-disasm.wasm site/apk-lens-disasm.wasm
           cp demo/index.html site/index.html
           ls -l site
       - uses: actions/configure-pages@v5

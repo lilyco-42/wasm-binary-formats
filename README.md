@@ -295,8 +295,14 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 109 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections, and both symbol tables |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 110 binary labels |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
+| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text for x86-64, AArch64 and Thumb bytes |
+
+The third module is the reason the second one reports a `machine` and a section's file offset at all:
+the page hands the analyser's answer - which instruction set, and where the code lies in the file -
+to the disassembler, the same way `objdump -d` gets both from the binary. It is 1.86 MB, 601 KB
+gzipped, which is exactly why it is not in the module every visitor loads.
 
 The analysis module rides on [`object`](https://crates.io/crates/object) (Apache-2.0 or MIT, pinned to
 `=0.32.2` because the row text is that crate's own naming), with `default-features = false` and only
@@ -314,8 +320,11 @@ Two things named in the requirement are not viable and are not going to be quiet
 something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no wasm port; and
 **LLVM itself** (the `cling` line of the user's own `clings`/`cling`/`cling-win` repos) is a
 multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
-200 KB demo. The honest path for instruction decoding is a per-architecture module, opt-in like this
-one, not the compiler suite.
+200 KB demo. Instruction decoding, by contrast, turned out to be reachable the same day the question
+was measured, so it ships: what is left on this lane is the rest of the pipeline those tools are known
+for - cross-references and function boundaries over decoded instructions, then names and types - one
+opt-in module at a time. A decompiler is not on the list: the well-known one is proprietary, and
+"we ported it" would not be true.
 
 ## Reproduce
 
