@@ -741,7 +741,10 @@ does not re-derive them:
   the entry itself carries `.file`; the row prints the entry and the script asserts the aux bytes spell
   what bfd prints, rather than waiving the mismatch. And the earlier check had been reading `ty` as
   decimal digits while bfd prints them as hex, which agrees by accident for every type whose digits are
-  all below 10 - a witness that is subtly wrong looks exactly like a witness that passed.
+  all below 10 - a witness that is subtly wrong looks exactly like a witness that passed. A third fact
+  came from a hand-built case rather than from a witness: patch the symbol count to zero and there is no
+  string table to resolve with, so the section keeps the literal `/4` its record holds - the alternative
+  is reading four bytes past the header and calling the result a name.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

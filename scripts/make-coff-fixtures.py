@@ -69,16 +69,22 @@ def name_of(data, entry, strings):
 
     The two tables spell a long name differently - a section writes `/4`, a symbol leaves the first
     four bytes empty and puts the offset in the next four - so both forms are handled here and the
-    difference is reported in the row.
+    difference is reported in the row. `strings` is None when the object states no symbol table, and
+    then nothing is resolved: the offset still goes out, but reading bytes at it would invent a name
+    out of whatever follows the header.
     """
     raw = entry[:8]
     if raw[:4] == b"\x00\x00\x00\x00" and len(raw) == 8:
         offset = struct.unpack_from("<I", raw, 4)[0]
+        if strings is None:
+            return "?", offset
         end = data.find(b"\x00", strings + offset)
         return data[strings + offset : end].decode("latin1"), offset
     text = raw.split(b"\x00", 1)[0].decode("latin1")
     if text.startswith("/"):
         offset = int(text[1:])
+        if strings is None:
+            return text, offset
         end = data.find(b"\x00", strings + offset)
         return data[strings + offset : end].decode("latin1"), offset
     return text, None
@@ -147,7 +153,9 @@ def walk(data, entries=None):
     if symbols and (not symbols_at or symbols_at + symbols * 18 > len(data)):
         return None
     strings_at, strings_size = string_table(data, symbols_at, symbols)
-    table = sections(data, count, strings_at)
+    # No symbol table means no string table following it, so a long name has nothing to resolve against.
+    table_at = None if symbols == 0 else strings_at
+    table = sections(data, count, table_at)
 
     broken = 0
     if symbols and strings_at + strings_size != len(data):
@@ -212,7 +220,7 @@ def walk(data, entries=None):
             stopped = True
             break
         entry = data[at : at + 18]
-        name, ref = name_of(data, entry, strings_at)
+        name, ref = name_of(data, entry, table_at)
         value = u32(entry, 8)
         section = struct.unpack_from("<h", entry, 12)[0]
         sym_type = u16(entry, 14)

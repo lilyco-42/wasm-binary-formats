@@ -169,8 +169,12 @@ fn the_i686_object_reads_the_same_way_under_underscored_names() {
         "coff\t697\tbroken\t0\tmachine\t014c(i386)\tsections\t5\topts\t0"
     );
     assert_eq!(
-        lines[lines.len() - 3],
-        "symbol\t12\t_helper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-"
+        lines
+            .iter()
+            .find(|line| line.starts_with("symbol\t12\t"))
+            .unwrap(),
+        "symbol\t12\t_helper\tvalue\t10\tsect\t1\ttype\t0020\tscl\t2\taux\t0\tbase\t-",
+        "looked up by prefix, because the rows after the symbol table are relocations"
     );
     assert_eq!(lines[lines.len() - 1], "walked\tend");
     // The 32-bit object carries no SEH unwind sections, so the difference between the two files is the
@@ -248,8 +252,20 @@ fn an_object_that_states_no_symbols_says_so_instead_of_pointing_at_a_table() {
         lines.iter().filter(|line| line.starts_with("symbol")).count(),
         0
     );
-    assert_eq!(lines.len(), 10, "header, layout, seven sections, walked");
+    // Nothing is resolved through a table that is not there: the section keeps the literal `/4` its
+    // record holds rather than a name read from whatever follows the header, and the relocations of a
+    // section that does carry them name their target `?`.
+    assert_eq!(
+        lines[8],
+        "section\t6\t/4\tvsize\t0\tvaddr\t0\traw\t1@543\treloc\t0x0\tlines\t0x0\tchars\t00100800"
+    );
+    assert_eq!(
+        lines[9],
+        "reloc\t0\t0\toffset\t15\ttype\t4(REL32)\tsym\t15(?)",
+        "the relocation is still a fact about the section even with no symbol table to read"
+    );
     assert_eq!(lines[lines.len() - 1], "walked\tend");
+    assert_eq!(lines.len(), 14, "header, layout, 7 sections, 4 relocations, walked");
 }
 
 #[test]

@@ -5977,7 +5977,11 @@ fn coff_tail(bytes: &[u8], at: usize) -> String {
 
 /// An eight-byte name field: the name itself, or a reference into the string table. A section spells a
 /// long name `/4`; a symbol leaves the first four bytes zero and puts the offset in the next four.
-fn coff_name(bytes: &[u8], at: usize, strings: usize) -> (String, Option<u32>) {
+///
+/// `strings` is `None` when the object states no symbol table, because then there is no table following
+/// it either: the offset a record carries is still printed, but nothing is resolved with it - reading
+/// four bytes past the header would otherwise hand back a name invented from unrelated bytes.
+fn coff_name(bytes: &[u8], at: usize, strings: Option<usize>) -> (String, Option<u32>) {
     let Some(end) = at.checked_add(8) else {
         return ("?".to_owned(), None);
     };
@@ -5985,10 +5989,12 @@ fn coff_name(bytes: &[u8], at: usize, strings: usize) -> (String, Option<u32>) {
         return ("?".to_owned(), None);
     }
     if coff_u32(bytes, at).unwrap_or(1) == 0 {
-        if let Some(offset) = coff_u32(bytes, at + 4) {
-            let where_at = strings.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX));
-            return (coff_tail(bytes, where_at), Some(offset));
-        }
+        let offset = coff_u32(bytes, at + 4).unwrap_or(0);
+        let where_at = strings.map(|table| {
+            table.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX))
+        });
+        let named = where_at.map_or_else(|| "?".to_owned(), |at| coff_tail(bytes, at));
+        return (named, Some(offset));
     }
     let text: String = bytes[at..end]
         .iter()
@@ -5997,8 +6003,12 @@ fn coff_name(bytes: &[u8], at: usize, strings: usize) -> (String, Option<u32>) {
         .collect();
     if let Some(rest) = text.strip_prefix('/') {
         if let Ok(offset) = rest.parse::<u32>() {
-            let where_at = strings.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX));
-            return (coff_tail(bytes, where_at), Some(offset));
+            if let Some(table) = strings {
+                let where_at =
+                    table.saturating_add(usize::try_from(offset).unwrap_or(usize::MAX));
+                return (coff_tail(bytes, where_at), Some(offset));
+            }
+            return (text, Some(offset));
         }
     }
     (text, None)
@@ -6022,7 +6032,13 @@ fn coff_reloc_kind(machine: u16, value: u16) -> &'static str {
 /// makes a relocation's index 15 mean `answer` rather than the sixteenth entry of the table, and it is
 /// the only place the index is used as an index - which is also why it is resolved by walking rather
 /// than by keeping a table of names for an object that may state millions of records.
-fn coff_symbol(bytes: &[u8], symbols_at: u32, symbols: u32, want: u32, strings: usize) -> String {
+fn coff_symbol(
+    bytes: &[u8],
+    symbols_at: u32,
+    symbols: u32,
+    want: u32,
+    strings: Option<usize>,
+) -> String {
     let mut at = u64::from(symbols_at);
     let mut records = 0u64;
     let target = u64::from(want);
@@ -6075,6 +6091,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
         let size = coff_u32(bytes, strings_at).unwrap_or(0);
         (size, format!("{size}@{strings_at}"))
     };
+    let strings = (symbols != 0).then_some(strings_at);
     // A table that mis-states its own length is the one broken claim the format cannot check any other
     // way, and it is counted rather than followed.
     let mut broken =
@@ -6084,7 +6101,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
     let mut tables: Vec<(usize, u32, u16)> = Vec::new();
     for index in 0..sections {
         let at = section_table + index * 40;
-        let (name, _) = coff_name(bytes, at, strings_at);
+        let (name, _) = coff_name(bytes, at, strings);
         let virtual_size = coff_u32(bytes, at + 8)?;
         let address = coff_u32(bytes, at + 12)?;
         let raw_size = coff_u32(bytes, at + 16)?;
@@ -6128,7 +6145,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
             stopped = true;
             break;
         };
-        let (name, base) = coff_name(bytes, start, strings_at);
+        let (name, base) = coff_name(bytes, start, strings);
         let value = coff_u32(bytes, start + 8)?;
         let section = coff_i16(bytes, start + 12)?;
         let kind = coff_u16(bytes, start + 14)?;
@@ -6172,7 +6189,7 @@ fn read_coff(bytes: &[u8]) -> Option<Vec<String>> {
             reloc_rows.push(format!(
                 "reloc\t{index}\t{record}\toffset\t{offset:x}\ttype\t{kind:x}({})\tsym\t{symlink}({})",
                 coff_reloc_kind(machine, kind),
-                coff_symbol(bytes, symbol_ptr, symbols, symlink, strings_at)
+                coff_symbol(bytes, symbol_ptr, symbols, symlink, strings)
             ));
             listed += 1;
         }
