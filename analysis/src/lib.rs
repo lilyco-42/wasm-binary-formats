@@ -77,7 +77,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
             label(&symbol.kind()),
             symbol
                 .section_index()
-                .map_or("-".to_owned(), |id| id.get().to_string())
+                .map_or("-".to_owned(), |id| id.0.to_string())
         ));
     }
     if symbols > MAX_LISTED {
