@@ -2726,7 +2726,7 @@ const NPY_MAGIC: [u8; 6] = [0x93, b'N', b'U', b'M', b'P', b'Y'];
 fn npy_value(header: &[u8], key: &[u8]) -> Option<Vec<u8>> {
     let at = find(header, 0, key)?.checked_add(key.len())?;
     let mut rest = header.get(at..)?;
-    while matches!(rest.first(), Some(b' ') | Some(b'\t')) {
+    while matches!(rest.first(), Some(&b' ') | Some(&b'\t')) {
         rest = rest.get(1..)?;
     }
     let open = *rest.first()?;
@@ -2758,6 +2758,7 @@ fn npy_value(header: &[u8], key: &[u8]) -> Option<Vec<u8>> {
     let end = rest
         .iter()
         .position(|byte| {
+            let byte = *byte;
             !(byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'+' | b'-'))
         })
         .unwrap_or(rest.len());
@@ -2800,7 +2801,7 @@ fn read_npy(bytes: &[u8]) -> Option<Vec<String>> {
         Le(bytes).u32(8)?
     };
     let header_len = usize::try_from(length.max(0)).ok()?;
-    let header_at = if major == 1 { 10 } else { 12 };
+    let header_at: usize = if major == 1 { 10 } else { 12 };
     let header_end = header_at.checked_add(header_len)?;
     let header = bytes.get(header_at..header_end)?;
     if header_len < 3 || header.first() != Some(&b'{') || header.last() != Some(&b'}') {
