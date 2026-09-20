@@ -4928,9 +4928,9 @@ fn cfb_name(bytes: &[u8], at: usize) -> String {
     if length < 2 || length > 64 {
         return String::new();
     }
-    let stop = at + 64 + length as usize - 2;
+    let stop = at + length as usize - 2;
     let mut out = String::new();
-    let mut walk = at + 64;
+    let mut walk = at;
     while walk < stop {
         // A character has to lie wholly inside the declared length; half of one does not exist.
         let value = if walk + 2 <= stop {
