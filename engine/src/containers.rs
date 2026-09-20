@@ -4877,26 +4877,23 @@ const CFB_CHAIN: usize = 65_536;
 const CFB_HOPS: usize = 1_024;
 
 fn cfb_u16(bytes: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from(u16::from_le_bytes(
-        *bytes.get(at..at.checked_add(2)?)?.try_into().ok()?,
-    )))
+    let raw: [u8; 2] = bytes.get(at..at.checked_add(2)?)?.try_into().ok()?;
+    Some(u32::from(u16::from_le_bytes(raw)))
 }
 
 fn cfb_u32(bytes: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_le_bytes(
-        bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
-    ))
+    let raw: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
+    Some(u32::from_le_bytes(raw))
 }
 
 fn cfb_u64(bytes: &[u8], at: usize) -> Option<u64> {
-    Some(u64::from_le_bytes(
-        bytes.get(at..at.checked_add(8)?)?.try_into().ok()?,
-    ))
+    let raw: [u8; 8] = bytes.get(at..at.checked_add(8)?)?.try_into().ok()?;
+    Some(u64::from_le_bytes(raw))
 }
 
 /// One sector of the file, addressed the only way CFB addresses anything.
 fn cfb_page(bytes: &[u8], sector: u32, size: usize) -> Option<&[u8]> {
-    let offset = CFB_HEADER.checked_add(usize::from(sector).checked_mul(size)?)?;
+    let offset = CFB_HEADER.checked_add((sector as usize).checked_mul(size)?)?;
     bytes.get(offset..offset.checked_add(size)?)
 }
 
@@ -5042,7 +5039,7 @@ fn read_cfb(bytes: &[u8]) -> Option<Vec<String>> {
     let per_entry = ss / 128;
     let entry_at = |index: usize| -> Option<&[u8]> {
         let sector = *dir_sectors.get(index / per_entry)?;
-        let base = CFB_HEADER.checked_add(usize::from(sector).checked_mul(ss)?)?;
+        let base = CFB_HEADER.checked_add((sector as usize).checked_mul(ss)?)?;
         let start = base.checked_add((index % per_entry).checked_mul(128)?)?;
         bytes.get(start..start.checked_add(128)?)
     };
