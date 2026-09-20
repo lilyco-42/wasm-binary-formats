@@ -127,11 +127,13 @@ fn the_known_tag_list_matches_the_implementation_the_fixture_came_from() {
     // The 63 names are a table, and tables are what this repo keeps getting wrong from memory, so
     // the probe carries fontTools' own list and the two are compared in order.
     let text = fs::read_to_string(format!("{FIXTURES}woff2.probe.json")).expect("woff2.probe.json");
+    let key = "\"known_tags\": [";
     let start = text
-        .find("\"known_tags\": [")
+        .find(key)
         .expect("the probe records the known-tag list")
-        + "\"known_tags\": [".len();
-    let body = &text[start..text[start + find_end(&text[start..])]];
+        + key.len();
+    let rest = &text[start..];
+    let body = &rest[..rest.find(']').expect("the list is closed")];
     let listed: Vec<String> = body
         .split(',')
         .map(|item| item.trim().trim_matches('"').to_owned())
@@ -142,14 +144,10 @@ fn the_known_tag_list_matches_the_implementation_the_fixture_came_from() {
         listed,
         WOFF2_KNOWN_TAGS
             .iter()
-            .map(String::from)
+            .map(|tag| (*tag).to_owned())
             .collect::<Vec<_>>(),
         "the reader's table and fontTools' disagree"
     );
-}
-
-fn find_end(rest: &str) -> usize {
-    rest.find(']').expect("the list is closed")
 }
 
 #[test]
