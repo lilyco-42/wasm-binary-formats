@@ -1,0 +1,198 @@
+{
+ "block.heic": {
+  "brand": "heic",
+  "bytes": 403,
+  "rows": [
+   "heif\t403\tboxes\t15\tbroken\t0\tbrand\theic",
+   "compat\tmif1,heic,miaf",
+   "handler\tpict",
+   "items\t1\tprimary\t1\tdescs\t1",
+   "coded\t64x64",
+   "depths\t8,8,8\tchannels\t3",
+   "colour\t1\ttransfer\t13\tmatrix\t6\trange\t1",
+   "data\t25",
+   "box\t0\tftyp\tat\t0\tsize\t28\tdepth\t0",
+   "box\t1\tmeta\tat\t28\tsize\t342\tdepth\t0",
+   "box\t2\thdlr\tat\t40\tsize\t33\tdepth\t1",
+   "box\t3\tiloc\tat\t73\tsize\t34\tdepth\t1",
+   "box\t4\tiinf\tat\t107\tsize\t35\tdepth\t1",
+   "box\t5\tinfe\tat\t121\tsize\t21\tdepth\t2",
+   "box\t6\tpitm\tat\t142\tsize\t14\tdepth\t1",
+   "box\t7\tiprp\tat\t156\tsize\t214\tdepth\t1",
+   "box\t8\tipco\tat\t164\tsize\t183\tdepth\t2",
+   "box\t9\thvcC\tat\t172\tsize\t120\tdepth\t3",
+   "box\t10\tcolr\tat\t292\tsize\t19\tdepth\t3",
+   "box\t11\tispe\tat\t311\tsize\t20\tdepth\t3",
+   "box\t12\tpixi\tat\t331\tsize\t16\tdepth\t3",
+   "box\t13\tipma\tat\t347\tsize\t23\tdepth\t2",
+   "box\t14\tmdat\tat\t370\tsize\t33\tdepth\t0",
+   "walked\tend"
+  ],
+  "writer": {
+   "bit_depth": 8,
+   "chroma": 420,
+   "colour": {
+    "matrix": 6,
+    "primaries": 1,
+    "range": 1,
+    "transfer": 13
+   },
+   "frames": 1,
+   "mimetype": "image/heic",
+   "primary": true,
+   "size": [
+    64,
+    64
+   ]
+  }
+ },
+ "container.heif": {
+  "brand": "heic",
+  "bytes": 457,
+  "rows": [
+   "heif\t457\tboxes\t16\tbroken\t0\tbrand\theic",
+   "compat\tmif1,heic,miaf",
+   "handler\tpict",
+   "items\t1\tprimary\t1\tdescs\t1",
+   "coded\t64x64",
+   "visible\t18/1x12/1",
+   "depths\t8,8,8\tchannels\t3",
+   "colour\t1\ttransfer\t13\tmatrix\t6\trange\t1",
+   "data\t41",
+   "box\t0\tftyp\tat\t0\tsize\t28\tdepth\t0",
+   "box\t1\tmeta\tat\t28\tsize\t380\tdepth\t0",
+   "box\t2\thdlr\tat\t40\tsize\t33\tdepth\t1",
+   "box\t3\tiloc\tat\t73\tsize\t34\tdepth\t1",
+   "box\t4\tiinf\tat\t107\tsize\t35\tdepth\t1",
+   "box\t5\tinfe\tat\t121\tsize\t21\tdepth\t2",
+   "box\t6\tpitm\tat\t142\tsize\t14\tdepth\t1",
+   "box\t7\tiprp\tat\t156\tsize\t252\tdepth\t1",
+   "box\t8\tipco\tat\t164\tsize\t220\tdepth\t2",
+   "box\t9\thvcC\tat\t172\tsize\t117\tdepth\t3",
+   "box\t10\tcolr\tat\t289\tsize\t19\tdepth\t3",
+   "box\t11\tispe\tat\t308\tsize\t20\tdepth\t3",
+   "box\t12\tclap\tat\t328\tsize\t40\tdepth\t3",
+   "box\t13\tpixi\tat\t368\tsize\t16\tdepth\t3",
+   "box\t14\tipma\tat\t384\tsize\t24\tdepth\t2",
+   "box\t15\tmdat\tat\t408\tsize\t49\tdepth\t0",
+   "walked\tend"
+  ],
+  "writer": {
+   "bit_depth": 8,
+   "chroma": 420,
+   "colour": {
+    "matrix": 6,
+    "primaries": 1,
+    "range": 1,
+    "transfer": 13
+   },
+   "frames": 1,
+   "mimetype": "image/heic",
+   "primary": true,
+   "size": [
+    18,
+    12
+   ]
+  }
+ },
+ "photo.heic": {
+  "brand": "heic",
+  "bytes": 453,
+  "rows": [
+   "heif\t453\tboxes\t16\tbroken\t0\tbrand\theic",
+   "compat\tmif1,heic",
+   "handler\tpict",
+   "items\t1\tprimary\t1\tdescs\t1",
+   "coded\t64x64",
+   "visible\t23/1x17/1",
+   "depths\t8,8,8\tchannels\t3",
+   "colour\t1\ttransfer\t13\tmatrix\t6\trange\t1",
+   "data\t41",
+   "box\t0\tftyp\tat\t0\tsize\t24\tdepth\t0",
+   "box\t1\tmeta\tat\t24\tsize\t380\tdepth\t0",
+   "box\t2\thdlr\tat\t36\tsize\t33\tdepth\t1",
+   "box\t3\tiloc\tat\t69\tsize\t34\tdepth\t1",
+   "box\t4\tiinf\tat\t103\tsize\t35\tdepth\t1",
+   "box\t5\tinfe\tat\t117\tsize\t21\tdepth\t2",
+   "box\t6\tpitm\tat\t138\tsize\t14\tdepth\t1",
+   "box\t7\tiprp\tat\t152\tsize\t252\tdepth\t1",
+   "box\t8\tipco\tat\t160\tsize\t220\tdepth\t2",
+   "box\t9\thvcC\tat\t168\tsize\t117\tdepth\t3",
+   "box\t10\tcolr\tat\t285\tsize\t19\tdepth\t3",
+   "box\t11\tispe\tat\t304\tsize\t20\tdepth\t3",
+   "box\t12\tclap\tat\t324\tsize\t40\tdepth\t3",
+   "box\t13\tpixi\tat\t364\tsize\t16\tdepth\t3",
+   "box\t14\tipma\tat\t380\tsize\t24\tdepth\t2",
+   "box\t15\tmdat\tat\t404\tsize\t49\tdepth\t0",
+   "walked\tend"
+  ],
+  "writer": {
+   "bit_depth": 8,
+   "chroma": 420,
+   "colour": {
+    "matrix": 6,
+    "primaries": 1,
+    "range": 1,
+    "transfer": 13
+   },
+   "frames": 1,
+   "mimetype": "image/heic",
+   "primary": true,
+   "size": [
+    23,
+    17
+   ]
+  }
+ },
+ "seq.heic": {
+  "brand": "heic",
+  "bytes": 636,
+  "rows": [
+   "heif\t636\tboxes\t18\tbroken\t0\tbrand\theic",
+   "compat\tmif1,heic,miaf",
+   "handler\tpict",
+   "items\t3\tprimary\t1\tdescs\t3",
+   "coded\t64x64",
+   "visible\t32/1x24/1",
+   "depths\t8,8,8\tchannels\t3",
+   "colour\t1\ttransfer\t13\tmatrix\t6\trange\t1",
+   "data\t126",
+   "box\t0\tftyp\tat\t0\tsize\t28\tdepth\t0",
+   "box\t1\tmeta\tat\t28\tsize\t474\tdepth\t0",
+   "box\t2\thdlr\tat\t40\tsize\t33\tdepth\t1",
+   "box\t3\tiloc\tat\t73\tsize\t70\tdepth\t1",
+   "box\t4\tiinf\tat\t143\tsize\t77\tdepth\t1",
+   "box\t5\tinfe\tat\t157\tsize\t21\tdepth\t2",
+   "box\t6\tinfe\tat\t178\tsize\t21\tdepth\t2",
+   "box\t7\tinfe\tat\t199\tsize\t21\tdepth\t2",
+   "box\t8\tpitm\tat\t220\tsize\t14\tdepth\t1",
+   "box\t9\tiprp\tat\t234\tsize\t268\tdepth\t1",
+   "box\t10\tipco\tat\t242\tsize\t220\tdepth\t2",
+   "box\t11\thvcC\tat\t250\tsize\t117\tdepth\t3",
+   "box\t12\tcolr\tat\t367\tsize\t19\tdepth\t3",
+   "box\t13\tispe\tat\t386\tsize\t20\tdepth\t3",
+   "box\t14\tclap\tat\t406\tsize\t40\tdepth\t3",
+   "box\t15\tpixi\tat\t446\tsize\t16\tdepth\t3",
+   "box\t16\tipma\tat\t462\tsize\t40\tdepth\t2",
+   "box\t17\tmdat\tat\t502\tsize\t134\tdepth\t0",
+   "walked\tend"
+  ],
+  "writer": {
+   "bit_depth": 8,
+   "chroma": 420,
+   "colour": {
+    "matrix": 6,
+    "primaries": 1,
+    "range": 1,
+    "transfer": 13
+   },
+   "frames": 3,
+   "mimetype": "image/heic",
+   "primary": true,
+   "size": [
+    32,
+    24
+   ]
+  }
+ }
+}

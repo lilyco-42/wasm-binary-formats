@@ -319,6 +319,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['rows.parquet', 39], ['plain.parquet', 39], ['zstd.parquet', 39], ['gzip.parquet', 39],
     ['nodict.parquet', 39], ['nulls.parquet', 39], ['groups.parquet', 39], ['typed.parquet', 39],
     ['add.onnx', 40], ['symbolic.onnx', 40], ['types.onnx', 40],
+    ['photo.heic', 41], ['block.heic', 41], ['seq.heic', 41], ['container.heif', 41],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -462,6 +463,19 @@ test('an ONNX model keeps its field numbers and its unknown axes across the ABI'
   assert.ok(symbolic.includes('opset	1	domain	ai.onnx.ml	version	3'), symbolic.join(' | '));
 });
 
+test('a HEIF keeps the coded size and the visible size apart across the ABI', () => {
+  const cropped = assertReadable('container', 'photo.heic', 41).rows;
+  assert.equal(cropped[0], 'heif	453	boxes	16	broken	0	brand	heic', cropped.join(' | '));
+  assert.ok(cropped.includes('coded	64x64'), 'ispe is the coded size');
+  assert.ok(cropped.includes('visible	23/1x17/1'), 'clap is the picture');
+  assert.ok(cropped.includes('colour	1	transfer	13	matrix	6	range	1'), cropped.join(' | '));
+  assert.equal(cropped[cropped.length - 1], 'walked	end');
+  const exact = assertReadable('container', 'block.heic', 41).rows;
+  assert.ok(!exact.some((row) => row.startsWith('visible	')), 'no crop box, so no crop row');
+  const sequence = assertReadable('container', 'seq.heic', 41).rows;
+  assert.ok(sequence.includes('items	3	primary	1	descs	3'), sequence.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -506,7 +520,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

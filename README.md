@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 41 | 18.7% |
+| own Rust reader, named header fields decoded | 42 | 19.2% |
 | own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **113** | 51.6% |
-| **covered, any level** | **106** | 48.4% |
+| **no parser at all - real gap** | **112** | 51.1% |
+| **covered, any level** | **107** | 48.9% |
 
-Top binary gap groups by count: unknown 54, archive 11, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 54, archive 11, image 10, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `h5`,
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 106 of 219 binary labels have a parser
-that runs here (41 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 113 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 107 of 219 binary labels have a parser
+that runs here (42 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 112 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -303,6 +303,7 @@ temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro wri
 temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
 temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
 temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
+temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -393,8 +394,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **106 covered** (41 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **113 with no
+Coverage is scored against magika's 219 binary labels: **107 covered** (42 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **112 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -537,6 +538,15 @@ does not re-derive them:
   `int32_data` 5 and `string_data` 6, so the remembered 5/6/12 would have called an int32 tensor a
   float one and a doc string a payload. `ModelProto.ByteSize()` equals the file length, which is what
   lets the reader require that its walk account for every byte and refuse a truncated model.
+  HEIF (+1 field-level label, 107 covered, 112 gaps) is the same ISO base-media container MP4 uses, and
+  the reason it needed its own reader is a size that is not the picture: libheif codes in whole blocks,
+  so a 23x17 image declares `ispe` 64x64 and carries the real 23x17 in `clap`, as signed numerators over
+  unsigned denominators. `scripts/make-heif-fixtures.py` writes it with pillow-heif (which bundles
+  libheif) and asserts the crop's numerators equal the size pillow-heif reports when it reads the file
+  back, the `pixi` depths' maximum equal its bit depth, and the `nclx` primaries/transfer/matrix/range
+  equal its colour profile; `block.heic`, written at an exact block size, is the control - same coded
+  64x64, no `clap` box at all, so the two files together show that reporting `ispe` alone would print a
+  size one of the two pictures does not have.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

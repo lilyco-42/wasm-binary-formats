@@ -14,6 +14,8 @@
 //!         entries (tag, type, count, value), then u32 next IFD offset
 //!   h5    0x89 "HDF" then CR LF SUB LF, one superblock version byte, the widths of every offset
 //!         and length, and addresses that sign the structure they point at
+//!   heif  ISO base-media boxes (`ftyp` brand `heic`) whose `meta` carries the item
+//!         inventory; `ispe` is the coded size and `clap` the visible one, which differ
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
@@ -106,6 +108,7 @@ pub fn name() -> &'static str {
         FORMAT_ARROW => "arrow",
         FORMAT_PARQUET => "parquet",
         FORMAT_ONNX => "onnx",
+        FORMAT_HEIF => "heif",
         _ => "unknown",
     }
 }
@@ -4565,6 +4568,289 @@ fn read_onnx(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+/// HEIF/HEIC: the item descriptions inside an ISO base-media container. 41, after ONNX at 40.
+///
+/// The container is the one this file already walks for MP4 - big-endian `size` then `type` - so what
+/// earns a separate reader is the metadata: `ftyp` names a *brand* rather than a meaning, and `meta`
+/// holds the item inventory (`iinf`/`infe`), the primary item (`pitm`), the properties items claim
+/// (`iprp`/`ipco`/`ipma`) and where the payload lives (`iloc`, `mdat`).
+///
+/// The reason this is worth naming is that **the coded size and the visible size are different
+/// numbers**. libheif codes in whole blocks, so `test/fixtures/photo.heic` - a 23x17 picture -
+/// declares `ispe` 64x64 and crops it back to 23x17 in `clap`, whose values are signed numerators over
+/// unsigned denominators. A reader that reports `ispe` prints a size the picture does not have, so both
+/// are reported and labelled. Every number is compared against what pillow-heif's own reader says
+/// about the same bytes (its size, bit depth, and the `nclx` primaries/transfer/matrix/range triple),
+/// never against a reading of the specification.
+pub const FORMAT_HEIF: i32 = 41;
+
+/// Boxes whose payload is more boxes, and the header bytes to skip before them. `meta`, `iinf` and
+/// friends are *full* boxes: the four bytes are a version and flags, not a box header.
+const HEIF_CONTAINERS: [(&str, usize); 4] = [("meta", 4), ("iprp", 0), ("ipco", 0), ("iinf", 6)];
+/// The brands the fixtures actually carry, plus the sibling HEVC still-image brands that share the
+/// identical metadata. AVIF is deliberately absent: the existing BMFF reader answers for it.
+const HEIF_BRANDS: [&str; 6] = ["heic", "heix", "heim", "heis", "mif1", "hevc"];
+const HEIF_BOXES: usize = 256;
+const HEIF_DEPTH: usize = 8;
+
+fn heif_u32(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(u32::from_be_bytes(
+        bytes.get(at..at + 4)?.try_into().ok()?,
+    )))
+}
+
+/// The signed reading of the same four bytes: `clap` offsets and numerators are signed.
+fn heif_i32(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(i32::from_be_bytes(
+        bytes.get(at..at + 4)?.try_into().ok()?,
+    )))
+}
+
+fn heif_u16(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(u16::from_be_bytes(
+        bytes.get(at..at + 2)?.try_into().ok()?,
+    )))
+}
+
+fn heif_byte(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(*bytes.get(at)?))
+}
+
+fn heif_tag(bytes: &[u8], at: usize) -> Option<String> {
+    Some(printable(&String::from_utf8_lossy(bytes.get(at..at + 4)?)))
+}
+
+fn heif_container(kind: &str) -> Option<usize> {
+    HEIF_CONTAINERS
+        .iter()
+        .find(|(name, _)| *name == kind)
+        .map(|(_, skip)| *skip)
+}
+
+/// The fields this reader names out of the boxes it walks.
+#[derive(Default)]
+struct HeifMeta {
+    brand: String,
+    compat: Vec<String>,
+    handler: String,
+    items: i64,
+    primary: i64,
+    descs: usize,
+    coded: Option<(i64, i64)>,
+    visible: Option<(i64, i64, i64, i64)>,
+    depths: Vec<i64>,
+    channels: i64,
+    colour: Option<(i64, i64, i64, i64)>,
+    payload: i64,
+}
+
+/// Walk one box list. `rows` collects the `box` lines in document order, `meta` the named fields, and
+/// the result counts the structures that did not add up - a truncated or hostile file stops the walk
+/// instead of panicking it.
+fn heif_walk(
+    bytes: &[u8],
+    start: usize,
+    stop: usize,
+    depth: usize,
+    rows: &mut Vec<String>,
+    meta: &mut HeifMeta,
+    index: &mut usize,
+) -> i64 {
+    let mut broken = 0i64;
+    let mut at = start;
+    while at + 8 <= stop {
+        let Some(declared) = heif_u32(bytes, at) else {
+            return broken + 1;
+        };
+        let Some(kind) = heif_tag(bytes, at + 4) else {
+            return broken + 1;
+        };
+        let mut head = 8usize;
+        let size = match declared {
+            0 => match stop.checked_sub(at) {
+                Some(rest) => rest,
+                None => return broken + 1,
+            },
+            1 => {
+                let Some(wide) = heif_u32(bytes, at + 8) else {
+                    return broken + 1;
+                };
+                if wide < 16 {
+                    return broken + 1;
+                }
+                head = 16;
+                usize::try_from(wide).unwrap_or(usize::MAX)
+            }
+            other => usize::try_from(other).unwrap_or(usize::MAX),
+        };
+        let Some(end) = at.checked_add(size) else {
+            return broken + 1;
+        };
+        if size < head || end > stop {
+            return broken + 1;
+        }
+        let body = size - head;
+        let here = at + head;
+        rows.push(format!(
+            "box\t{index}\t{kind}\tat\t{at}\tsize\t{size}\tdepth\t{depth}",
+            index = *index
+        ));
+        *index += 1;
+        match kind.as_str() {
+            "ftyp" if body >= 12 => {
+                meta.brand = heif_tag(bytes, here).unwrap_or_default();
+                let mut cursor = here + 8;
+                while cursor + 4 <= at + size {
+                    if let Some(brand) = heif_tag(bytes, cursor) {
+                        meta.compat.push(brand);
+                    }
+                    cursor += 4;
+                }
+            }
+            "hdlr" if body >= 12 => {
+                meta.handler = heif_tag(bytes, here + 8).unwrap_or_default();
+            }
+            "ispe" if body >= 12 => {
+                if let (Some(width), Some(height)) =
+                    (heif_u32(bytes, here + 4), heif_u32(bytes, here + 8))
+                {
+                    meta.coded = Some((width, height));
+                }
+            }
+            "clap" if body >= 16 => {
+                let width = heif_i32(bytes, here).unwrap_or(0);
+                let width_ratio = heif_u32(bytes, here + 4).unwrap_or(1).max(1);
+                let height = heif_i32(bytes, here + 8).unwrap_or(0);
+                let height_ratio = heif_u32(bytes, here + 12).unwrap_or(1).max(1);
+                meta.visible = Some((width, width_ratio, height, height_ratio));
+            }
+            "pixi" if body >= 5 => {
+                meta.channels = heif_byte(bytes, here + 4).unwrap_or(0);
+                let count = meta.channels.clamp(0, 8) as usize;
+                meta.depths = (0..count)
+                    .filter_map(|channel| heif_byte(bytes, here + 5 + channel))
+                    .collect();
+            }
+            "colr" if body >= 11 => {
+                if bytes.get(here..here + 4) == Some(&b"nclx"[..]) {
+                    let primaries = heif_u16(bytes, here + 4).unwrap_or(0);
+                    let transfer = heif_u16(bytes, here + 6).unwrap_or(0);
+                    let matrix = heif_u16(bytes, here + 8).unwrap_or(0);
+                    let range = heif_byte(bytes, here + 10).unwrap_or(0) >> 7;
+                    meta.colour = Some((primaries, transfer, matrix, range));
+                }
+            }
+            "pitm" if body >= 6 => {
+                meta.primary = if heif_byte(bytes, here) == Some(0) {
+                    heif_u16(bytes, here + 4).unwrap_or(0)
+                } else {
+                    heif_u32(bytes, here + 4).unwrap_or(0)
+                };
+            }
+            "iinf" if body >= 5 => {
+                meta.items = if heif_byte(bytes, here) == Some(0) {
+                    heif_u16(bytes, here + 4).unwrap_or(0)
+                } else {
+                    heif_byte(bytes, here + 4).unwrap_or(0)
+                };
+            }
+            "infe" => meta.descs += 1,
+            "mdat" => meta.payload += body as i64,
+            _ => {}
+        }
+        if let Some(skip) = heif_container(&kind) {
+            if depth < HEIF_DEPTH {
+                broken += heif_walk(bytes, here + skip, end, depth + 1, rows, meta, index);
+            } else {
+                broken += 1;
+            }
+        }
+        if *index >= HEIF_BOXES {
+            return broken;
+        }
+        at = end;
+    }
+    broken + i64::from(at != stop)
+}
+
+fn read_heif(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 || bytes.get(4..8) != Some(&b"ftyp"[..]) {
+        return None;
+    }
+    let brand = heif_tag(bytes, 8)?;
+    if !HEIF_BRANDS.contains(&brand.as_str()) {
+        return None;
+    }
+    let mut rows = Vec::new();
+    let mut meta = HeifMeta::default();
+    let mut index = 0usize;
+    let broken = heif_walk(bytes, 0, bytes.len(), 0, &mut rows, &mut meta, &mut index);
+    // A brand alone is not a claim: without a declared image size this is some other ISO file that
+    // happens to borrow the container.
+    let (coded_width, coded_height) = meta.coded?;
+    let compat: Vec<String> = meta
+        .compat
+        .iter()
+        .filter(|value| !value.contains('?') && !value.trim_matches('\0').is_empty())
+        .cloned()
+        .collect();
+    let mut entries = vec![format!(
+        "heif\t{size}\tboxes\t{boxes}\tbroken\t{broken}\tbrand\t{brand}",
+        size = bytes.len(),
+        boxes = rows.len(),
+        brand = meta.brand
+    )];
+    entries.push(format!(
+        "compat\t{}",
+        if compat.is_empty() {
+            "-".to_owned()
+        } else {
+            compat.join(",")
+        }
+    ));
+    entries.push(format!(
+        "handler\t{}",
+        if meta.handler.is_empty() {
+            "?".to_owned()
+        } else {
+            meta.handler.clone()
+        }
+    ));
+    entries.push(format!(
+        "items\t{items}\tprimary\t{primary}\tdescs\t{descs}",
+        items = meta.items,
+        primary = meta.primary,
+        descs = meta.descs
+    ));
+    entries.push(format!("coded\t{coded_width}x{coded_height}"));
+    if let Some((width, width_ratio, height, height_ratio)) = meta.visible {
+        entries.push(format!(
+            "visible\t{width}/{width_ratio}x{height}/{height_ratio}"
+        ));
+    }
+    if !meta.depths.is_empty() {
+        let depths: Vec<String> = meta.depths.iter().map(|value| value.to_string()).collect();
+        entries.push(format!(
+            "depths\t{}\tchannels\t{channels}",
+            depths.join(","),
+            channels = meta.channels
+        ));
+    }
+    if let Some((primaries, transfer, matrix, range)) = meta.colour {
+        entries.push(format!(
+            "colour\t{primaries}\ttransfer\t{transfer}\tmatrix\t{matrix}\trange\t{range}"
+        ));
+    }
+    entries.push(format!("data\t{payload}", payload = meta.payload));
+    entries.append(&mut rows);
+    entries.push(if broken == 0 {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\tbroken\t{broken}")
+    });
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -4584,6 +4870,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     }
     if let Some(lines) = read_ebml(bytes) {
         return accept(FORMAT_EBML, lines);
+    }
+    // Before the generic ISO base-media walk: a HEIF file is BMFF too, and the richer read of its
+    // item properties has to win for the brands it knows.
+    if let Some(lines) = read_heif(bytes) {
+        return accept(FORMAT_HEIF, lines);
     }
     if let Some(lines) = read_bmff(bytes) {
         return accept(FORMAT_BMFF, lines);
@@ -4655,7 +4946,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_ONNX, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file or ONNX model",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model or HEIF image",
         -2,
     )
 }
