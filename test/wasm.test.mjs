@@ -312,6 +312,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
     ['tiny.woff2', 34],
     ['f64.npy', 35], ['i32.npy', 35], ['v2.npy', 35], ['v3.npy', 35],
+    ['tree-v0.h5', 36], ['links-v3.h5', 36],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -374,6 +375,17 @@ test('a numpy header arrives with the size arithmetic numpy itself agrees to', (
   assert.ok(!v2.includes('walked	end'), 'a field list has no item size to claim');
 });
 
+test('an HDF5 superblock keeps the addresses that sign their structures', () => {
+  const old = assertReadable('container', 'tree-v0.h5', 36).rows;
+  assert.equal(old[0], 'h5	0	8	8	29	4');
+  assert.equal(old[1], 'eof	40	10240	file	10240');
+  assert.ok(old.includes('addr	88	680	sig	HEAP'), old.join(' | '));
+  assert.ok(old.includes('walked	end'), old.join(' | '));
+  const modern = assertReadable('container', 'links-v3.h5', 36).rows;
+  assert.equal(modern[0], 'h5	3	8	8	29	2');
+  assert.equal(modern[2], 'addr	36	48	sig	OHDR', modern.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -418,7 +430,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

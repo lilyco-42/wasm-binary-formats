@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 37,
-    "selfContainer": 23,
+    "selfContainer": 24,
     "binarySpecAvailable": 0,
-    "gaps": 118,
+    "gaps": 117,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -21,7 +21,7 @@
     "gapByGroup": {
       "unknown": 57,
       "image": 11,
-      "archive": 13,
+      "archive": 12,
       "code": 5,
       "document": 10,
       "executable": 5,
@@ -1599,8 +1599,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "handlebars",

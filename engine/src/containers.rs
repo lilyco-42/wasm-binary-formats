@@ -12,6 +12,9 @@
 //!   RIFF  "RIFF", u32le total-8, form FourCC, then chunks of FourCC + u32le size + padded body
 //!   TIFF  "II"/"MM", u16 42 (or 43 for bigtiff), u32 first IFD; IFD = u16 count, 12-byte
 //!         entries (tag, type, count, value), then u32 next IFD offset
+//!   h5    0x89 "HDF" then CR LF SUB LF, one superblock version byte, the widths of every offset
+//!         and length, and addresses that sign the structure they point at
+//!         offset and length, then addresses that sign the structure they point at
 //!   npy   0x93 "NUMPY" + two version bytes, then a little-endian header length (u16 in v1, u32
 //!         in v2/v3) and a Python dictionary written as text, then the array data
 //!   woff2 "wOF2", u32 flavor/length, u16 table count, u32 sfnt size + compressed size, then a
@@ -91,6 +94,7 @@ pub fn name() -> &'static str {
         FORMAT_JP2 => "jp2",
         FORMAT_WOFF2 => "woff2",
         FORMAT_NPY => "npy",
+        FORMAT_H5 => "h5",
         _ => "unknown",
     }
 }
@@ -2864,6 +2868,90 @@ fn read_npy(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// HDF5: the superblock, and the addresses inside it that point at real structures. 36, after npy.
+///
+/// The file starts with `\x89HDF\r\n\x1a\n`, one superblock version byte, then the widths of every
+/// offset and length the file will use: generation 0 keeps those two bytes at 13 and 14, generations
+/// 2 and 3 at 9 and 10 - and both fixtures in `test/fixtures` use 8 and 8, so the only thing that
+/// distinguishes the two positions is that reading them the other way round yields 0, which is not a
+/// width. That is the whole reason the reader branches on the version instead of picking one.
+///
+/// What follows is deliberately *not* a field-by-field walk of a layout table. HDF5's generations
+/// disagree about where things sit, the object-header message kinds are a table this repo cannot
+/// verify from these two files, and the traversal below the root group (B-trees, local heaps, link
+/// messages) is a larger piece of work - so instead the first 128 bytes are scanned in four-byte
+/// steps, and every 64-bit little-endian slot is reported for what it demonstrably is: either the
+/// file's own length, or an address whose target begins with four ASCII letters, which is how every
+/// HDF5 structure signs itself (`TREE`, `HEAP`, `OHDR`, ...). The names therefore come out of the
+/// file, not out of a recollection, and the `eof` row is the check that the header describes this
+/// file: the stored end-of-file value has to equal the buffer's length.
+pub const FORMAT_H5: i32 = 36;
+
+const H5_SCAN: usize = 128;
+const H5_ROWS: usize = 32;
+
+fn read_h5(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 16 || bytes[1..8] != *b"HDF\r\n\x1a\n" {
+        return None;
+    }
+    let version = bytes[8];
+    if version > 3 {
+        return None;
+    }
+    let (offset_size, length_size) = if version == 0 {
+        (bytes[13], bytes[14])
+    } else {
+        (bytes[9], bytes[10])
+    };
+    if !(1..=8).contains(&offset_size) || !(1..=8).contains(&length_size) {
+        return None;
+    }
+    let limit = bytes.len().min(H5_SCAN);
+    let mut rows = Vec::new();
+    let mut eof = None;
+    let mut scanned = 0i64;
+    let mut found = 0i64;
+    let mut at = 8usize;
+    while at + 8 <= limit {
+        scanned += 1;
+        let value = u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
+        if value == bytes.len() as u64 {
+            if eof.is_none() {
+                eof = Some(format!("eof\t{at}\t{value}\tfile\t{}", bytes.len()));
+                found += 1;
+            }
+        } else if let Ok(target) = usize::try_from(value) {
+            let signed = match target.checked_add(4) {
+                Some(end) if target >= 8 && end <= bytes.len() => bytes.get(target..end),
+                _ => None,
+            };
+            if let Some(sign) =
+                signed.filter(|area| area.iter().all(|byte| byte.is_ascii_alphabetic()))
+            {
+                if rows.len() >= H5_ROWS {
+                    break;
+                }
+                rows.push(format!(
+                    "addr\t{at}\t{target}\tsig\t{}",
+                    String::from_utf8_lossy(sign)
+                ));
+                found += 1;
+            }
+        }
+        at += 4;
+    }
+    let mut entries = vec![format!(
+        "h5\t{version}\t{offset_size}\t{length_size}\t{scanned}\t{found}"
+    )];
+    let ended = eof.is_some();
+    entries.extend(eof);
+    entries.append(&mut rows);
+    if ended {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -2938,8 +3026,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_npy(bytes) {
         return accept(FORMAT_NPY, lines);
     }
+    if let Some(lines) = read_h5(bytes) {
+        return accept(FORMAT_H5, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000 or NumPy array container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array or HDF5 container",
         -2,
     )
 }

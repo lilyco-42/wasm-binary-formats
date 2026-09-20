@@ -1,0 +1,54 @@
+{
+ "links-v3": {
+  "eof_slots": [
+   {
+    "at": 28,
+    "means": "file length",
+    "value": 6236
+   }
+  ],
+  "first_bytes": "89 48 44 46 0d 0a 1a 0a 03 08 08 00 00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff ff 5c 18 00 00 00 00 00 00 30 00 00 00 00 00 00 00 e2 1e 51 51",
+  "length": 6236,
+  "length_size": 8,
+  "offset_size": 8,
+  "pointers": [
+   {
+    "at": 36,
+    "tag": "OHDR",
+    "value": 48
+   }
+  ],
+  "version": 3
+ },
+ "tree-v0": {
+  "eof_slots": [
+   {
+    "at": 40,
+    "means": "file length",
+    "value": 10240
+   }
+  ],
+  "first_bytes": "89 48 44 46 0d 0a 1a 0a 00 00 00 00 00 08 08 00 04 00 10 00 00 00 00 00 00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff ff 00 28 00 00 00 00 00 00",
+  "length": 10240,
+  "length_size": 8,
+  "offset_size": 8,
+  "pointers": [
+   {
+    "at": 80,
+    "tag": "TREE",
+    "value": 136
+   },
+   {
+    "at": 88,
+    "tag": "HEAP",
+    "value": 680
+   },
+   {
+    "at": 120,
+    "tag": "TREE",
+    "value": 136
+   }
+  ],
+  "version": 0
+ }
+}

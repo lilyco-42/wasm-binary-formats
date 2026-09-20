@@ -264,13 +264,13 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 37 | 16.9% |
-| own Rust reader, container framing only | 23 | 10.5% |
+| own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **118** | 53.9% |
-| **covered, any level** | **101** | 46.1% |
+| **no parser at all - real gap** | **117** | 53.4% |
+| **covered, any level** | **102** | 46.6% |
 
-Top binary gap groups by count: unknown 57, archive 13, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 57, archive 12, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 101 of 219 binary labels have a parser
-that runs here (37 field-level and 23 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 118 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 102 of 219 binary labels have a parser
+that runs here (37 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 117 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -298,6 +298,7 @@ python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and dec
 python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; the probe walks them back
 temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
 temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
+temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -388,8 +389,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **101 covered** (37 field-level and 23
-container-level from this repo's own readers, 41 generated and mostly load-gated), **118 with no
+Coverage is scored against magika's 219 binary labels: **102 covered** (37 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **117 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -474,6 +475,19 @@ does not re-derive them:
   left explicitly `unknown` (the v2 fixture's real item size is 13, which only alignment rules give)
   and earns no `walked end`. Version 1 stores the header length as a little-endian u16 and versions
   2 and 3 as a u32, and both forms are real files rather than hand-built ones.
+  HDF5 (+1 **container**-level label, 102 covered, 117 gaps) is where the remembered-table trap was
+  refused outright rather than worked around. h5py will write it twice over - `libver="earliest"` gives
+  the old v0 superblock with its B-tree and local heap, `libver="latest"` gives v3 with an `OHDR`
+  object header - so both generations are the same library's output and h5py reopens each one before
+  it is committed. What the reader then does is *not* walk a field table: it reads the version byte and
+  the two width bytes (v0 keeps them at 13/14, v2/v3 at 9/10, and since both files say 8/8 the only
+  proof the positions differ is that reading them swapped yields 0, which no longer parses - pinned by
+  a test that zeroes each pair in turn), then scans the superblock's 64-bit slots and reports each one
+  only for what the bytes demonstrate: that it equals the file's own length, or that the address it
+  holds points at four ASCII letters, which is how HDF5 signs every structure (`TREE` and `HEAP` at
+  136 and 680 in the old file, `OHDR` at 48 in the new). No message-kind table and no traversal below
+  the root group is claimed, because these two files cannot verify either; `h5` is therefore
+  container-level, and the deeper read is queued behind `parquet`/`onnx` rather than faked.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
