@@ -284,6 +284,39 @@ that runs here (42 field-level and 26 container-level from our own Rust engine, 
 Kaitai specs and load-gated in CI), 110 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
+## Analysis modules, fetched only when a visitor asks
+
+The engine above is one small module that every visitor downloads: the structural readers share it,
+and it costs about 200 KB. A binary *analyser* is a different weight class, and most visitors came to
+unpack an APK - so the analysers are separate crates that build to separate `.wasm` files, listed on
+the page behind a button, with nothing fetched, instantiated or held in memory until that button is
+pressed. The row says so before the click and reports the byte count, export count and instantiation
+time after it.
+
+| module | built from | in the base download | what it answers |
+|---|---|---|---|
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 109 binary labels |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections, and both symbol tables |
+
+The analysis module rides on [`object`](https://crates.io/crates/object) (Apache-2.0 or MIT, pinned to
+`=0.32.2` because the row text is that crate's own naming), with `default-features = false` and only
+`read` + `std` so `flate2`/`ruzstd` stay out of a file the browser downloads on request. It reads two
+symbol tables rather than one, which the CI runner taught the hard way: `/bin/ls` there is stripped,
+so `.symtab` is empty and every import lives in `.dynsym` - a reader that looked only at the first
+would call a real program symbol-less. `test/module.test.mjs` asserts the other half of the deal too:
+the base module must **not** export `analyse_run`, `analyse_count`, `analyse_at` or `self_test`.
+
+**What this lane can and cannot grow into, measured by `.github/workflows/toolchain.yml` rather than
+assumed:** the runner has rustc 1.98 and clang 18.1.3 (plus 16 and 17), and a minimal wasm crate
+builds in ~8 s; it has **no `emcc` and no emsdk**, though `apt` offers `emscripten 3.1.6` - so a C
+engine such as Capstone is reachable behind an install step, at the cost of pinning an old toolchain.
+Two things named in the requirement are not viable and are not going to be quietly swapped for
+something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no wasm port; and
+**LLVM itself** (the `cling` line of the user's own `clings`/`cling`/`cling-win` repos) is a
+multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
+200 KB demo. The honest path for instruction decoding is a per-architecture module, opt-in like this
+one, not the compiler suite.
+
 ## Reproduce
 
 ```bash
@@ -308,6 +341,8 @@ temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif 
 temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
+node test/module.test.mjs analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
 ```
 

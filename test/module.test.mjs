@@ -40,9 +40,11 @@ function text(fn, ...args) {
 function report(bytes) {
   const ptr = ex.alloc(bytes.length);
   new Uint8Array(ex.memory.buffer, ptr, bytes.length).set(bytes);
+  // analyse_run answers 0 for "accepted"; the number of rows is a separate question.
   const rc = ex.analyse_run(ptr, bytes.length);
   ex.dealloc(ptr, bytes.length);
-  return { rc, rows: Array.from({ length: Math.max(rc, 0) }, (_, i) => text('analyse_at', i)) };
+  const count = rc === 0 ? ex.analyse_count() : 0;
+  return { rc, rows: Array.from({ length: count }, (_, i) => text('analyse_at', i)) };
 }
 
 // The same 199-byte ELF64 stub analysis/src/lib.rs builds for its self test.
