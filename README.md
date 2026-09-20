@@ -297,12 +297,19 @@ time after it.
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 112 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
-| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text for x86-64, AArch64 and Thumb bytes |
+| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text and cross-references for x86-64, AArch64 and Thumb bytes |
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
 to the disassembler, the same way `objdump -d` gets both from the binary. It is 1.86 MB, 601 KB
 gzipped, which is exactly why it is not in the module every visitor loads.
+
+The disassembler's C can be checked on any host that has a C compiler, without emsdk and without
+linking anything: `git clone --filter=blob:none --no-checkout --depth 1 --branch 5.0.5` the Capstone
+tree, `git sparse-checkout set include/capstone`, then
+`clang -fsyntax-only -Wall -Wextra -I <that include dir> disasm/shim.c`. That is how a wrong operand
+spelling - Capstone's types are `cs_x86_op`, `cs_arm64_op`, `cs_arm_op`, not the shorter names one
+expects - is caught in a second instead of a CI cycle.
 
 The analysis module rides on [`object`](https://crates.io/crates/object) (Apache-2.0 or MIT, pinned to
 `=0.32.2` because the row text is that crate's own naming), with `default-features = false` and only
@@ -322,9 +329,22 @@ something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no w
 multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
 200 KB demo. Instruction decoding, by contrast, turned out to be reachable the same day the question
 was measured, so it ships: what is left on this lane is the rest of the pipeline those tools are known
-for - cross-references and function boundaries over decoded instructions, then names and types - one
-opt-in module at a time. A decompiler is not on the list: the well-known one is proprietary, and
+for - function boundaries and then names and types over the edges that now exist - one opt-in module at
+a time. A decompiler is not on the list: the well-known one is proprietary, and
 "we ported it" would not be true.
+
+The cross-reference pass is `disasm_xrefs`, and it is deliberately narrower than the window in IDA it
+is modelled on. An edge exists when a decoded instruction is a call or a jump and carries an immediate
+target (Capstone resolves the PC-relative offset for both), or when an x86-64 instruction reaches
+memory through `rip` - which is how the same code names a global it reads. An immediate in
+`sub eax, 0x10` is a constant and stays out of the list, because a reference graph full of constants
+hides the edges that matter. Every edge carries a `where`, saying whether the target falls inside the
+window that was disassembled or outside it, which is the difference between a call into the same
+section and a pointer into something the loader has not shown you; and the summary row gives the counts
+against the number of instructions scanned. `self_test` exercises this second path too, on a five-byte
+`call rel32 + 10`, so a build that decodes text but not edges returns a negative number and the page
+says so. What it does **not** claim: a control-flow graph, function detection, or any statement that an
+address it prints is a function entry.
 
 ## Reproduce
 

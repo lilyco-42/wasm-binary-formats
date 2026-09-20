@@ -165,7 +165,20 @@ function disassembleHere(mod) {
   if (rc < 0) return `反汇编拒绝了这个节（返回 ${rc}）。`;
   const lines = Array.from({ length: mod.disasm_count() },
     (_, i) => cString(mod, mod.disasm_at(i)));
-  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}`;
+  // Read the listing before asking for edges: both passes answer out of the same row buffer, and an
+  // older cached module has no second pass at all, so this is feature-detected rather than assumed.
+  let refs = '';
+  if (typeof mod.disasm_xrefs === 'function') {
+    const again = mod.malloc(slice.length);
+    new Uint8Array(mod.memory.buffer, again, slice.length).set(slice);
+    const edges = mod.disasm_xrefs(again, slice.length, BigInt(address), arch);
+    mod.free(again);
+    const found = Array.from({ length: mod.disasm_count() },
+      (_, i) => cString(mod, mod.disasm_at(i)));
+    refs = edges < 0 ? `\n\n交叉引用：拒绝（返回 ${edges}）`
+      : `\n\n交叉引用：\n${found.join('\n')}`;
+  }
+  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}`;
 }
 
 function cString(mod, pointer) {
