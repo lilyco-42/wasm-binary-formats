@@ -17,6 +17,8 @@
 //!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
 //!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
 //!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
+//!   parquet "PAR1" at both ends, an int32 before the last one giving the size of the Thrift
+//!         compact Footer that describes every row group in the file
 //!   npy   0x93 "NUMPY" + two version bytes, then a little-endian header length (u16 in v1, u32
 //!         in v2/v3) and a Python dictionary written as text, then the array data
 //!   woff2 "wOF2", u32 flavor/length, u16 table count, u32 sfnt size + compressed size, then a
@@ -99,6 +101,7 @@ pub fn name() -> &'static str {
         FORMAT_H5 => "h5",
         FORMAT_AVRO => "avro",
         FORMAT_ARROW => "arrow",
+        FORMAT_PARQUET => "parquet",
         _ => "unknown",
     }
 }
@@ -3550,6 +3553,545 @@ fn read_arrow(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Parquet: the Thrift-compact footer, which is the whole file's table of contents. 39, after Arrow
+/// at 38.
+///
+/// A Parquet file is `PAR1`, the row groups, a Footer, an int32 giving the Footer's size, then `PAR1`
+/// again - so unlike every other reader in this file the interesting part is read from the end, and it
+/// is encoded in Thrift *compact* protocol rather than a bespoke layout: each field is a nibble-pair
+/// header holding a delta from the previous field id and the value's type, ids are only recoverable by
+/// summing the deltas, a zero byte closes a struct, and lists carry their own size and element type.
+/// A field equal to its default is simply absent, so unknown fields have to be skipped *by type* -
+/// that is the only behaviour that lets a file written by a newer parquet exist in these bytes without
+/// breaking the rest of the walk.
+///
+/// The codec and physical-type names come from files pyarrow was told to write with those options
+/// named (`scripts/make-parquet-fixtures.py` collects the pairs and refuses a value that maps to two
+/// names); `ZSTD` turning out to be ordinal 6 rather than 5 is why nothing here is written from
+/// memory. An encoding ordinal is never named at all: one file with a dictionary page and one without
+/// pin down which ordinal belongs to a dictionary, and no more than that.
+pub const FORMAT_PARQUET: i32 = 39;
+
+const PARQUET_MAGIC: &[u8] = b"PAR1";
+const PARQUET_DEPTH: usize = 12;
+const PARQUET_COLUMNS: usize = 64;
+const PARQUET_GROUPS: usize = 64;
+const PARQUET_CHUNKS: usize = 128;
+
+/// A byte cursor over a bounded region. Running off the end is a counted failure, never a guess.
+struct PqCursor<'a> {
+    bytes: &'a [u8],
+    at: usize,
+    stop: usize,
+    bad: i64,
+}
+
+impl<'a> PqCursor<'a> {
+    fn raw(&mut self, count: usize) -> Option<&'a [u8]> {
+        let end = self.at.checked_add(count)?;
+        if end > self.stop {
+            self.bad += 1;
+            return None;
+        }
+        let out = self.bytes.get(self.at..end)?;
+        self.at = end;
+        Some(out)
+    }
+
+    fn varint(&mut self) -> Option<i64> {
+        let mut result = 0u64;
+        let mut shift = 0u32;
+        loop {
+            let byte = *self.raw(1)?.first()?;
+            result |= u64::from(byte & 0x7F).checked_shl(shift)?;
+            if byte & 0x80 == 0 {
+                return Some(result as i64);
+            }
+            shift += 7;
+            if shift > 63 {
+                self.bad += 1;
+                return None;
+            }
+        }
+    }
+
+    /// Zigzag: the compact protocol's only signed integer form.
+    fn long(&mut self) -> Option<i64> {
+        let raw = self.varint()? as u64;
+        Some(((raw >> 1) as i64) ^ -((raw & 1) as i64))
+    }
+
+    fn binary(&mut self) -> Option<&'a [u8]> {
+        let size = usize::try_from(self.varint()?).ok()?;
+        self.raw(size)
+    }
+
+    fn list_header(&mut self) -> Option<(usize, u8)> {
+        let head = *self.raw(1)?.first()?;
+        let mut size = usize::from(head >> 4);
+        let element = head & 0x0F;
+        if size == 15 {
+            size = usize::try_from(self.varint()?).ok()?;
+        }
+        Some((size, element))
+    }
+
+    fn skip(&mut self, kind: u8, depth: usize) {
+        match kind {
+            1 | 2 => {}
+            3 => {
+                self.raw(1);
+            }
+            4 | 5 | 6 => {
+                self.varint();
+            }
+            7 => {
+                self.raw(8);
+            }
+            8 => {
+                let size = self.varint().and_then(|n| usize::try_from(n).ok());
+                if let Some(size) = size {
+                    self.raw(size);
+                }
+            }
+            9 | 10 => {
+                if let Some((size, element)) = self.list_header() {
+                    for _ in 0..size.min(PARQUET_CHUNKS) {
+                        self.skip(element, depth + 1);
+                    }
+                }
+            }
+            11 => {
+                // A map states its size once and then carries every entry under the key/value types
+                // of that header byte. None of parquet's own structures use one, but a footer written
+                // by a future writer might.
+                let Some(size) = self.varint() else { return };
+                let Ok(size) = usize::try_from(size) else {
+                    return;
+                };
+                if size == 0 {
+                    return;
+                }
+                let Some(pair) = self.raw(1) else { return };
+                let (key, value) = (pair[0] >> 4, pair[0] & 0x0F);
+                for _ in 0..size.min(PARQUET_CHUNKS) {
+                    self.skip(key, depth + 1);
+                    self.skip(value, depth + 1);
+                }
+            }
+            12 => {
+                if depth > PARQUET_DEPTH {
+                    self.bad += 1;
+                    return;
+                }
+                loop {
+                    let Some(head) = self.raw(1) else { return };
+                    let head = head[0];
+                    if head == 0 {
+                        return;
+                    }
+                    if head >> 4 == 0 {
+                        self.varint();
+                    }
+                    self.skip(head & 0x0F, depth + 1);
+                }
+            }
+            _ => self.bad += 1,
+        }
+    }
+
+    /// One struct field header: the delta from the previous id, and the value's type. None at the
+    /// closing zero byte or a failed read.
+    fn field(&mut self) -> Option<(i64, u8)> {
+        let head = *self.raw(1)?.first()?;
+        let delta = head >> 4;
+        let kind = head & 0x0F;
+        if delta == 0 && kind == 0 {
+            return None;
+        }
+        Some((i64::from(delta), kind))
+    }
+}
+
+/// The ordinals witnessed by the fixtures, and nothing else.
+fn pq_codec(ordinal: i64) -> &'static str {
+    match ordinal {
+        0 => "uncompressed",
+        1 => "snappy",
+        2 => "gzip",
+        6 => "zstd",
+        _ => "unnamed",
+    }
+}
+
+fn pq_physical(ordinal: i64) -> &'static str {
+    match ordinal {
+        0 => "boolean",
+        1 => "int32",
+        2 => "int64",
+        4 => "float",
+        5 => "double",
+        6 => "byte_array",
+        _ => "unnamed",
+    }
+}
+
+#[derive(Default)]
+struct PqColumn {
+    name: String,
+    kind: Option<i64>,
+    length: Option<i64>,
+    repetition: Option<i64>,
+    children: Option<i64>,
+    converted: Option<i64>,
+}
+
+#[derive(Default)]
+struct PqStats {
+    nulls: i64,
+    low: Option<Vec<u8>>,
+    high: Option<Vec<u8>>,
+}
+
+#[derive(Default)]
+struct PqChunk {
+    path: String,
+    kind: i64,
+    codec: i64,
+    values: i64,
+    uncompressed: i64,
+    compressed: i64,
+    data_page: Option<i64>,
+    dict_page: Option<i64>,
+    encodings: Vec<i64>,
+    stats: Option<PqStats>,
+}
+
+#[derive(Default)]
+struct PqGroup {
+    rows: i64,
+    bytes: i64,
+    chunks: Vec<PqChunk>,
+}
+
+#[derive(Default)]
+struct PqMeta {
+    version: i64,
+    rows: i64,
+    columns: Vec<PqColumn>,
+    groups: Vec<PqGroup>,
+    created: String,
+}
+
+fn pq_text(value: Option<&[u8]>) -> String {
+    printable(&String::from_utf8_lossy(value.unwrap_or(b"")))
+}
+
+fn read_statistics(cursor: &mut PqCursor<'_>) -> PqStats {
+    let mut out = PqStats::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (1, 8) => out.high = cursor.binary().map(|v| v.to_vec()),
+            (2, 8) => out.low = cursor.binary().map(|v| v.to_vec()),
+            (3, 6) => out.nulls = cursor.long().unwrap_or(0),
+            (5, 8) => out.high = cursor.binary().map(|v| v.to_vec()),
+            (6, 8) => out.low = cursor.binary().map(|v| v.to_vec()),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            return out;
+        }
+    }
+    out
+}
+
+fn read_column_metadata(cursor: &mut PqCursor<'_>) -> PqChunk {
+    let mut out = PqChunk::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (1, 4 | 5) => out.kind = cursor.long().unwrap_or(0),
+            (4, 4 | 5) => out.codec = cursor.long().unwrap_or(0),
+            (5, 6) => out.values = cursor.long().unwrap_or(0),
+            (6, 6) => out.uncompressed = cursor.long().unwrap_or(0),
+            (7, 6) => out.compressed = cursor.long().unwrap_or(0),
+            (9, 6) => out.data_page = cursor.long(),
+            (11, 6) => out.dict_page = cursor.long(),
+            (2, 9) => {
+                if let Some((size, element)) = cursor.list_header() {
+                    if !matches!(element, 4 | 5 | 6) {
+                        cursor.bad += 1;
+                        return out;
+                    }
+                    for _ in 0..size.min(PARQUET_CHUNKS) {
+                        out.encodings.push(cursor.long().unwrap_or(0));
+                    }
+                }
+            }
+            (3, 9) => {
+                if let Some((size, element)) = cursor.list_header() {
+                    if element != 8 {
+                        cursor.bad += 1;
+                        return out;
+                    }
+                    let mut parts = Vec::new();
+                    for _ in 0..size.min(PARQUET_COLUMNS) {
+                        parts.push(pq_text(cursor.binary()));
+                    }
+                    out.path = parts.join("/");
+                }
+            }
+            (12, 12) => out.stats = Some(read_statistics(cursor)),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            return out;
+        }
+    }
+    out
+}
+
+fn read_column_chunk(cursor: &mut PqCursor<'_>) -> PqChunk {
+    let mut out = PqChunk::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (3, 12) => out = read_column_metadata(cursor),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            return out;
+        }
+    }
+    out
+}
+
+fn read_row_group(cursor: &mut PqCursor<'_>) -> PqGroup {
+    let mut out = PqGroup::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (1, 9) => {
+                if let Some((size, 12)) = cursor.list_header() {
+                    for _ in 0..size.min(PARQUET_CHUNKS) {
+                        out.chunks.push(read_column_chunk(cursor));
+                    }
+                }
+            }
+            (2, 6) => out.bytes = cursor.long().unwrap_or(0),
+            (3, 6) => out.rows = cursor.long().unwrap_or(0),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            return out;
+        }
+    }
+    out
+}
+
+fn read_schema_element(cursor: &mut PqCursor<'_>) -> PqColumn {
+    let mut out = PqColumn::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (1, 4 | 5) => out.kind = cursor.long(),
+            (2, 4 | 5) => out.length = cursor.long(),
+            (3, 4 | 5) => out.repetition = cursor.long(),
+            (4, 8) => out.name = pq_text(cursor.binary()),
+            (5, 4 | 5) => out.children = cursor.long(),
+            (6, 4 | 5) => out.converted = cursor.long(),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            return out;
+        }
+    }
+    out
+}
+
+fn read_file_metadata(bytes: &[u8], start: usize, stop: usize) -> (PqMeta, usize, i64) {
+    let mut cursor = PqCursor {
+        bytes,
+        at: start,
+        stop,
+        bad: 0,
+    };
+    let mut out = PqMeta::default();
+    let mut id = 0i64;
+    while let Some((delta, kind)) = cursor.field() {
+        id = if delta != 0 {
+            id + delta
+        } else {
+            cursor.long().unwrap_or(0)
+        };
+        match (id, kind) {
+            (1, 4 | 5) => out.version = cursor.long().unwrap_or(0),
+            (2, 9) => {
+                if let Some((size, 12)) = cursor.list_header() {
+                    for _ in 0..size.min(PARQUET_COLUMNS) {
+                        out.columns.push(read_schema_element(&mut cursor));
+                    }
+                }
+            }
+            (3, 6) => out.rows = cursor.long().unwrap_or(0),
+            (4, 9) => {
+                if let Some((size, 12)) = cursor.list_header() {
+                    for _ in 0..size.min(PARQUET_GROUPS) {
+                        out.groups.push(read_row_group(&mut cursor));
+                    }
+                }
+            }
+            (6, 8) => out.created = pq_text(cursor.binary()),
+            _ => cursor.skip(kind, 0),
+        }
+        if cursor.bad > 0 {
+            break;
+        }
+    }
+    (out, cursor.at, cursor.bad)
+}
+
+fn pq_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn read_parquet(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 12 || !bytes.starts_with(PARQUET_MAGIC) || !bytes.ends_with(PARQUET_MAGIC) {
+        return None;
+    }
+    let limit = bytes.len();
+    let length = usize::try_from(u32::from_le_bytes(
+        bytes.get(limit - 8..limit - 4)?.try_into().ok()?,
+    ))
+    .ok()?;
+    if length < 8 {
+        return None;
+    }
+    let start = limit.checked_sub(8)?.checked_sub(length)?;
+    if start < 4 {
+        return None;
+    }
+    let (meta, ended, bad) = read_file_metadata(bytes, start, limit - 8);
+    // A footer whose fields all default would carry no information at all; the version and the schema
+    // are the two things every writer has to emit.
+    if bad > 0 || meta.columns.is_empty() || meta.version > 2 {
+        return None;
+    }
+    let leaves = meta
+        .columns
+        .iter()
+        .filter(|c| c.children.unwrap_or(0) == 0)
+        .count();
+    let mut rows = vec![format!(
+        "parquet\t{limit}\tfooter\t{start}\tbytes\t{length}\tgroups\t{}",
+        meta.groups.len()
+    )];
+    rows.push(format!(
+        "version\t{}\trows\t{}\tschema\t{}\tcolumns\t{leaves}",
+        meta.version,
+        meta.rows,
+        meta.columns.len()
+    ));
+    rows.push(format!("created\t{}", meta.created));
+    for (i, column) in meta.columns.iter().enumerate() {
+        let mut line = format!("column\t{i}\t{}", column.name);
+        if let Some(kind) = column.kind {
+            line.push_str(&format!("\ttype\t{kind}\tname\t{}", pq_physical(kind)));
+        }
+        if let Some(length) = column.length {
+            line.push_str(&format!("\tlength\t{length}"));
+        }
+        if let Some(repetition) = column.repetition {
+            line.push_str(&format!("\trep\t{repetition}"));
+        }
+        if let Some(children) = column.children {
+            line.push_str(&format!("\tchildren\t{children}"));
+        }
+        if let Some(converted) = column.converted {
+            line.push_str(&format!("\tconverted\t{converted}"));
+        }
+        rows.push(line);
+    }
+    let mut chunks = Vec::new();
+    for (i, group) in meta.groups.iter().enumerate() {
+        rows.push(format!(
+            "group\t{i}\trows\t{}\tbytes\t{}\tcolumns\t{}",
+            group.rows,
+            group.bytes,
+            group.chunks.len()
+        ));
+        for chunk in &group.chunks {
+            chunks.push((i, chunk));
+        }
+    }
+    for (i, (group, chunk)) in chunks.into_iter().take(PARQUET_CHUNKS).enumerate() {
+        let encodings: Vec<String> = chunk
+            .encodings
+            .iter()
+            .map(|value| value.to_string())
+            .collect();
+        let mut line = format!(
+            "chunk\t{i}\tpath\t{}\tgroup\t{group}\trows\t{}\ttype\t{}\tname\t{}\tcodec\t{}\tcodec_name\t{}\tuncompressed\t{}\tcompressed\t{}\tencodings\t{}",
+            chunk.path,
+            chunk.values,
+            chunk.kind,
+            pq_physical(chunk.kind),
+            chunk.codec,
+            pq_codec(chunk.codec),
+            chunk.uncompressed,
+            chunk.compressed,
+            encodings.join(","),
+        );
+        if let Some(page) = chunk.data_page {
+            line.push_str(&format!("\tdata\t{page}"));
+        }
+        if let Some(page) = chunk.dict_page {
+            line.push_str(&format!("\tdict\t{page}"));
+        }
+        rows.push(line);
+        if let Some(stats) = chunk.stats.as_ref() {
+            rows.push(format!(
+                "stats\t{i}\tnull\t{}\tmin\t{}\tmax\t{}",
+                stats.nulls,
+                pq_hex(stats.low.as_deref().unwrap_or(b"")),
+                pq_hex(stats.high.as_deref().unwrap_or(b"")),
+            ));
+        }
+    }
+    rows.push(if ended == start + length {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\t{ended}\tbad\t{bad}")
+    });
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -3633,8 +4175,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_arrow(bytes) {
         return accept(FORMAT_ARROW, lines);
     }
+    if let Some(lines) = read_parquet(bytes) {
+        return accept(FORMAT_PARQUET, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container or Arrow stream",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream or Parquet file",
         -2,
     )
 }

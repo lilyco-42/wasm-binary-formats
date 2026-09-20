@@ -316,6 +316,8 @@ test('every container the demo offers answers with the code the page prints', ()
     ['rows.avro', 37], ['deflate.avro', 37], ['many.avro', 37],
     ['rows.arrow', 38], ['batches.arrow', 38], ['dict.arrow', 38], ['lz4.arrow', 38],
     ['zstd.arrow', 38], ['file.arrow', 38], ['file_dict.arrow', 38],
+    ['rows.parquet', 39], ['plain.parquet', 39], ['zstd.parquet', 39], ['gzip.parquet', 39],
+    ['nodict.parquet', 39], ['nulls.parquet', 39], ['groups.parquet', 39], ['typed.parquet', 39],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -430,6 +432,24 @@ test('an Arrow stream keeps its envelope arithmetic and a file keeps its block i
   assert.ok(zstd.includes('batch\t0\trows\t3\tnodes\t2\tbuffers\t5\tcodec\t1'), zstd.join(' | '));
 });
 
+test('a Parquet footer keeps its field ids and its page offsets across the ABI', () => {
+  const lines = assertReadable('container', 'rows.parquet', 39).rows;
+  assert.equal(lines[0], 'parquet\t703\tfooter\t174\tbytes\t521\tgroups\t1', lines.join(' | '));
+  assert.equal(lines[1], 'version\t2\trows\t3\tschema\t3\tcolumns\t2');
+  assert.ok(lines.includes('column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0'), lines.join(' | '));
+  assert.equal(
+    lines.find((line) => line.startsWith('chunk\t0')),
+    'chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t83\tcompressed\t87\tencodings\t0,3,8\tdata\t32\tdict\t4'
+  );
+  assert.equal(lines[lines.length - 1], 'walked\tend');
+
+  // Nulls are the case a count-only reader gets wrong: the extremes have to ignore them.
+  const nulls = assertReadable('container', 'nulls.parquet', 39).rows;
+  assert.ok(nulls.includes('stats\t0\tnull\t2\tmin\t07000000\tmax\t09000000'), nulls.join(' | '));
+  const groups = assertReadable('container', 'groups.parquet', 39).rows;
+  assert.equal(groups[0], 'parquet\t2256\tfooter\t939\tbytes\t1309\tgroups\t3');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -474,7 +494,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

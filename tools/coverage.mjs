@@ -39,7 +39,7 @@ const SELF = {
   flac: ['fields'], mp3: ['fields'], mp2: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['fields'], pbm: ['fields'], wasm: ['fields'], ttf: ['fields'], woff: ['fields'], icns: ['fields'],
   applebplist: ['fields'], qoi: ['fields'], jp2: ['fields'], woff2: ['fields'], npy: ['fields'], h5: ['container'], avro: ['fields'],
-  arrow: ['fields'],
+  arrow: ['fields'], parquet: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };

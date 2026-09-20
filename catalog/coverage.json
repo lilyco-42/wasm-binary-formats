@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 39,
+    "selfFields": 40,
     "selfContainer": 24,
     "binarySpecAvailable": 0,
-    "gaps": 115,
+    "gaps": 114,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,7 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "unknown": 55,
+      "unknown": 54,
       "image": 11,
       "archive": 12,
       "code": 5,
@@ -2939,8 +2939,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "pascal",

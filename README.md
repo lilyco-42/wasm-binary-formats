@@ -263,24 +263,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 39 | 17.8% |
+| own Rust reader, named header fields decoded | 40 | 18.3% |
 | own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **115** | 52.5% |
-| **covered, any level** | **104** | 47.5% |
+| **no parser at all - real gap** | **114** | 52.1% |
+| **covered, any level** | **105** | 47.9% |
 
-Top binary gap groups by count: unknown 55, archive 12, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 54, archive 12, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
-and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`h5`,
+and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`h5`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 104 of 219 binary labels have a parser
-that runs here (39 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 115 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 105 of 219 binary labels have a parser
+that runs here (40 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 114 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -301,6 +301,7 @@ temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes th
 temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
 temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
 temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
+temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -391,8 +392,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **104 covered** (39 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **115 with no
+Coverage is scored against magika's 219 binary labels: **105 covered** (40 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **114 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -515,6 +516,16 @@ does not re-derive them:
   field entirely and only `zstd` has to appear: two files written with two option strings are what
   order those two values, which is why the reader names nothing it has not seen and reports column
   type discriminators as numbers.
+  Parquet (+1 field-level label, 105 covered, 114 gaps) is the same file family read a second way: the
+  interesting half of a .parquet is at the *end*, and it is Thrift compact protocol rather than a
+  bespoke layout, so field ids exist only as deltas and a field that equals its default is simply
+  absent - which is why unknown fields must be skipped by type, the behaviour a hand-written test
+  exercises by appending a field the reader has never seen and asserting the report does not move. The
+  generator names nothing from memory either: it collects codec and physical-type ordinals from files
+  pyarrow was told to write with those options, and refuses a value that maps to two names. That check
+  caught a recalled table being wrong before it reached the reader - `ZSTD` is ordinal 6, not 5 - and it
+  is also why encoding ordinals stay unnamed: the only thing two fixtures that differ in exactly the
+  `use_dictionary` option prove is *which* ordinal belongs to a dictionary page.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

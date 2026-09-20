@@ -1,0 +1,222 @@
+{
+ "_observed": {
+  "codecs": {
+   "0": "UNCOMPRESSED",
+   "1": "SNAPPY",
+   "2": "GZIP",
+   "6": "ZSTD"
+  },
+  "only_beside_a_dictionary_page": [
+   8
+  ],
+  "physical_types": {
+   "0": "BOOLEAN",
+   "1": "INT32",
+   "2": "INT64",
+   "4": "FLOAT",
+   "5": "DOUBLE",
+   "6": "BYTE_ARRAY"
+  },
+  "written_with_a_dictionary_page": [
+   0,
+   3,
+   8
+  ],
+  "written_without": [
+   0,
+   3
+  ]
+ },
+ "groups.parquet": {
+  "bytes": 2256,
+  "consumed": 1309,
+  "footer_at": 939,
+  "footer_len": 1309,
+  "rows": [
+   "parquet\t2256\tfooter\t939\tbytes\t1309\tgroups\t3",
+   "version\t2\trows\t12\tschema\t4\tcolumns\t3",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t3",
+   "column\t1\tn\ttype\t2\tname\tint64\trep\t1",
+   "column\t2\tratio\ttype\t5\tname\tdouble\trep\t1",
+   "column\t3\ttag\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t4\tbytes\t317\tcolumns\t3",
+   "group\t1\trows\t4\tbytes\t317\tcolumns\t3",
+   "group\t2\trows\t4\tbytes\t320\tcolumns\t3",
+   "chunk\t0\tpath\tn\tgroup\t0\trows\t4\ttype\t2\tname\tint64\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t115\tencodings\t0,3,8\tdata\t44\tdict\t4",
+   "stats\t0\tnull\t0\tmin\t0000000000000000\tmax\t0300000000000000",
+   "chunk\t1\tpath\tratio\tgroup\t0\trows\t4\ttype\t5\tname\tdouble\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t110\tencodings\t0,3,8\tdata\t154\tdict\t119",
+   "stats\t1\tnull\t0\tmin\t0000000000000080\tmax\t0000000000000840",
+   "chunk\t2\tpath\ttag\tgroup\t0\trows\t4\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t79\tcompressed\t81\tencodings\t0,3,8\tdata\t267\tdict\t229",
+   "stats\t2\tnull\t0\tmin\t7330\tmax\t7333",
+   "chunk\t3\tpath\tn\tgroup\t1\trows\t4\ttype\t2\tname\tint64\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t117\tencodings\t0,3,8\tdata\t352\tdict\t310",
+   "stats\t3\tnull\t0\tmin\t0400000000000000\tmax\t0700000000000000",
+   "chunk\t4\tpath\tratio\tgroup\t1\trows\t4\ttype\t5\tname\tdouble\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t115\tencodings\t0,3,8\tdata\t467\tdict\t427",
+   "stats\t4\tnull\t0\tmin\t0000000000001040\tmax\t0000000000001c40",
+   "chunk\t5\tpath\ttag\tgroup\t1\trows\t4\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t79\tcompressed\t81\tencodings\t0,3,8\tdata\t580\tdict\t542",
+   "stats\t5\tnull\t0\tmin\t7334\tmax\t7337",
+   "chunk\t6\tpath\tn\tgroup\t2\trows\t4\ttype\t2\tname\tint64\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t117\tencodings\t0,3,8\tdata\t665\tdict\t623",
+   "stats\t6\tnull\t0\tmin\t0800000000000000\tmax\t0b00000000000000",
+   "chunk\t7\tpath\tratio\tgroup\t2\trows\t4\ttype\t5\tname\tdouble\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t119\tcompressed\t115\tencodings\t0,3,8\tdata\t780\tdict\t740",
+   "stats\t7\tnull\t0\tmin\t0000000000002040\tmax\t0000000000002640",
+   "chunk\t8\tpath\ttag\tgroup\t2\trows\t4\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t82\tcompressed\t84\tencodings\t0,3,8\tdata\t895\tdict\t855",
+   "stats\t8\tnull\t0\tmin\t733130\tmax\t7339",
+   "walked\tend"
+  ]
+ },
+ "gzip.parquet": {
+  "bytes": 769,
+  "consumed": 521,
+  "footer_at": 240,
+  "footer_len": 521,
+  "rows": [
+   "parquet\t769\tfooter\t240\tbytes\t521\tgroups\t1",
+   "version\t2\trows\t3\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tid\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t3\tbytes\t163\tcolumns\t2",
+   "chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t2\tcodec_name\tgzip\tuncompressed\t83\tcompressed\t120\tencodings\t0,3,8\tdata\t47\tdict\t4",
+   "stats\t0\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t1\tpath\tname\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t2\tcodec_name\tgzip\tuncompressed\t80\tcompressed\t116\tencodings\t0,3,8\tdata\t177\tdict\t124",
+   "stats\t1\tnull\t0\tmin\t6f6e65\tmax\t74776f",
+   "walked\tend"
+  ]
+ },
+ "nodict.parquet": {
+  "bytes": 640,
+  "consumed": 498,
+  "footer_at": 134,
+  "footer_len": 498,
+  "rows": [
+   "parquet\t640\tfooter\t134\tbytes\t498\tgroups\t1",
+   "version\t2\trows\t3\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tid\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t3\tbytes\t127\tcolumns\t2",
+   "chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t65\tcompressed\t67\tencodings\t3,0\tdata\t4",
+   "stats\t0\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t1\tpath\tname\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t62\tcompressed\t63\tencodings\t3,0\tdata\t71",
+   "stats\t1\tnull\t0\tmin\t6f6e65\tmax\t74776f",
+   "walked\tend"
+  ]
+ },
+ "nulls.parquet": {
+  "bytes": 703,
+  "consumed": 537,
+  "footer_at": 158,
+  "footer_len": 537,
+  "rows": [
+   "parquet\t703\tfooter\t158\tbytes\t537\tgroups\t1",
+   "version\t2\trows\t4\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tvalue\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tlabel\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t4\tbytes\t146\tcolumns\t2",
+   "chunk\t0\tpath\tvalue\tgroup\t0\trows\t4\ttype\t1\tname\tint32\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t78\tcompressed\t82\tencodings\t0,3,8\tdata\t28\tdict\t4",
+   "stats\t0\tnull\t2\tmin\t07000000\tmax\t09000000",
+   "chunk\t1\tpath\tlabel\tgroup\t0\trows\t4\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t68\tcompressed\t72\tencodings\t0,3,8\tdata\t117\tdict\t86",
+   "stats\t1\tnull\t1\tmin\t61\tmax\t63",
+   "walked\tend"
+  ]
+ },
+ "plain.parquet": {
+  "bytes": 696,
+  "consumed": 521,
+  "footer_at": 167,
+  "footer_len": 521,
+  "rows": [
+   "parquet\t696\tfooter\t167\tbytes\t521\tgroups\t1",
+   "version\t2\trows\t3\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tid\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t3\tbytes\t163\tcolumns\t2",
+   "chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t0\tcodec_name\tuncompressed\tuncompressed\t83\tcompressed\t83\tencodings\t0,3,8\tdata\t30\tdict\t4",
+   "stats\t0\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t1\tpath\tname\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t0\tcodec_name\tuncompressed\tuncompressed\t80\tcompressed\t80\tencodings\t0,3,8\tdata\t124\tdict\t87",
+   "stats\t1\tnull\t0\tmin\t6f6e65\tmax\t74776f",
+   "walked\tend"
+  ]
+ },
+ "rows.parquet": {
+  "bytes": 703,
+  "consumed": 521,
+  "footer_at": 174,
+  "footer_len": 521,
+  "rows": [
+   "parquet\t703\tfooter\t174\tbytes\t521\tgroups\t1",
+   "version\t2\trows\t3\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tid\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t3\tbytes\t163\tcolumns\t2",
+   "chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t83\tcompressed\t87\tencodings\t0,3,8\tdata\t32\tdict\t4",
+   "stats\t0\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t1\tpath\tname\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t80\tcompressed\t83\tencodings\t0,3,8\tdata\t129\tdict\t91",
+   "stats\t1\tnull\t0\tmin\t6f6e65\tmax\t74776f",
+   "walked\tend"
+  ]
+ },
+ "typed.parquet": {
+  "bytes": 1938,
+  "consumed": 1331,
+  "footer_at": 599,
+  "footer_len": 1331,
+  "rows": [
+   "parquet\t1938\tfooter\t599\tbytes\t1331\tgroups\t1",
+   "version\t2\trows\t3\tschema\t8\tcolumns\t7",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t7",
+   "column\t1\tflag\ttype\t0\tname\tboolean\trep\t1",
+   "column\t2\ti32\ttype\t1\tname\tint32\trep\t1",
+   "column\t3\ti64\ttype\t2\tname\tint64\trep\t1",
+   "column\t4\tf32\ttype\t4\tname\tfloat\trep\t1",
+   "column\t5\tf64\ttype\t5\tname\tdouble\trep\t1",
+   "column\t6\ttext\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "column\t7\tblob\ttype\t6\tname\tbyte_array\trep\t1",
+   "group\t0\trows\t3\tbytes\t576\tcolumns\t7",
+   "chunk\t0\tpath\tflag\tgroup\t0\trows\t3\ttype\t0\tname\tboolean\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t42\tcompressed\t44\tencodings\t3,0\tdata\t4",
+   "stats\t0\tnull\t0\tmin\t00\tmax\t01",
+   "chunk\t1\tpath\ti32\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t83\tcompressed\t87\tencodings\t0,3,8\tdata\t76\tdict\t48",
+   "stats\t1\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t2\tpath\ti64\tgroup\t0\trows\t3\ttype\t2\tname\tint64\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t111\tcompressed\t112\tencodings\t0,3,8\tdata\t172\tdict\t135",
+   "stats\t2\tnull\t0\tmin\t0a00000000000000\tmax\t1e00000000000000",
+   "chunk\t3\tpath\tf32\tgroup\t0\trows\t3\ttype\t4\tname\tfloat\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t83\tcompressed\t87\tencodings\t0,3,8\tdata\t275\tdict\t247",
+   "stats\t3\tnull\t0\tmin\t0000c03f\tmax\t00006040",
+   "chunk\t4\tpath\tf64\tgroup\t0\trows\t3\ttype\t5\tname\tdouble\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t111\tcompressed\t111\tencodings\t0,3,8\tdata\t370\tdict\t334",
+   "stats\t4\tnull\t0\tmin\t000000000000f83f\tmax\t0000000000000c40",
+   "chunk\t5\tpath\ttext\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t73\tcompressed\t77\tencodings\t0,3,8\tdata\t479\tdict\t445",
+   "stats\t5\tnull\t0\tmin\t78\tmax\t7a7a7a",
+   "chunk\t6\tpath\tblob\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t1\tcodec_name\tsnappy\tuncompressed\t73\tcompressed\t77\tencodings\t0,3,8\tdata\t556\tdict\t522",
+   "stats\t6\tnull\t0\tmin\t61\tmax\t636363",
+   "walked\tend"
+  ]
+ },
+ "zstd.parquet": {
+  "bytes": 732,
+  "consumed": 521,
+  "footer_at": 203,
+  "footer_len": 521,
+  "rows": [
+   "parquet\t732\tfooter\t203\tbytes\t521\tgroups\t1",
+   "version\t2\trows\t3\tschema\t3\tcolumns\t2",
+   "created\tparquet-cpp-arrow version 25.0.1",
+   "column\t0\tschema\trep\t0\tchildren\t2",
+   "column\t1\tid\ttype\t1\tname\tint32\trep\t1",
+   "column\t2\tname\ttype\t6\tname\tbyte_array\trep\t1\tconverted\t0",
+   "group\t0\trows\t3\tbytes\t163\tcolumns\t2",
+   "chunk\t0\tpath\tid\tgroup\t0\trows\t3\ttype\t1\tname\tint32\tcodec\t6\tcodec_name\tzstd\tuncompressed\t83\tcompressed\t101\tencodings\t0,3,8\tdata\t39\tdict\t4",
+   "stats\t0\tnull\t0\tmin\t01000000\tmax\t03000000",
+   "chunk\t1\tpath\tname\tgroup\t0\trows\t3\ttype\t6\tname\tbyte_array\tcodec\t6\tcodec_name\tzstd\tuncompressed\t80\tcompressed\t98\tencodings\t0,3,8\tdata\t151\tdict\t105",
+   "stats\t1\tnull\t0\tmin\t6f6e65\tmax\t74776f",
+   "walked\tend"
+  ]
+ }
+}
