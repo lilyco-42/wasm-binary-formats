@@ -314,6 +314,8 @@ test('every container the demo offers answers with the code the page prints', ()
     ['f64.npy', 35], ['i32.npy', 35], ['v2.npy', 35], ['v3.npy', 35],
     ['tree-v0.h5', 36], ['links-v3.h5', 36],
     ['rows.avro', 37], ['deflate.avro', 37], ['many.avro', 37],
+    ['rows.arrow', 38], ['batches.arrow', 38], ['dict.arrow', 38], ['lz4.arrow', 38],
+    ['zstd.arrow', 38], ['file.arrow', 38], ['file_dict.arrow', 38],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -399,6 +401,35 @@ test('an Avro container walks its blocks and the records add up', () => {
   assert.equal(deflate[2], 'codec	deflate', 'the codec name is reported, the payload is not inflated');
 });
 
+test('an Arrow stream keeps its envelope arithmetic and a file keeps its block index', () => {
+  const stream = assertReadable('container', 'batches.arrow', 38).rows;
+  assert.equal(stream[0], 'arrow\t904\t4\t0\tframing\tstream', stream.join(' | '));
+  assert.equal(stream[1], 'message\t0\thead\tSchema\tmeta\t168\tbody\t0\tversion\t4');
+  assert.ok(stream.includes('field\t1\tname\tnullable\t1\ttype\t5'), 'the column names travel as text');
+  assert.ok(stream.includes('batch\t2\trows\t3\tnodes\t2\tbuffers\t5'), 'three batches, three bodies');
+  assert.equal(stream[stream.length - 1], 'walked\tend');
+
+  // A file framing footer is not an encapsulated message: it is a flatbuffer behind an int32, and
+  // its blocks index envelopes rather than bodies, so both numbers have to arrive intact.
+  const file = assertReadable('container', 'file.arrow', 38).rows;
+  assert.equal(file[0], 'arrow\t922\t3\t0\tframing\tfile', file.join(' | '));
+  assert.equal(
+    file[file.length - 5],
+    'footer\t680\tbytes\t232\tenvelope\t912\tversion\t4\tbatches\t2\tdicts\t0\tmagic\t1',
+    file.join(' | ')
+  );
+  assert.equal(file[file.length - 4], 'block\t0\tenvelope\t184\tmeta\t208\tbody\t48');
+  assert.equal(file[file.length - 3], 'block\t1\tenvelope\t440\tmeta\t208\tbody\t24');
+  assert.equal(file[file.length - 1], 'walked\tend');
+
+  // A codec equal to the enum's zero is written by omitting the field, so the two compressed files
+  // have to differ by more than their sizes.
+  const lz4 = assertReadable('container', 'lz4.arrow', 38).rows;
+  assert.ok(lz4.includes('batch\t0\trows\t3\tnodes\t2\tbuffers\t5\tcodec\t0'), lz4.join(' | '));
+  const zstd = assertReadable('container', 'zstd.arrow', 38).rows;
+  assert.ok(zstd.includes('batch\t0\trows\t3\tnodes\t2\tbuffers\t5\tcodec\t1'), zstd.join(' | '));
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -443,7 +474,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

@@ -1,0 +1,950 @@
+{
+ "_observed": {
+  "codecs": {
+   "0": "lz4_frame",
+   "1": "zstd"
+  },
+  "field_type_ordinals": {
+   "2": [
+    "int32"
+   ],
+   "5": [
+    "dictionary<values=string, indices=int8, ordered=0>",
+    "string"
+   ]
+  },
+  "header_ordinals": {
+   "1": [
+    "Schema",
+    "schema"
+   ],
+   "2": [
+    "DictionaryBatch",
+    "dictionary"
+   ],
+   "3": [
+    "RecordBatch",
+    "record batch"
+   ]
+  },
+  "note": "field_type_ordinals maps the Type union id pyarrow wrote to the type it printed; the reader reports the number only, so no name is claimed for an unobserved ordinal",
+  "versions": [
+   4
+  ]
+ },
+ "batches.arrow": {
+  "bytes": 904,
+  "eos": true,
+  "footer": null,
+  "footer_fields": null,
+  "framing": "stream",
+  "head": "ffffffffa8000000",
+  "messages": [
+   {
+    "at": 0,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "id",
+       "nullable": 1,
+       "type": 2
+      },
+      {
+       "children": 0,
+       "name": "name",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 168,
+    "next": 176,
+    "version": 4
+   },
+   {
+    "at": 176,
+    "body": 32,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      2,
+      0
+     ],
+     "nodes": 2,
+     "rows": 2
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 416,
+    "version": 4
+   },
+   {
+    "at": 416,
+    "body": 24,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      1,
+      0
+     ],
+     "nodes": 2,
+     "rows": 1
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 648,
+    "version": 4
+   },
+   {
+    "at": 648,
+    "body": 40,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      3,
+      0
+     ],
+     "nodes": 2,
+     "rows": 3
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 896,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    2,
+    1,
+    3
+   ],
+   "columns": [
+    2,
+    2,
+    2
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 176,
+     "meta": 168,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 32,
+     "end": 416,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 24,
+     "end": 648,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 40,
+     "end": 896,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "id",
+    "name"
+   ],
+   "nullable": [
+    true,
+    true
+   ],
+   "rows": 6,
+   "schema": "id: int32\nname: string",
+   "types": [
+    "int32",
+    "string"
+   ]
+  },
+  "tail": "6465660000000000ffffffff00000000",
+  "walk_end": 904
+ },
+ "dict.arrow": {
+  "bytes": 520,
+  "eos": true,
+  "footer": null,
+  "footer_fields": null,
+  "framing": "stream",
+  "head": "ffffffff90000000",
+  "messages": [
+   {
+    "at": 0,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "color",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 144,
+    "next": 152,
+    "version": 4
+   },
+   {
+    "at": 152,
+    "body": 32,
+    "fields": {
+     "data": {
+      "buffers": 3,
+      "node0": [
+       3,
+       0
+      ],
+      "nodes": 1,
+      "rows": 3
+     },
+     "dict_id": 0,
+     "is_delta": 0
+    },
+    "head": 2,
+    "head_name": "DictionaryBatch",
+    "meta": 168,
+    "next": 360,
+    "version": 4
+   },
+   {
+    "at": 360,
+    "body": 8,
+    "fields": {
+     "buffers": 2,
+     "node0": [
+      4,
+      0
+     ],
+     "nodes": 1,
+     "rows": 4
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 136,
+    "next": 512,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    4
+   ],
+   "columns": [
+    1
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 152,
+     "meta": 144,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 32,
+     "end": 360,
+     "meta": 168,
+     "type": "dictionary",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 8,
+     "end": 512,
+     "meta": 136,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "color"
+   ],
+   "nullable": [
+    true
+   ],
+   "rows": 4,
+   "schema": "color: dictionary<values=string, indices=int8, ordered=0>",
+   "types": [
+    "dictionary<values=string, indices=int8, ordered=0>"
+   ]
+  },
+  "tail": "0001000200000000ffffffff00000000",
+  "walk_end": 520
+ },
+ "file.arrow": {
+  "bytes": 922,
+  "eos": true,
+  "footer": {
+   "at": 680,
+   "head_at": 912,
+   "leading_magic": true,
+   "length": 232,
+   "pad_before": 0,
+   "padding": 0,
+   "tail_magic": true
+  },
+  "footer_fields": {
+   "batches": 2,
+   "blocks": [
+    {
+     "body": 48,
+     "meta": 208,
+     "offset": 184
+    },
+    {
+     "body": 24,
+     "meta": 208,
+     "offset": 440
+    }
+   ],
+   "dictionaries": 0,
+   "fversion": 4,
+   "schema": [
+    {
+     "children": 0,
+     "name": "id",
+     "nullable": 1,
+     "type": 2
+    },
+    {
+     "children": 0,
+     "name": "name",
+     "nullable": 1,
+     "type": 5
+    }
+   ]
+  },
+  "framing": "file",
+  "head": "4152524f57310000",
+  "messages": [
+   {
+    "at": 8,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "id",
+       "nullable": 1,
+       "type": 2
+      },
+      {
+       "children": 0,
+       "name": "name",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 168,
+    "next": 184,
+    "version": 4
+   },
+   {
+    "at": 184,
+    "body": 48,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      3,
+      0
+     ],
+     "nodes": 2,
+     "rows": 3
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 440,
+    "version": 4
+   },
+   {
+    "at": 440,
+    "body": 24,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      1,
+      0
+     ],
+     "nodes": 2,
+     "rows": 1
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 672,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    3,
+    1
+   ],
+   "columns": [
+    2,
+    2
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 184,
+     "meta": 168,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 48,
+     "end": 440,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 24,
+     "end": 672,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "id",
+    "name"
+   ],
+   "nullable": [
+    true,
+    true
+   ],
+   "num_record_batches": 2,
+   "rows": 4,
+   "schema": "id: int32\nname: string",
+   "types": [
+    "int32",
+    "string"
+   ]
+  },
+  "tail": "000120000000e80000004152524f5731",
+  "walk_end": 680
+ },
+ "file_dict.arrow": {
+  "bytes": 930,
+  "eos": true,
+  "footer": {
+   "at": 680,
+   "head_at": 920,
+   "leading_magic": true,
+   "length": 240,
+   "pad_before": 0,
+   "padding": 0,
+   "tail_magic": true
+  },
+  "footer_fields": {
+   "batches": 2,
+   "blocks": [
+    {
+     "body": 8,
+     "meta": 144,
+     "offset": 368
+    },
+    {
+     "body": 8,
+     "meta": 144,
+     "offset": 520
+    }
+   ],
+   "dict_blocks": [
+    {
+     "body": 32,
+     "meta": 176,
+     "offset": 160
+    }
+   ],
+   "dictionaries": 1,
+   "fversion": 4,
+   "schema": [
+    {
+     "children": 0,
+     "name": "color",
+     "nullable": 1,
+     "type": 5
+    }
+   ]
+  },
+  "framing": "file",
+  "head": "4152524f57310000",
+  "messages": [
+   {
+    "at": 8,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "color",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 144,
+    "next": 160,
+    "version": 4
+   },
+   {
+    "at": 160,
+    "body": 32,
+    "fields": {
+     "data": {
+      "buffers": 3,
+      "node0": [
+       3,
+       0
+      ],
+      "nodes": 1,
+      "rows": 3
+     },
+     "dict_id": 0,
+     "is_delta": 0
+    },
+    "head": 2,
+    "head_name": "DictionaryBatch",
+    "meta": 168,
+    "next": 368,
+    "version": 4
+   },
+   {
+    "at": 368,
+    "body": 8,
+    "fields": {
+     "buffers": 2,
+     "node0": [
+      4,
+      0
+     ],
+     "nodes": 1,
+     "rows": 4
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 136,
+    "next": 520,
+    "version": 4
+   },
+   {
+    "at": 520,
+    "body": 8,
+    "fields": {
+     "buffers": 2,
+     "node0": [
+      4,
+      0
+     ],
+     "nodes": 1,
+     "rows": 4
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 136,
+    "next": 672,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    4,
+    4
+   ],
+   "columns": [
+    1,
+    1
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 160,
+     "meta": 144,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 32,
+     "end": 368,
+     "meta": 168,
+     "type": "dictionary",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 8,
+     "end": 520,
+     "meta": 136,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 8,
+     "end": 672,
+     "meta": 136,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "color"
+   ],
+   "nullable": [
+    true
+   ],
+   "num_record_batches": 2,
+   "rows": 8,
+   "schema": "color: dictionary<values=string, indices=int8, ordered=0>",
+   "types": [
+    "dictionary<values=string, indices=int8, ordered=0>"
+   ]
+  },
+  "tail": "040004000000f00000004152524f5731",
+  "walk_end": 680
+ },
+ "lz4.arrow": {
+  "bytes": 528,
+  "eos": true,
+  "footer": null,
+  "footer_fields": null,
+  "framing": "stream",
+  "head": "ffffffffa8000000",
+  "messages": [
+   {
+    "at": 0,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "id",
+       "nullable": 1,
+       "type": 2
+      },
+      {
+       "children": 0,
+       "name": "name",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 168,
+    "next": 176,
+    "version": 4
+   },
+   {
+    "at": 176,
+    "body": 120,
+    "fields": {
+     "buffers": 5,
+     "compression": {
+      "codec": 0,
+      "compressed": 0,
+      "frame": 0
+     },
+     "node0": [
+      3,
+      0
+     ],
+     "nodes": 2,
+     "rows": 3
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 216,
+    "next": 520,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    3
+   ],
+   "columns": [
+    2
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 176,
+     "meta": 168,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 120,
+     "end": 520,
+     "meta": 216,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "id",
+    "name"
+   ],
+   "nullable": [
+    true,
+    true
+   ],
+   "rows": 3,
+   "schema": "id: int32\nname: string",
+   "types": [
+    "int32",
+    "string"
+   ]
+  },
+  "tail": "0000000000000000ffffffff00000000",
+  "walk_end": 528
+ },
+ "rows.arrow": {
+  "bytes": 440,
+  "eos": true,
+  "footer": null,
+  "footer_fields": null,
+  "framing": "stream",
+  "head": "ffffffffa8000000",
+  "messages": [
+   {
+    "at": 0,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "id",
+       "nullable": 1,
+       "type": 2
+      },
+      {
+       "children": 0,
+       "name": "name",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 168,
+    "next": 176,
+    "version": 4
+   },
+   {
+    "at": 176,
+    "body": 48,
+    "fields": {
+     "buffers": 5,
+     "node0": [
+      3,
+      0
+     ],
+     "nodes": 2,
+     "rows": 3
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 200,
+    "next": 432,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    3
+   ],
+   "columns": [
+    2
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 176,
+     "meta": 168,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 48,
+     "end": 432,
+     "meta": 200,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "id",
+    "name"
+   ],
+   "nullable": [
+    true,
+    true
+   ],
+   "rows": 3,
+   "schema": "id: int32\nname: string",
+   "types": [
+    "int32",
+    "string"
+   ]
+  },
+  "tail": "7265650000000000ffffffff00000000",
+  "walk_end": 440
+ },
+ "zstd.arrow": {
+  "bytes": 520,
+  "eos": true,
+  "footer": null,
+  "footer_fields": null,
+  "framing": "stream",
+  "head": "ffffffffa8000000",
+  "messages": [
+   {
+    "at": 0,
+    "body": 0,
+    "fields": {
+     "endianness": 0,
+     "fields": [
+      {
+       "children": 0,
+       "name": "id",
+       "nullable": 1,
+       "type": 2
+      },
+      {
+       "children": 0,
+       "name": "name",
+       "nullable": 1,
+       "type": 5
+      }
+     ]
+    },
+    "head": 1,
+    "head_name": "Schema",
+    "meta": 168,
+    "next": 176,
+    "version": 4
+   },
+   {
+    "at": 176,
+    "body": 104,
+    "fields": {
+     "buffers": 5,
+     "compression": {
+      "codec": 1,
+      "compressed": 0,
+      "frame": 0
+     },
+     "node0": [
+      3,
+      0
+     ],
+     "nodes": 2,
+     "rows": 3
+    },
+    "head": 3,
+    "head_name": "RecordBatch",
+    "meta": 224,
+    "next": 512,
+    "version": 4
+   }
+  ],
+  "pyarrow": {
+   "batches": [
+    3
+   ],
+   "columns": [
+    2
+   ],
+   "messages": [
+    {
+     "body": 0,
+     "end": 176,
+     "meta": 168,
+     "type": "schema",
+     "version": 4,
+     "version_name": "V5"
+    },
+    {
+     "body": 104,
+     "end": 512,
+     "meta": 224,
+     "type": "record batch",
+     "version": 4,
+     "version_name": "V5"
+    }
+   ],
+   "names": [
+    "id",
+    "name"
+   ],
+   "nullable": [
+    true,
+    true
+   ],
+   "rows": 3,
+   "schema": "id: int32\nname: string",
+   "types": [
+    "int32",
+    "string"
+   ]
+  },
+  "tail": "6872656500000000ffffffff00000000",
+  "walk_end": 520
+ }
+}

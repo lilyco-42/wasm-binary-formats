@@ -14,7 +14,9 @@
 //!         entries (tag, type, count, value), then u32 next IFD offset
 //!   h5    0x89 "HDF" then CR LF SUB LF, one superblock version byte, the widths of every offset
 //!         and length, and addresses that sign the structure they point at
-//!         offset and length, then addresses that sign the structure they point at
+//!   arrow no magic in the stream framing: 0xFFFFFFFF continuation, u32le metadata length, a
+//!         flatbuffer, then a body whose length only the flatbuffer states; the file framing adds
+//!         "ARROW1" at both ends with a Footer behind an int32 length before the trailing magic
 //!   npy   0x93 "NUMPY" + two version bytes, then a little-endian header length (u16 in v1, u32
 //!         in v2/v3) and a Python dictionary written as text, then the array data
 //!   woff2 "wOF2", u32 flavor/length, u16 table count, u32 sfnt size + compressed size, then a
@@ -96,6 +98,7 @@ pub fn name() -> &'static str {
         FORMAT_NPY => "npy",
         FORMAT_H5 => "h5",
         FORMAT_AVRO => "avro",
+        FORMAT_ARROW => "arrow",
         _ => "unknown",
     }
 }
@@ -3161,6 +3164,392 @@ fn read_avro(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Arrow IPC: the encapsulated message envelope, and the flatbuffer fields inside it. 38, after
+/// Avro at 37.
+///
+/// The stream framing carries no magic: an encapsulated message is a `0xFFFFFFFF` continuation, an
+/// int32 metadata length, a flatbuffer, and then a body whose length lives *inside* that flatbuffer.
+/// Skipping only the metadata therefore desynchronises the walk at the first record batch, which is
+/// why the loop below reads `body_length` before it advances. The file framing adds `ARROW1` at both
+/// ends and puts a non-encapsulated Footer behind an int32 length; a Footer `Block` indexes a
+/// message by its envelope position with a `metaDataLength` that *already* includes the 8-byte
+/// prefix, so the body begins at `offset + meta` - treating both numbers as pure metadata sizes lands
+/// eight bytes into every body, which is the trap `file.arrow` pins.
+///
+/// Field access goes through one vtable helper, because flatbuffers omit every field that equals its
+/// default: an absent slot is the default, not a zero to read out of the buffer. A `lz4_frame` batch
+/// is exactly that case - its codec ordinal is the enum's zero, so the writer emits no field at all
+/// and only `zstd` has to appear, which is what fixes the ordering without a table to trust.
+///
+/// Column types are reported as the discriminator number and never as a name: the fixtures show
+/// `int32` and `string` arriving as 2 and 5, and nothing here demonstrates what the rest of that
+/// union means. The same rule keeps the header names to the three kinds actually observed.
+pub const FORMAT_ARROW: i32 = 38;
+
+const ARROW_ENVELOPE: usize = 8;
+const ARROW_MESSAGES: usize = 512;
+const ARROW_FIELDS: usize = 64;
+const ARROW_BLOCKS: usize = 128;
+const ARROW_BLOCK_BYTES: usize = 24;
+const ARROW_NODE_BYTES: usize = 16;
+const ARROW_MAX_VERSION: i64 = 4;
+const ARROW_CONTINUATION: i64 = 0xFFFF_FFFF;
+
+fn arrow_u8(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(*bytes.get(at)?))
+}
+
+fn arrow_i16(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(i16::from_le_bytes(
+        bytes.get(at..at + 2)?.try_into().unwrap(),
+    )))
+}
+
+fn arrow_u32(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(u32::from_le_bytes(
+        bytes.get(at..at + 4)?.try_into().unwrap(),
+    )))
+}
+
+fn arrow_i32(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from(i32::from_le_bytes(
+        bytes.get(at..at + 4)?.try_into().unwrap(),
+    )))
+}
+
+fn arrow_i64(bytes: &[u8], at: usize) -> Option<i64> {
+    Some(i64::from_le_bytes(
+        bytes.get(at..at + 8)?.try_into().unwrap(),
+    ))
+}
+
+fn arrow_index(value: i64) -> Option<usize> {
+    usize::try_from(value).ok()
+}
+
+/// Position of one field inside a table, or None when the writer left it at its default. The i32 at
+/// a table is an offset *backwards* to its vtable, which carries one u16 per numbered slot.
+fn arrow_slot(bytes: &[u8], table: usize, want: usize) -> Option<usize> {
+    let back = arrow_i32(bytes, table)?;
+    let vtable = arrow_index(i64::try_from(table).ok()?.checked_sub(back)?)?;
+    let span = arrow_i16(bytes, vtable)?;
+    let entry_at = 4usize.checked_add(want.checked_mul(2)?)?;
+    if span < 4 || arrow_index(span)? <= entry_at {
+        return None;
+    }
+    let offset = arrow_i16(bytes, vtable.checked_add(entry_at)?)?;
+    if offset == 0 {
+        return None;
+    }
+    let at = table.checked_add(arrow_index(offset)?)?;
+    (at < bytes.len()).then_some(at)
+}
+
+/// A `short` field, or the caller's default when the writer omitted it.
+fn arrow_short(bytes: &[u8], table: usize, want: usize, default: i64) -> i64 {
+    arrow_slot(bytes, table, want)
+        .and_then(|at| arrow_i16(bytes, at))
+        .unwrap_or(default)
+}
+
+/// A `long` field, or the caller's default when the writer omitted it.
+fn arrow_long(bytes: &[u8], table: usize, want: usize, default: i64) -> i64 {
+    arrow_slot(bytes, table, want)
+        .and_then(|at| arrow_i64(bytes, at))
+        .unwrap_or(default)
+}
+
+/// A one-byte discriminator or flag, with no default: the caller has to know whether the writer
+/// said anything, because a codec of zero is written by *omitting* the field.
+fn arrow_mark(bytes: &[u8], table: usize, want: usize) -> Option<i64> {
+    arrow_u8(bytes, arrow_slot(bytes, table, want)?)
+}
+
+/// Where a string, vector or nested table actually sits.
+fn arrow_ref(bytes: &[u8], table: usize, want: usize) -> Option<usize> {
+    let at = arrow_slot(bytes, table, want)?;
+    let target = at.checked_add(arrow_index(arrow_u32(bytes, at)?)?)?;
+    (target < bytes.len()).then_some(target)
+}
+
+fn arrow_text(bytes: &[u8], table: usize, want: usize) -> Option<String> {
+    let at = arrow_ref(bytes, table, want)?;
+    let end = at
+        .checked_add(4)?
+        .checked_add(arrow_index(arrow_u32(bytes, at)?)?)?;
+    Some(printable(&String::from_utf8_lossy(bytes.get(at + 4..end)?)))
+}
+
+/// First element and count of a vector whose elements are `element` bytes wide, or None when the
+/// claimed span does not fit the buffer.
+fn arrow_vec(bytes: &[u8], table: usize, want: usize, element: usize) -> Option<(usize, usize)> {
+    let at = arrow_ref(bytes, table, want)?;
+    let count = arrow_index(arrow_u32(bytes, at)?)?;
+    let first = at.checked_add(4)?;
+    let span = count.checked_mul(element)?;
+    (first.checked_add(span)? <= bytes.len()).then_some((first, count))
+}
+
+struct ArrowMessage {
+    at: usize,
+    meta: usize,
+    version: i64,
+    head: i64,
+    body: i64,
+    header: usize,
+}
+
+/// One encapsulated message, inside the region `stop` bounds.
+fn arrow_message(bytes: &[u8], at: usize, stop: usize) -> Option<ArrowMessage> {
+    let fb = at.checked_add(ARROW_ENVELOPE)?;
+    if fb > stop {
+        return None;
+    }
+    if arrow_u32(bytes, at)? != ARROW_CONTINUATION {
+        return None;
+    }
+    let meta = arrow_index(arrow_u32(bytes, at + 4)?)?;
+    if meta < ARROW_ENVELOPE || fb.checked_add(meta)? > stop {
+        return None;
+    }
+    let table = fb.checked_add(arrow_index(arrow_u32(bytes, fb)?)?)?;
+    if table.checked_add(ARROW_ENVELOPE)? > stop {
+        return None;
+    }
+    Some(ArrowMessage {
+        at,
+        meta,
+        version: arrow_short(bytes, table, 0, -1),
+        head: arrow_mark(bytes, table, 1)?,
+        body: arrow_long(bytes, table, 3, 0),
+        header: arrow_ref(bytes, table, 2)?,
+    })
+}
+
+struct ArrowFooter {
+    start: usize,
+    length: usize,
+    head: usize,
+    table: usize,
+}
+
+/// The file framing's tail: a Footer flatbuffer, the int32 that states its size, and the magic -
+/// with an unknown amount of padding between the size and the magic, so the position is whichever
+/// candidate yields a table carrying an in-range version and the required schema field.
+fn arrow_footer(bytes: &[u8]) -> Option<ArrowFooter> {
+    let limit = bytes.len();
+    if limit < 14 || !bytes.starts_with(b"ARROW1") || bytes[limit - 6..] != *b"ARROW1" {
+        return None;
+    }
+    for pad in 0..8usize {
+        let head = limit.checked_sub(10)?.checked_sub(pad)?;
+        let length = arrow_index(arrow_u32(bytes, head)?)?;
+        if length < ARROW_ENVELOPE {
+            continue;
+        }
+        let start = head.checked_sub(length)?;
+        if start < ARROW_ENVELOPE {
+            continue;
+        }
+        let table = start.checked_add(arrow_index(arrow_u32(bytes, start)?)?)?;
+        if table.checked_add(ARROW_ENVELOPE)? > limit {
+            continue;
+        }
+        if !(0..=ARROW_MAX_VERSION).contains(&arrow_short(bytes, table, 0, -1)) {
+            continue;
+        }
+        if arrow_ref(bytes, table, 1).is_none() {
+            continue;
+        }
+        return Some(ArrowFooter {
+            start,
+            length,
+            head,
+            table,
+        });
+    }
+    None
+}
+
+fn read_arrow(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < ARROW_ENVELOPE * 2 {
+        return None;
+    }
+    let signed = bytes.starts_with(b"ARROW1");
+    let footer = if signed { arrow_footer(bytes) } else { None };
+    if signed != footer.is_some() {
+        return None;
+    }
+    let framing = if footer.is_some() { "file" } else { "stream" };
+    let start = if footer.is_some() { ARROW_ENVELOPE } else { 0 };
+    let stop = footer.as_ref().map_or(bytes.len(), |tail| tail.start);
+    // A stream that does not open with a Schema message is not an Arrow stream, whatever it holds,
+    // and that gate is also what keeps a file full of 0xFF padding from reading as one.
+    let first = arrow_message(bytes, start, stop)?;
+    if first.head != 1 || !(0..=ARROW_MAX_VERSION).contains(&first.version) {
+        return None;
+    }
+    let mut rows = Vec::new();
+    let mut at = start;
+    let mut msgs = 0usize;
+    let mut batches = 0usize;
+    let mut dicts = 0usize;
+    let mut named = false;
+    let mut broken = 0i64;
+    let mut eos = false;
+    while at < stop {
+        let Some(prefix) = at.checked_add(ARROW_ENVELOPE) else {
+            broken += 1;
+            break;
+        };
+        if prefix > stop {
+            broken += 1;
+            break;
+        }
+        if arrow_u32(bytes, at) == Some(ARROW_CONTINUATION) && arrow_u32(bytes, at + 4) == Some(0) {
+            eos = true;
+            at = prefix;
+            break;
+        }
+        let Some(message) = arrow_message(bytes, at, stop) else {
+            broken += 1;
+            break;
+        };
+        let body = match usize::try_from(message.body) {
+            Ok(size) => size,
+            Err(_) => {
+                broken += 1;
+                break;
+            }
+        };
+        let Some(next) = message
+            .at
+            .checked_add(ARROW_ENVELOPE)
+            .and_then(|pos| pos.checked_add(message.meta))
+            .and_then(|pos| pos.checked_add(body))
+        else {
+            broken += 1;
+            break;
+        };
+        rows.push(format!(
+            "message\t{msgs}\thead\t{}\tmeta\t{}\tbody\t{}\tversion\t{}",
+            match message.head {
+                1 => "Schema".to_owned(),
+                2 => "DictionaryBatch".to_owned(),
+                3 => "RecordBatch".to_owned(),
+                other => other.to_string(),
+            },
+            message.meta,
+            message.body,
+            message.version
+        ));
+        match message.head {
+            1 => {
+                let (first_field, fields) =
+                    arrow_vec(bytes, message.header, 1, 4).unwrap_or((0, 0));
+                rows.push(format!(
+                    "schema\tfields\t{fields}\tendianness\t{}",
+                    arrow_short(bytes, message.header, 0, 0)
+                ));
+                if !named {
+                    for i in 0..fields.min(ARROW_FIELDS) {
+                        // arrow_vec already bounded the whole vector, so every element position here
+                        // is inside the buffer; only the offset each element holds can still lie.
+                        let slot = first_field + i * 4;
+                        let Some(shift) = arrow_u32(bytes, slot).and_then(arrow_index) else {
+                            break;
+                        };
+                        let Some(field) = slot.checked_add(shift) else {
+                            break;
+                        };
+                        let name = arrow_text(bytes, field, 0).unwrap_or_else(|| "?".to_owned());
+                        let nullable = arrow_mark(bytes, field, 1).unwrap_or(0);
+                        let kind = arrow_mark(bytes, field, 2).unwrap_or(0);
+                        rows.push(format!(
+                            "field\t{i}\t{name}\tnullable\t{nullable}\ttype\t{kind}"
+                        ));
+                    }
+                    named = true;
+                }
+            }
+            2 => {
+                let id = arrow_long(bytes, message.header, 0, 0);
+                let delta = arrow_mark(bytes, message.header, 2).unwrap_or(0);
+                let mut line = format!("dict\t{dicts}\tid\t{id}");
+                if let Some(data) = arrow_ref(bytes, message.header, 1) {
+                    let inner = arrow_long(bytes, data, 0, 0);
+                    let buffers = arrow_vec(bytes, data, 2, ARROW_NODE_BYTES).map_or(0, |(_, n)| n);
+                    line.push_str(&format!("\trows\t{inner}\tbuffers\t{buffers}"));
+                }
+                rows.push(format!("{line}\tdelta\t{delta}"));
+                dicts += 1;
+            }
+            3 => {
+                let rows_in = arrow_long(bytes, message.header, 0, 0);
+                let nodes =
+                    arrow_vec(bytes, message.header, 1, ARROW_NODE_BYTES).map_or(0, |(_, n)| n);
+                let buffers =
+                    arrow_vec(bytes, message.header, 2, ARROW_NODE_BYTES).map_or(0, |(_, n)| n);
+                let mut line = format!(
+                    "batch\t{batches}\trows\t{rows_in}\tnodes\t{nodes}\tbuffers\t{buffers}"
+                );
+                if let Some(compression) = arrow_ref(bytes, message.header, 3) {
+                    let codec = arrow_mark(bytes, compression, 0).unwrap_or(0);
+                    line.push_str(&format!("\tcodec\t{codec}"));
+                }
+                rows.push(line);
+                batches += 1;
+            }
+            _ => {}
+        }
+        msgs += 1;
+        at = next;
+        if msgs >= ARROW_MESSAGES {
+            broken += 1;
+            break;
+        }
+    }
+    let mut tail_rows = Vec::new();
+    if let Some(tail) = footer.as_ref() {
+        let (blocks_at, blocks) =
+            arrow_vec(bytes, tail.table, 3, ARROW_BLOCK_BYTES).unwrap_or((0, 0));
+        let dictionaries = arrow_vec(bytes, tail.table, 2, ARROW_BLOCK_BYTES).map_or(0, |(_, n)| n);
+        let padded = if bytes.starts_with(b"ARROW1\0\0") {
+            1
+        } else {
+            0
+        };
+        tail_rows.push(format!(
+            "footer\t{}\tbytes\t{}\tenvelope\t{}\tversion\t{}\tbatches\t{blocks}\tdicts\t{dictionaries}\tmagic\t{padded}",
+            tail.start,
+            tail.length,
+            tail.head,
+            arrow_short(bytes, tail.table, 0, -1),
+        ));
+        for i in 0..blocks.min(ARROW_BLOCKS) {
+            let element = blocks_at + i * ARROW_BLOCK_BYTES;
+            let offset = arrow_i64(bytes, element).unwrap_or(0);
+            let meta = arrow_i64(bytes, element + 8).unwrap_or(0);
+            let body = arrow_i64(bytes, element + 16).unwrap_or(0);
+            tail_rows.push(format!(
+                "block\t{i}\tenvelope\t{offset}\tmeta\t{meta}\tbody\t{body}"
+            ));
+        }
+    }
+    let mut entries = vec![format!(
+        "arrow\t{}\t{msgs}\t{broken}\tframing\t{framing}",
+        bytes.len()
+    )];
+    entries.append(&mut rows);
+    entries.append(&mut tail_rows);
+    entries.push(format!("eos\t{}", if eos { 1 } else { 0 }));
+    let covered = broken == 0 && footer.map_or(eos && at == bytes.len(), |tail| at == tail.start);
+    if covered {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -3241,8 +3630,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_avro(bytes) {
         return accept(FORMAT_AVRO, lines);
     }
+    if let Some(lines) = read_arrow(bytes) {
+        return accept(FORMAT_ARROW, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5 or Avro container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container or Arrow stream",
         -2,
     )
 }

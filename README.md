@@ -263,24 +263,24 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 38 | 17.4% |
+| own Rust reader, named header fields decoded | 39 | 17.8% |
 | own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **116** | 53.0% |
-| **covered, any level** | **103** | 47.0% |
+| **no parser at all - real gap** | **115** | 52.5% |
+| **covered, any level** | **104** | 47.5% |
 
-Top binary gap groups by count: unknown 56, archive 12, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 55, archive 12, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
-and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
+and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`h5`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, `coff`, `heif`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 103 of 219 binary labels have a parser
-that runs here (38 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 116 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 104 of 219 binary labels have a parser
+that runs here (39 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 115 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -300,6 +300,7 @@ temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotl
 temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
 temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
 temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
+temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -390,8 +391,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **103 covered** (38 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **116 with no
+Coverage is scored against magika's 219 binary labels: **104 covered** (39 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **115 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -500,6 +501,20 @@ does not re-derive them:
   hand-built tests (a varint `0x14` for an 11-byte key, and a patched byte that was not the block's
   size field), which is the point of the mirror: after the npy port silently dropped a trim step the
   mirror had, the Rust and the python are now compared line by line as well as row by row.
+  Arrow IPC (+1 field-level label, 104 covered, 115 gaps) is where that discipline paid for itself
+  twice in one file. `scripts/make-arrow-fixtures.py` writes seven fixtures with pyarrow, walks each
+  one with its own flatbuffer reader, reads it back through `pyarrow.ipc.read_message`, and refuses
+  to write `arrow.probe.json` unless the two agree on every metadata length, body length, version,
+  header kind, row count, column name and block offset. Two traps fell out of that comparison and
+  neither is visible in a spec summary: a message's body length lives *inside* its metadata
+  flatbuffer, so a walk that skips only the metadata desynchronises at the first record batch
+  (`batches.arrow`, three batches, cannot be walked that way); and a file's footer `Block` gives the
+  envelope position plus a `metaDataLength` that already includes the 8-byte encapsulation prefix, so
+  the naive `offset + meta` reading of "both are metadata sizes" lands eight bytes into every body.
+  The codec ordinal is a third, quieter case - `lz4_frame` is the enum's zero, so pyarrow omits the
+  field entirely and only `zstd` has to appear: two files written with two option strings are what
+  order those two values, which is why the reader names nothing it has not seen and reports column
+  type discriminators as numbers.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
