@@ -57,12 +57,17 @@ jobs:
             analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm \
             engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 
+      # One artifact per module, and each with a single path: an upload that lists two files keeps
+      # their directories, which is exactly what broke the site assembly the first time.
       - uses: actions/upload-artifact@v4
         with:
           name: apk-lens-wasm
-          path: |
-            engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
-            analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm
+          path: engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-lens-analysis-wasm
+          path: analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm
 
   pages:
     needs: engine
@@ -80,12 +85,17 @@ jobs:
         with:
           name: apk-lens-wasm
           path: artifact
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-lens-analysis-wasm
+          path: artifact-analysis
       - name: Assemble site
         run: |
           mkdir -p site
           cp artifact/apk_lens.wasm site/apk-lens.wasm
-          cp artifact/analysis/target/wasm32-unknown-unknown/release/apk_lens_analysis.wasm site/apk-lens-analysis.wasm
+          cp artifact-analysis/apk_lens_analysis.wasm site/apk-lens-analysis.wasm
           cp demo/index.html site/index.html
+          ls -l site
       - uses: actions/configure-pages@v5
         with:
           enablement: true
