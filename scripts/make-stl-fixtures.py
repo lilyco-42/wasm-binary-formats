@@ -77,58 +77,59 @@ def normal_of(a, b, c):
     return [part / length for part in cross]
 
 
-def walk(data):
-    rows = []
-    broken = 0
-    if len(data) < 84:
-        return ["stl\t%d\ttris\t0\tbroken\t1\tsolid\t-" % len(data), "stopped\tbroken\t1"]
-    count = struct.unpack_from("<I", data, 80)[0]
-    declared = 84 + 50 * count
-    fit = "exact" if declared == len(data) else ("short" if declared < len(data) else "long")
-    if fit != "exact":
-        broken += 1
-    rows.append(
-        "stl\t%d\ttris\t%d\tbroken\t0\tsolid\t%s" % (len(data), count, clean(data[:80]) or "-")
-    )
-    rows.append("sizes\tdeclared\t%d\tactual\t%d\tfit\t%s" % (declared, len(data), fit))
+def u32(data, at):
+    return struct.unpack_from("<I", data, at)[0]
 
+
+def walk(data):
+    """The reader's own gate, modelled: exact arithmetic, and every triangle's normal plausible."""
+    if len(data) < 134:
+        return None
+    count = u32(data, 80)
+    declared = 84 + 50 * count
+    if count == 0 or declared != len(data):
+        return None
     listed = min(count, MAX_TRIS)
+    rows = []
     points = []
+    low = [float("inf")] * 3
+    high = [float("-inf")] * 3
     zero = 0
     wrong = 0
-    for index in range(listed):
+    for index in range(count):
         base = 84 + 50 * index
         values = struct.unpack_from("<12f", data, base)
         attr = struct.unpack_from("<H", data, base + 48)[0]
-        normal = values[0:3]
-        verts = [values[3:6], values[6:9], values[9:12]]
-        points.extend(verts)
-        if all(part == 0.0 for part in normal):
+        normal = list(values[0:3])
+        verts = [list(values[3:6]), list(values[6:9]), list(values[9:12])]
+        if any(part != part or abs(part) == float("inf") for part in values):
+            return None
+        length = sum(part * part for part in normal) ** 0.5
+        if length != 0.0 and not 0.5 <= length < 1.5:
+            return None
+        for corner in verts:
+            points.append(corner)
+            for axis in range(3):
+                low[axis] = min(low[axis], corner[axis])
+                high[axis] = max(high[axis], corner[axis])
+        if length == 0.0:
             zero += 1
         else:
             implied = normal_of(*verts)
             if implied is None or max(abs(normal[i] - implied[i]) for i in range(3)) > 1e-3:
                 wrong += 1
-        rows.append(
-            "tri\t%d\tnormal\t%s\tv0\t%s\tv1\t%s\tv2\t%s\tattr\t%d"
-            % (index, trio(normal), trio(verts[0]), trio(verts[1]), trio(verts[2]), attr)
-        )
+        if index < listed:
+            rows.append(
+                "tri\t%d\tnormal\t%s\tv0\t%s\tv1\t%s\tv2\t%s\tattr\t%d"
+                % (index, trio(normal), trio(verts[0]), trio(verts[1]), trio(verts[2]), attr)
+            )
+    head = ["stl\t%d\ttris\t%d\tsolid\t%s" % (len(data), count, clean(data[:80]) or "-"),
+            "sizes\tdeclared\t%d\tactual\t%d\tfit\texact" % (declared, len(data))]
     if count > listed:
         rows.append("cut\ttris\t%d" % count)
-    if listed:
-        low = [min(point[axis] for point in points) for axis in range(3)]
-        high = [max(point[axis] for point in points) for axis in range(3)]
-        rows.append("box\tmin\t%s\tmax\t%s" % (trio(low), trio(high)))
-    rows.append("normals\tzero\t%d\twrong\t%d\tcounted\t%d" % (zero, wrong, listed))
-    broken += 0
-    rows[0] = "stl\t%d\ttris\t%d\tbroken\t%d\tsolid\t%s" % (
-        len(data),
-        count,
-        broken,
-        clean(data[:80]) or "-",
-    )
-    rows.append("walked\tend" if broken == 0 else "stopped\tbroken\t%d" % broken)
-    return rows
+    rows.append("box\tmin\t%s\tmax\t%s" % (trio(low), trio(high)))
+    rows.append("normals\tzero\t%d\twrong\t%d\tcounted\t%d" % (zero, wrong, count))
+    return head + rows + ["walked\tend"]
 
 
 def main():

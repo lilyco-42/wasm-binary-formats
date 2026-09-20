@@ -5319,35 +5319,24 @@ fn read_stl(bytes: &[u8]) -> Option<Vec<String>> {
     if count == 0 || count > STL_MAX_TRIS {
         return None;
     }
+    // The identity has to hold, not merely be close. A file that claims more triangles than it holds
+    // cannot be checked at all, and without this gate any blob whose 80th byte happens to be small
+    // enough reads as a mesh: a real HDF5 superblock was claimed exactly that way.
     let declared = 84usize.checked_add(count as usize * STL_TRI)?;
-    if !stl_triangle_sane(bytes, STL_HEAD + 4) || !stl_normal_plausible(bytes, STL_HEAD + 4) {
+    if declared != bytes.len() {
         return None;
     }
-    // A file that claims far more triangles than it holds is still recognisably an STL, so it is
-    // read and reported rather than refused; a file whose last bytes are elsewhere is the same case.
-    let readable = (bytes.len() - (STL_HEAD + 4)) / STL_TRI;
-    let last = readable.min(count as usize) - 1;
-    if readable == 0 || !stl_triangle_sane(bytes, STL_HEAD + 4 + last * STL_TRI) {
-        return None;
-    }
-    let fit = match declared.cmp(&bytes.len()) {
-        std::cmp::Ordering::Equal => "exact",
-        std::cmp::Ordering::Less => "short",
-        std::cmp::Ordering::Greater => "long",
-    };
-    let mut broken = usize::from(fit != "exact");
-
-    let listed = usize::try_from(count)
-        .unwrap_or(usize::MAX)
-        .min(STL_LISTED)
-        .min(readable);
+    let listed = usize::try_from(count).unwrap_or(usize::MAX).min(STL_LISTED);
     let mut rows = Vec::new();
     let mut low = [f32::MAX; 3];
     let mut high = [f32::MIN; 3];
     let mut zeroed = 0usize;
     let mut wrong = 0usize;
-    for index in 0..listed {
+    for index in 0..count as usize {
         let base = STL_HEAD + 4 + index * STL_TRI;
+        if !stl_triangle_sane(bytes, base) || !stl_normal_plausible(bytes, base) {
+            return None;
+        }
         let normal: [f32; 3] = [
             stl_f32(bytes, base)?,
             stl_f32(bytes, base + 4)?,
@@ -5371,54 +5360,50 @@ fn read_stl(bytes: &[u8]) -> Option<Vec<String>> {
         }) {
             wrong += 1;
         }
-        rows.push(format!(
-            "tri\t{index}\tnormal\t{}\tv0\t{}\tv1\t{}\tv2\t{}\tattr\t{}",
-            stl_trio(bytes, base)?,
-            stl_trio(bytes, base + 12)?,
-            stl_trio(bytes, base + 24)?,
-            stl_trio(bytes, base + 36)?,
-            stl_u16(bytes, base + 48)?
-        ));
+        if index < listed {
+            rows.push(format!(
+                "tri\t{index}\tnormal\t{}\tv0\t{}\tv1\t{}\tv2\t{}\tattr\t{}",
+                stl_trio(bytes, base)?,
+                stl_trio(bytes, base + 12)?,
+                stl_trio(bytes, base + 24)?,
+                stl_trio(bytes, base + 36)?,
+                stl_u16(bytes, base + 48)?
+            ));
+        }
     }
-    if count as usize > listed {
+    if (count as usize) > listed {
         rows.push(format!("cut\ttris\t{count}"));
     }
-    if listed > 0 {
-        rows.push(format!(
-            "box\tmin\t{}\tmax\t{}",
-            low.iter()
-                .map(|value| format!("{value:.6}"))
-                .collect::<Vec<_>>()
-                .join(","),
-            high.iter()
-                .map(|value| format!("{value:.6}"))
-                .collect::<Vec<_>>()
-                .join(",")
-        ));
-    }
-    rows.insert(
-        0,
-        format!(
-            "sizes\tdeclared\t{declared}\tactual\t{}\tfit\t{fit}",
-            bytes.len()
-        ),
-    );
     rows.push(format!(
-        "normals\tzero\t{zeroed}\twrong\t{wrong}\tcounted\t{listed}"
+        "box\tmin\t{}\tmax\t{}",
+        low.iter()
+            .map(|value| format!("{value:.6}"))
+            .collect::<Vec<_>>()
+            .join(","),
+        high.iter()
+            .map(|value| format!("{value:.6}"))
+            .collect::<Vec<_>>()
+            .join(",")
     ));
     rows.insert(
         0,
         format!(
-            "stl\t{}\ttris\t{count}\tbroken\t{broken}\tsolid\t{}",
+            "sizes\tdeclared\t{declared}\tactual\t{}\tfit\texact",
+            bytes.len()
+        ),
+    );
+    rows.push(format!(
+        "normals\tzero\t{zeroed}\twrong\t{wrong}\tcounted\t{count}"
+    ));
+    rows.insert(
+        0,
+        format!(
+            "stl\t{}\ttris\t{count}\tsolid\t{}",
             bytes.len(),
             stl_text(bytes)
         ),
     );
-    if broken == 0 {
-        rows.push("walked\tend".to_owned());
-    } else {
-        rows.push(format!("stopped\tbroken\t{broken}"));
-    }
+    rows.push("walked\tend".to_owned());
     Some(rows)
 }
 

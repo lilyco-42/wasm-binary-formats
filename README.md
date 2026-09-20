@@ -600,13 +600,15 @@ does not re-derive them:
   owners - `collisions` counts the ones that do, and it is 0 in all three real files.
   Binary STL (+1 field-level label, 110 covered, 109 gaps) is the opposite case: a format with no
   magic at all, where the only thing a file asserts about itself is `84 + 50 * triangles == size`.
-  That identity is necessary and not sufficient - text happens to satisfy arithmetic too - so the
-  reader also asks that the coordinates it is about to name are finite and that the stored normal is
-  either zero or a unit vector, which is what turns an ASCII STL away. Normals are then listed as
-  written *and* counted against the normal the three points imply, because writers disagree: meshio
-  computes them, plenty of exporters leave them at zero, and `normals.stl` carries both cases on
-  purpose. `scripts/make-stl-fixtures.py` writes the meshes with meshio and asserts that meshio's own
-  reader returns the same triangle count the header declares.
+  That identity is necessary and not sufficient, and CI proved how much: an HDF5 superblock that the
+  HDF5 reader correctly refuses was picked up as a mesh because one byte at offset 80 of a real file
+  divided evenly by 50. So the gate is the exact identity - a file whose count does not close is
+  refused, not annotated - plus finite coordinates and a stored normal that is either zero or a unit
+  vector, checked against *every* triangle. Normals are then listed as written *and* counted against
+  the normal the three points imply, because writers disagree: meshio computes them, plenty of
+  exporters leave them at zero, and `normals.stl` carries both cases on purpose.
+  `scripts/make-stl-fixtures.py` writes the meshes with meshio and asserts that meshio's own reader
+  returns the same triangle count the header declares.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
