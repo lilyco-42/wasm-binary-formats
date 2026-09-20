@@ -32,7 +32,9 @@ function importsFor(module) {
 
 const bytes = await readFile(path);
 const compiled = new WebAssembly.Module(bytes.buffer.slice(0));
-const { instance } = await WebAssembly.instantiate(compiled, importsFor(compiled));
+// Given a Module, `instantiate` answers with the Instance itself, not the {module, instance} pair it
+// returns for the streaming and byte-buffer forms.
+const instance = new WebAssembly.Instance(compiled, importsFor(compiled));
 const ex = instance.exports;
 
 for (const name of ['memory', 'self_test', 'disasm_run', 'disasm_count', 'disasm_at']) {
