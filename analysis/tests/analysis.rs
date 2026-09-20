@@ -17,7 +17,7 @@ fn the_stub_elf_reports_its_own_section_table() {
     let lines = rows(&sample_elf());
     assert_eq!(
         lines[0],
-        "file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tsections\t2\tsymbols\t0\tentry\t0",
+        "file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tsections\t2\tsymbols\t0\tdynsym\t0\tentry\t0",
         "the counts in the header row have to be the counts the rows below carry"
     );
     assert_eq!(lines[1], "section\t0\t\taddr\t0\tsize\t0\talign\t0");
@@ -71,15 +71,20 @@ fn a_distribution_binary_comes_through_the_same_abi() {
         listed > 1,
         "a real binary has more than one section: {listed}"
     );
+    // A distribution binary is stripped: what it still carries is the dynamic table.
+    assert!(
+        lines.iter().any(|line| line.starts_with("dynsym\t")),
+        "no dynamic symbols in a dynamically linked /bin/ls"
+    );
     assert!(
         lines
             .iter()
-            .any(|line| line.starts_with("symbol\t") && line.contains("\taddr\t")),
-        "a distribution binary has a symbol table: none was listed"
+            .any(|line| line.starts_with("dynsym\t") && line.contains("\taddr\t")),
+        "a dynamic symbol row has no address column"
     );
     let declared: usize = lines[0]
         .split('\t')
-        .skip_while(|field| *field != "symbols")
+        .skip_while(|field| *field != "dynsym")
         .nth(1)
         .and_then(|value| value.parse().ok())
         .unwrap_or(0);

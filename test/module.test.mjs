@@ -80,7 +80,7 @@ test('a minimal ELF comes back as a section table', () => {
   assert.equal(rows.length, ex.analyse_count());
   assert.equal(
     rows[0],
-    'file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tsections\t2\tsymbols\t0\tentry\t0',
+    'file\telf\tbits\t64\tendian\tlittle\tkind\tdynamic\tsections\t2\tsymbols\t0\tdynsym\t0\tentry\t0',
     rows.join(' | ')
   );
   assert.equal(rows[1], 'section\t0\t\taddr\t0\tsize\t0\talign\t0');
@@ -106,7 +106,14 @@ test('a distribution binary comes through the same ABI', async () => {
   assert.match(rows[0], /^file\t/);
   const sections = rows.filter((row) => row.startsWith('section\t'));
   assert.ok(sections.length > 1, `only ${sections.length} sections of a real binary`);
-  assert.ok(rows.some((row) => row.startsWith('symbol\t')), 'no symbol rows at all');
+  assert.ok(
+    rows.some((row) => row.startsWith('dynsym\t')),
+    'a dynamically linked /bin/ls has an import table; none was listed'
+  );
+  assert.ok(
+    rows.some((row) => row.startsWith('dynsym\t') && row.includes('\taddr\t')),
+    'a dynamic symbol row has no address column'
+  );
 });
 
 test('the base module the page always downloads carries none of this', async () => {

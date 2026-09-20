@@ -41,11 +41,27 @@ fn label<T: std::fmt::Debug>(value: &T) -> String {
         .collect()
 }
 
+/// A symbol row. Static and dynamic tables share the shape but not the lifetime, so both come
+/// through here.
+fn symbol_row<T: ObjectSymbol>(prefix: &str, index: usize, symbol: &T) -> String {
+    format!(
+        "{prefix}\t{index}\t{}\taddr\t{}\tsize\t{}\tkind\t{}\tsection\t{}",
+        clean(symbol.name().unwrap_or("?")),
+        symbol.address(),
+        symbol.size(),
+        label(&symbol.kind()),
+        symbol
+            .section_index()
+            .map_or("-".to_owned(), |id| id.0.to_string())
+    )
+}
+
 pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
+    let mut imported = 0usize;
 
     for (index, section) in file.sections().enumerate() {
         sections += 1;
@@ -64,30 +80,32 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         rows.push(format!("cut\tsections\t{sections}"));
     }
 
+    // Two tables, because a distribution binary is usually stripped: `.symtab` may be empty while
+    // every import and export is still in `.dynsym`. Reading only the first would report a real
+    // program as having no symbols at all.
     for (index, symbol) in file.symbols().enumerate() {
         symbols += 1;
-        if index >= MAX_LISTED {
-            continue;
+        if index < MAX_LISTED {
+            rows.push(symbol_row("symbol", index, &symbol));
         }
-        rows.push(format!(
-            "symbol\t{index}\t{}\taddr\t{}\tsize\t{}\tkind\t{}\tsection\t{}",
-            clean(symbol.name().unwrap_or("?")),
-            symbol.address(),
-            symbol.size(),
-            label(&symbol.kind()),
-            symbol
-                .section_index()
-                .map_or("-".to_owned(), |id| id.0.to_string())
-        ));
+    }
+    for (index, symbol) in file.dynamic_symbols().enumerate() {
+        imported += 1;
+        if index < MAX_LISTED {
+            rows.push(symbol_row("dynsym", index, &symbol));
+        }
     }
     if symbols > MAX_LISTED {
         rows.push(format!("cut\tsymbols\t{symbols}"));
+    }
+    if imported > MAX_LISTED {
+        rows.push(format!("cut\tdynsym\t{imported}"));
     }
 
     rows.insert(
         0,
         format!(
-            "file\t{}\tbits\t{}\tendian\t{}\tkind\t{}\tsections\t{sections}\tsymbols\t{symbols}\tentry\t{}",
+            "file\t{}\tbits\t{}\tendian\t{}\tkind\t{}\tsections\t{sections}\tsymbols\t{symbols}\tdynsym\t{imported}\tentry\t{}",
             label(&file.format()),
             if file.is_64() { 64 } else { 32 },
             if file.is_little_endian() { "little" } else { "big" },
