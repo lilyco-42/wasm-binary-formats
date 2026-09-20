@@ -272,9 +272,12 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 7,
 code 5, executable 4, inode 3, text 1.
-Named gaps that an end user would call common: `ppt` - the last compound-file Office type, left out
-because the smallest PowerPoint LibreOffice will write here is 640 KB of padding around one stream
-name - then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
+Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
+re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
+Draw document) and then refuses the store with `SfxBaseModel::impl_store ... 0x81a`, and nothing on
+this host opens as an Impress document, so no ppt can be produced to read at all - an older note here
+blamed a 640 KB padding size, which this round could not reproduce because nothing was written.
+Then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, the bare `ebml` label, and `otf` -
 `otf` because no CFF charstring writer runs here. `woff2`, `coff` and `crt` were on that list as the row
 before: the first for a reason that turned out to be about the interpreter on PATH rather than about
@@ -804,9 +807,10 @@ does not re-derive them:
   Two more were unbuilt for a reason that has since gone away: `doc` and `xls` were listed as needing a
   CFB writer that this host did not have, and `scripts/make-cfb-fixtures.py` found LibreOffice plus `xlwt`
   writing them and `olefile` reading both back, so they are credited at container level now. What is left
-  of that list is `ppt`, whose blocker is not a producer but a size - 640 KB of padding around one stream
-  name is the smallest PowerPoint the writers here emit - and `chm`, which has not been probed for a
-  writer since the lesson above.
+  of that list is `ppt`, which re-probed badly: the filter name is accepted, the store is refused
+  (`impl_store ... 0x81a`), because a Draw document is not an Impress document - so the size figure that
+  used to be given as its blocker belongs to a file this host cannot make. And `chm`, which has not been
+  probed for a writer since the lesson above.
 * Refused rather than guessed: **CAB's folder area** - the *file* table decodes exactly as documented
   and matches `expand -D`, but `makecab` gives it 8 bytes where `CFFOLDER` is specified as 16, so the
   reader stops at the file table and `cab` is credited as a container, not a field-level parser.
