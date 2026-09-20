@@ -95,6 +95,7 @@ pub fn name() -> &'static str {
         FORMAT_WOFF2 => "woff2",
         FORMAT_NPY => "npy",
         FORMAT_H5 => "h5",
+        FORMAT_AVRO => "avro",
         _ => "unknown",
     }
 }
@@ -2952,6 +2953,214 @@ fn read_h5(bytes: &[u8]) -> Option<Vec<String>> {
     Some(entries)
 }
 
+/// Avro object containers: the metadata map, the synchronisation marker, and the block chain whose
+/// record counts have to add up. 37, after HDF5 at 36.
+///
+/// `Obj\x01`, then a metadata map as zigzag-varint long / byte-string pairs terminated by a zero
+/// long, then a 16-byte sync marker, then blocks of `count`, `byte size`, that many bytes of payload
+/// and a copy of the sync marker. Every integer here is a variable-length zigzag long, which is why
+/// the loop below reads numbers through one bounded helper instead of assuming widths: a block that
+/// claims more bytes than the file holds is a broken chain, not a length to trust.
+///
+/// Nothing is deserialised - the payload bytes are counted, not decoded, and a compressed block is
+/// reported with whatever codec name the metadata states rather than inflated. What *is* claimed is
+/// the arithmetic: `scripts/make-avro-fixtures.py` asserts that the block counts sum to the number of
+/// records fastavro reads back from the same bytes, and `many.avro` is deliberately written with
+/// `sync_interval=1000` so that several blocks exist - a one-block file cannot tell a loop from a
+/// block that merely happens to end where the file does.
+pub const FORMAT_AVRO: i32 = 37;
+
+const AVRO_BLOCKS: usize = 512;
+const AVRO_SYNC: usize = 16;
+
+/// Zigzag-encoded variable-length long, at most ten bytes, or None when the file runs out first or
+/// the bytes do not fit.
+fn avro_long(bytes: &[u8], at: usize) -> Option<(i64, usize)> {
+    let mut result = 0u64;
+    let mut cursor = at;
+    for shift in (0..70).step_by(7) {
+        let byte = *bytes.get(cursor)?;
+        cursor += 1;
+        let chunk = u64::from(byte & 0x7F).checked_mul(1u64.checked_shl(shift)?)?;
+        result = result.checked_add(chunk)?;
+        if byte & 0x80 == 0 {
+            let signed = ((result >> 1) as i64) ^ -((result & 1) as i64);
+            return Some((signed, cursor));
+        }
+    }
+    None
+}
+
+/// The first `"name"` key in the schema text, which is the record type's own name: the fields come
+/// later in the array, and the writer puts the record's name first.
+fn avro_record_name(text: &[u8]) -> Option<String> {
+    let needle = b"\"name\"";
+    let mut at = find(text, 0, needle)? + needle.len();
+    while matches!(text.get(at), Some(b' ') | Some(b'\t') | Some(b'\n')) {
+        at += 1;
+    }
+    if *text.get(at)? != b':' {
+        return None;
+    }
+    at += 1;
+    while matches!(text.get(at), Some(b' ') | Some(b'\t') | Some(b'\n')) {
+        at += 1;
+    }
+    if *text.get(at)? != b'"' {
+        return None;
+    }
+    at += 1;
+    let end = at + text.get(at..)?.iter().position(|byte| *byte == b'"')?;
+    Some(String::from_utf8_lossy(text.get(at..end)?).into_owned())
+}
+
+fn read_avro(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 8 || !bytes.starts_with(b"Obj\x01") {
+        return None;
+    }
+    let mut broken = 0i64;
+    let mut at = 4usize;
+    let Some((pairs, after)) = avro_long(bytes, at) else {
+        return None;
+    };
+    at = after;
+    let mut codec = None;
+    let mut schema: Option<Vec<u8>> = None;
+    let mut listed = 0i64;
+    for _ in 0..pairs.max(0) {
+        let Some((key_len, after)) = avro_long(bytes, at) else {
+            broken += 1;
+            break;
+        };
+        at = after;
+        let Ok(len) = usize::try_from(key_len) else {
+            broken += 1;
+            break;
+        };
+        let Some(key) = at.checked_add(len).and_then(|end| bytes.get(at..end)) else {
+            broken += 1;
+            break;
+        };
+        at += len;
+        let Some((value_len, after)) = avro_long(bytes, at) else {
+            broken += 1;
+            break;
+        };
+        at = after;
+        let Ok(len) = usize::try_from(value_len) else {
+            broken += 1;
+            break;
+        };
+        let Some(value) = at.checked_add(len).and_then(|end| bytes.get(at..end)) else {
+            broken += 1;
+            break;
+        };
+        at += len;
+        listed += 1;
+        if key == b"avro.codec".as_slice() {
+            codec = Some(String::from_utf8_lossy(value).into_owned());
+        }
+        if key == b"avro.schema".as_slice() {
+            schema = Some(value.to_vec());
+        }
+    }
+    // The map ends with a zero-length block; without it the sync marker would be read from the
+    // wrong place and every block offset after it would be nonsense.
+    let Some((terminator, after)) = avro_long(bytes, at) else {
+        return None;
+    };
+    at = after;
+    if terminator != 0 {
+        broken += 1;
+    }
+    let sync: Vec<u8> = bytes
+        .get(at..at.checked_add(AVRO_SYNC)?)
+        .unwrap_or_default()
+        .to_vec();
+    if sync.len() != AVRO_SYNC {
+        return None;
+    }
+    at += AVRO_SYNC;
+
+    let mut rows = Vec::new();
+    let mut blocks = 0i64;
+    let mut records = 0i64;
+    let mut syncs_agree = true;
+    while at < bytes.len() {
+        if blocks as usize >= AVRO_BLOCKS {
+            broken += 1;
+            break;
+        }
+        let Some((count, after)) = avro_long(bytes, at) else {
+            broken += 1;
+            break;
+        };
+        at = after;
+        let Some((size, after)) = avro_long(bytes, at) else {
+            broken += 1;
+            break;
+        };
+        at = after;
+        let Ok(len) = usize::try_from(size) else {
+            broken += 1;
+            break;
+        };
+        let Some(end) = at
+            .checked_add(len)
+            .and_then(|end| end.checked_add(AVRO_SYNC))
+        else {
+            broken += 1;
+            break;
+        };
+        if end > bytes.len() {
+            broken += 1;
+            break;
+        }
+        if bytes.get(at + len..end).unwrap_or_default() != sync.as_slice() {
+            broken += 1;
+            syncs_agree = false;
+            rows.push(format!("block\t{blocks}\t{count}\t{len}\tsync\tdiffers"));
+            break;
+        }
+        if count >= 0 {
+            records += count;
+        }
+        rows.push(format!("block\t{blocks}\t{count}\t{len}"));
+        blocks += 1;
+        at = end;
+    }
+
+    let mut entries = vec![format!("avro\t{at}\t{}\t{blocks}\t{broken}", bytes.len())];
+    entries.push(format!(
+        "metadata\t{listed}\twith_schema\t{}",
+        i64::from(schema.is_some())
+    ));
+    entries.push(format!(
+        "codec\t{}",
+        codec.unwrap_or_else(|| "absent".to_owned())
+    ));
+    entries.push(match schema.as_deref() {
+        None => "schema\tabsent".to_owned(),
+        Some(text) => match avro_record_name(text) {
+            Some(name) => format!("schema\t{}\tname\t{}", text.len(), printable(&name)),
+            None => format!("schema\t{}\tname\tunknown", text.len()),
+        },
+    });
+    entries.push(format!(
+        "sync\t{}\tagrees\t{}",
+        sync.iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+        u8::from(syncs_agree)
+    ));
+    entries.append(&mut rows);
+    entries.push(format!("records\t{records}"));
+    if broken == 0 && at == bytes.len() {
+        entries.push("walked\tend".to_owned());
+    }
+    Some(entries)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -3029,8 +3238,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_h5(bytes) {
         return accept(FORMAT_H5, lines);
     }
+    if let Some(lines) = read_avro(bytes) {
+        return accept(FORMAT_AVRO, lines);
+    }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array or HDF5 container",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5 or Avro container",
         -2,
     )
 }

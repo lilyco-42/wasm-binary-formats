@@ -1,0 +1,90 @@
+{
+ "deflate": {
+  "blocks": [
+   {
+    "bytes": 22,
+    "records": 3
+   }
+  ],
+  "codec": "deflate",
+  "length": 211,
+  "pairs": [
+   [
+    "avro.codec",
+    "deflate"
+   ],
+   [
+    "avro.schema",
+    "{\"type\": \"record\", \"name\": \"Sample\", \"fields\": [{\"name\": \"id\", \"type\": \"long\"}, {\"name\": \"name\", \"type\": \"string\"}]}"
+   ]
+  ],
+  "read_back": 3,
+  "records": 3,
+  "schema_bytes": 116,
+  "sync": "e789f333c43959beba3d9c8e84f2816f"
+ },
+ "many": {
+  "blocks": [
+   {
+    "bytes": 1006,
+    "records": 118
+   },
+   {
+    "bytes": 1000,
+    "records": 100
+   },
+   {
+    "bytes": 1000,
+    "records": 100
+   },
+   {
+    "bytes": 1000,
+    "records": 100
+   },
+   {
+    "bytes": 820,
+    "records": 82
+   }
+  ],
+  "codec": "null",
+  "length": 5094,
+  "pairs": [
+   [
+    "avro.codec",
+    "null"
+   ],
+   [
+    "avro.schema",
+    "{\"type\": \"record\", \"name\": \"Sample\", \"fields\": [{\"name\": \"id\", \"type\": \"long\"}, {\"name\": \"name\", \"type\": \"string\"}]}"
+   ]
+  ],
+  "read_back": 500,
+  "records": 500,
+  "schema_bytes": 116,
+  "sync": "9f5e112e98ed73216f3d0f3a3bd6ad30"
+ },
+ "rows": {
+  "blocks": [
+   {
+    "bytes": 17,
+    "records": 3
+   }
+  ],
+  "codec": "null",
+  "length": 203,
+  "pairs": [
+   [
+    "avro.codec",
+    "null"
+   ],
+   [
+    "avro.schema",
+    "{\"type\": \"record\", \"name\": \"Sample\", \"fields\": [{\"name\": \"id\", \"type\": \"long\"}, {\"name\": \"name\", \"type\": \"string\"}]}"
+   ]
+  ],
+  "read_back": 3,
+  "records": 3,
+  "schema_bytes": 116,
+  "sync": "255a91d349f75fe0a71ec89715bec21d"
+ }
+}

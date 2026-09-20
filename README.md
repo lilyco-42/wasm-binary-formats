@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 37 | 16.9% |
+| own Rust reader, named header fields decoded | 38 | 17.4% |
 | own Rust reader, container framing only | 24 | 11.0% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **117** | 53.4% |
-| **covered, any level** | **102** | 46.6% |
+| **no parser at all - real gap** | **116** | 53.0% |
+| **covered, any level** | **103** | 47.0% |
 
-Top binary gap groups by count: unknown 57, archive 12, image 11, document 10, application 10,
+Top binary gap groups by count: unknown 56, archive 12, image 11, document 10, application 10,
 code 5, executable 5, inode 3.
 Named gaps that an end user would call common: the compound-file Office types (`doc`, `xls`, `ppt`)
 and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avro`/`arrow`/`h5`,
@@ -278,9 +278,9 @@ and `chm`, `sevenzip`, `bzip3`, `arc`/`arj`, `postscript`, `onnx`/`parquet`/`avr
 `otf` because no CFF charstring writer runs here. `woff2` was on that list as the row before, for a
 reason that turned out to be about the interpreter on PATH rather than about the machine: see below.
 
-So the honest answer to the objective is **no, not yet**: 102 of 219 binary labels have a parser
-that runs here (37 field-level and 24 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 117 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 103 of 219 binary labels have a parser
+that runs here (38 field-level and 24 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 116 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Reproduce
@@ -299,6 +299,7 @@ python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; t
 temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
 temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
 temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
+temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path engine/Cargo.toml   # host tests for zip and PE
@@ -389,8 +390,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **102 covered** (37 field-level and 24
-container-level from this repo's own readers, 41 generated and mostly load-gated), **117 with no
+Coverage is scored against magika's 219 binary labels: **103 covered** (38 field-level and 24
+container-level from this repo's own readers, 41 generated and mostly load-gated), **116 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -488,6 +489,17 @@ does not re-derive them:
   136 and 680 in the old file, `OHDR` at 48 in the new). No message-kind table and no traversal below
   the root group is claimed, because these two files cannot verify either; `h5` is therefore
   container-level, and the deeper read is queued behind `parquet`/`onnx` rather than faked.
+  Avro (+1 field-level label, 103 covered, 116 gaps) is the same discipline applied to a container of
+  variable-length integers: fastavro writes `rows.avro`/`deflate.avro`/`many.avro`, reads each one
+  back, and the generator refuses to commit a file whose block counts do not sum to the record count
+  the library returns - so the arithmetic the Rust reader repeats has already been checked against a
+  second implementation. `many.avro` is deliberately written with `sync_interval=1000` to be five
+  blocks, because with one block a loop and a block that merely ends where the file does are the same
+  observable thing. Payload bytes are counted, never deserialised, and a deflate-coded block is
+  reported by name rather than inflated. Writing the mirror first caught two arithmetic slips in the
+  hand-built tests (a varint `0x14` for an 11-byte key, and a patched byte that was not the block's
+  size field), which is the point of the mirror: after the npy port silently dropped a trim step the
+  mirror had, the Rust and the python are now compared line by line as well as row by row.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

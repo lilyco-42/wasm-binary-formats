@@ -38,7 +38,7 @@ const SELF = {
   flv: ['container'], cab: ['container'], mpegts: ['fields'],
   flac: ['fields'], mp3: ['fields'], mp2: ['fields'], ogg: ['fields'], wav: ['fields'],
   pdf: ['fields'], pbm: ['fields'], wasm: ['fields'], ttf: ['fields'], woff: ['fields'], icns: ['fields'],
-  applebplist: ['fields'], qoi: ['fields'], jp2: ['fields'], woff2: ['fields'], npy: ['fields'], h5: ['container'],
+  applebplist: ['fields'], qoi: ['fields'], jp2: ['fields'], woff2: ['fields'], npy: ['fields'], h5: ['container'], avro: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };
