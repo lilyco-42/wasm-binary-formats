@@ -216,7 +216,14 @@ fn another_brand_or_a_broken_box_is_not_claimed_as_heif() {
     let broken = hand_built("heic", true);
     assert_eq!(parse(&broken), FORMAT_HEIF);
     let lines = report();
-    assert!(lines[0].ends_with("\tbroken\t1"), "{lines:?}");
+    assert_eq!(
+        summary(&lines)[0],
+        format!(
+            "heif\t{size}\tboxes\t5\tbroken\t1\tbrand\theic",
+            size = broken.len()
+        ),
+        "the box that claims past its parent is never listed, so the count stays at five"
+    );
     assert_eq!(lines[lines.len() - 1], "stopped\tbroken\t1", "{lines:?}");
     assert!(
         summary(&lines)
