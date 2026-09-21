@@ -81,17 +81,34 @@ fn label<T: std::fmt::Debug>(value: &T) -> String {
 
 /// A symbol row. Static and dynamic tables share the shape but not the lifetime, so both come
 /// through here; the reader's symbol trait is parameterised over the input's lifetime.
-fn symbol_row<'data, T: ObjectSymbol<'data>>(prefix: &str, index: usize, symbol: &T) -> String {
+fn symbol_row<'data, T: ObjectSymbol<'data>>(prefix: &str, index: usize, symbol: &T, one_based: bool) -> String {
     format!(
         "{prefix}\t{index}\t{}\taddr\t{}\tsize\t{}\tkind\t{}\tsection\t{}",
         clean(symbol.name().unwrap_or("?")),
         symbol.address(),
         symbol.size(),
         label(&symbol.kind()),
-        symbol
-            .section_index()
-            .map_or("-".to_owned(), |id| id.0.to_string())
+        section_home(one_based, symbol.section_index())
+            .map_or("-".to_owned(), |where_| where_.to_string())
     )
+}
+
+/// The section a symbol belongs to, as this module's own section list numbers it.
+///
+/// Mach-O writes `n_sect` one past the position of the section in the file's section list - a symbol
+/// in the first section says 1 - and the reader this module goes through keeps that one-based number
+/// for both of its directions, so `section_by_index` asked with it answers right while the list
+/// printed by this module counts from zero. The rows have to agree with the list, so on that format
+/// the number comes down by one. `test/fixtures/macho64.o` shows the three together: the file says 1,
+/// `llvm-nm -m` prints its `(__TEXT,__text)` beside the symbol, and the section list calls that
+/// section 0. A zero is not section minus one: it is an undefined or absolute symbol, which the reader
+/// already reports as belonging to no section at all.
+fn section_home(one_based: bool, id: Option<object::SectionIndex>) -> Option<usize> {
+    let id = id?;
+    if one_based {
+        return Some(id.0.saturating_sub(1));
+    }
+    Some(id.0)
 }
 
 /// A name the address index can carry, or `None` for a symbol that does not own an address.
@@ -228,6 +245,9 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         return Some(vec![summary]);
     }
     let file = object::File::parse(bytes).ok()?;
+    // The one file format whose section numbers start at one rather than zero; every other reader
+    // answer is already an index into the list `sections` walks.
+    let one_based = label(&file.format()) == "macho";
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
     let mut mangled: Vec<String> = Vec::new();
@@ -311,7 +331,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     for (index, symbol) in file.symbols().enumerate() {
         symbols += 1;
         if index < MAX_LISTED {
-            rows.push(symbol_row("symbol", index, &symbol));
+            rows.push(symbol_row("symbol", index, &symbol, one_based));
         }
         // The index is not capped by MAX_LISTED: a name is worth finding precisely when the table is
         // too long to read as a list.
@@ -323,7 +343,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     for (index, symbol) in file.dynamic_symbols().enumerate() {
         imported += 1;
         if index < MAX_LISTED {
-            rows.push(symbol_row("dynsym", index, &symbol));
+            rows.push(symbol_row("dynsym", index, &symbol, one_based));
         }
         named.extend(name_pair(&symbol));
         mangled.extend(mangled_name(&symbol));
@@ -821,6 +841,348 @@ impl Pe {
             .find(|(base, span, _)| rva >= *base && rva < base.saturating_add(*span))
             .map(|(_, _, name)| name.as_str())
     }
+}
+
+/* ---------------------------------------------------------------------------------
+ * Mach-O: the load-command chain, the colour map it makes, and the relocations an object carries.
+ * --------------------------------------------------------------------------------- */
+
+/// `MH_MAGIC` and `MH_MAGIC_64`. Both say Mach-O and the difference is the width of every address and
+/// length behind them. A byte-swapped file matches neither when read little-endian, and that is the
+/// answer this reader gives: it has never seen one that a reader on this host could print.
+const MH_MAGIC: u64 = 0xFEED_FACE;
+const MH_MAGIC_64: u64 = 0xFEED_FACF;
+const LC_SEGMENT: u64 = 1;
+const LC_SYMTAB: u64 = 2;
+const LC_DYSYMTAB: u64 = 0xb;
+const LC_SEGMENT_64: u64 = 0x19;
+const SECTION_TYPE: u64 = 0xff;
+const S_ZEROFILL: u64 = 1;
+const S_THREAD_LOCAL_ZEROFILL: u64 = 0x12;
+const S_ATTR_PURE_INSTRUCTIONS: u64 = 0x8000_0000;
+const S_ATTR_DEBUG: u64 = 0x0200_0000;
+/// Bit 31 of a relocation's *address*, not of its info word: the record that sets it is scattered and
+/// repacks the word behind it, so nothing below reads the rest of that pair.
+const RELOC_SCATTERED: u64 = 0x8000_0000;
+const CPU_I386: u64 = 7;
+const CPU_X86_64: u64 = 0x0100_0007;
+const CPU_ARM64: u64 = 0x0100_000C;
+
+/// One section, as the segment record that owns it states it.
+struct MachSect {
+    seg: String,
+    sect: String,
+    addr: u64,
+    size: u64,
+    offset: u64,
+    reloff: u64,
+    nreloc: u64,
+    flags: u64,
+}
+
+/// The part of the chain this module reads: where the sections lie, and where the symbol table, its
+/// names and its indirect index are. A command that is none of these three moves the walk along by
+/// its own `cmdsize` and is left unnamed rather than guessed at.
+struct MachO {
+    wide: bool,
+    cputype: u64,
+    sections: Vec<MachSect>,
+    symoff: u64,
+    nsyms: u64,
+    stroff: u64,
+    strsize: u64,
+    indirect: Option<(u64, u64)>,
+}
+
+impl MachO {
+    fn parse(raw: &[u8]) -> Option<Self> {
+        let magic = word_at(raw, 0, true)?;
+        let wide = match magic {
+            MH_MAGIC_64 => true,
+            MH_MAGIC => false,
+            _ => return None,
+        };
+        let mut out = MachO {
+            wide,
+            cputype: word_at(raw, 4, true)?,
+            sections: Vec::new(),
+            symoff: 0,
+            nsyms: 0,
+            stroff: 0,
+            strsize: 0,
+            indirect: None,
+        };
+        let commands = word_at(raw, 16, true)?.min(256) as usize;
+        let mut at = if wide { 32 } else { 28 };
+        for _ in 0..commands {
+            let (cmd, size) = (word_at(raw, at, true)?, word_at(raw, at.checked_add(4)?, true)?);
+            let room = usize::try_from(size).ok()?;
+            if room < 8 || at.checked_add(room)? > raw.len() {
+                return None;
+            }
+            if cmd == LC_SEGMENT || cmd == LC_SEGMENT_64 {
+                out.sections.extend(MachO::sections(raw, at, wide, room)?);
+            } else if cmd == LC_SYMTAB {
+                let (symoff, nsyms, stroff, strsize) = (
+                    word_at(raw, at + 8, true)?,
+                    word_at(raw, at + 12, true)?,
+                    word_at(raw, at + 16, true)?,
+                    word_at(raw, at + 20, true)?,
+                );
+                out.symoff = symoff;
+                out.nsyms = nsyms;
+                out.stroff = stroff;
+                out.strsize = strsize;
+            } else if cmd == LC_DYSYMTAB {
+                let (where_at, count) = (word_at(raw, at + 56, true)?, word_at(raw, at + 60, true)?);
+                if count > 0 {
+                    out.indirect = Some((where_at, count.checked_mul(4)?));
+                }
+            }
+            at += room;
+        }
+        Some(out)
+    }
+
+    /// The section records of one `LC_SEGMENT`, which sit right behind the segment header it states.
+    fn sections(raw: &[u8], at: usize, wide: bool, room: usize) -> Option<Vec<MachSect>> {
+        let record = if wide { 80 } else { 68 };
+        let head: usize = if wide { 72 } else { 56 };
+        let count = usize::try_from(word_at(raw, at + if wide { 64 } else { 48 }, true)?).ok()?;
+        if head.checked_add(count.checked_mul(record)?)? > room {
+            // More sections than the command's own length holds: the record is not this file's, so
+            // none of it is claimed.
+            return Some(Vec::new());
+        }
+        let tail = if wide { 48 } else { 40 };
+        let mut out = Vec::with_capacity(count);
+        for each in 0..count {
+            let p = at + head + each * record;
+            let (Some(addr), Some(size)) = (
+                addr_at(raw, p + 32, wide, true),
+                addr_at(raw, p + if wide { 40 } else { 36 }, wide, true),
+            ) else {
+                break;
+            };
+            let (Some(offset), Some(reloff), Some(nreloc), Some(flags)) = (
+                word_at(raw, p + tail, true),
+                word_at(raw, p + tail + 8, true),
+                word_at(raw, p + tail + 12, true),
+                word_at(raw, p + tail + 16, true),
+            ) else {
+                break;
+            };
+            out.push(MachSect {
+                sect: macho_field(raw, p),
+                seg: macho_field(raw, p + 16),
+                addr,
+                size,
+                offset,
+                reloff,
+                nreloc,
+                flags,
+            });
+        }
+        Some(out)
+    }
+
+    /// The name the file gives the symbol at `index`, or nothing where the index reaches past the
+    /// table. Only the name is asked for here; the row already carries the number.
+    fn symbol_name(&self, raw: &[u8], index: usize) -> Option<String> {
+        let entry = if self.wide { 16 } else { 12 };
+        let p = usize::try_from(self.symoff).ok()?.checked_add(index.checked_mul(entry)?)?;
+        let strx = word_at(raw, p, true)?;
+        if self.strsize == 0 {
+            return None;
+        }
+        let start = usize::try_from(self.stroff.checked_add(strx)?).ok()?;
+        let stop = usize::try_from(self.stroff).ok()?.checked_add(usize::try_from(self.strsize).ok()?)?;
+        let room = raw.get(start..stop)?;
+        let end = room.iter().position(|byte| *byte == 0).unwrap_or(room.len());
+        Some(clean(&String::from_utf8_lossy(&room[..end])))
+    }
+}
+
+/// One of the two 16-byte name fields a section record carries, which the file pads with zeroes
+/// rather than terminate in a table of its own.
+fn macho_field(raw: &[u8], at: usize) -> String {
+    let room = raw.get(at..at + 16).unwrap_or_default();
+    let stop = room.iter().position(|byte| *byte == 0).unwrap_or(room.len());
+    clean(&String::from_utf8_lossy(&room[..stop]))
+}
+
+/// What a section's own attribute word says its bytes are. `S_ATTR_PURE_INSTRUCTIONS` is the file
+/// saying that a processor runs these, and it is the same word that makes `llvm-objdump -h` answer
+/// `TEXT` beside the section - in every fixture here, and in neither direction by accident.
+/// `S_ATTR_DEBUG` says the opposite: `__compact_unwind` describes code and runs nowhere. A zero-fill
+/// section has a size in memory and none in the file, so there is nothing here to colour.
+fn macho_kind(one: &MachSect) -> Option<&'static str> {
+    if one.size == 0 {
+        return None;
+    }
+    if one.flags & SECTION_TYPE == S_ZEROFILL || one.flags & SECTION_TYPE == S_THREAD_LOCAL_ZEROFILL {
+        return None;
+    }
+    if one.flags & S_ATTR_DEBUG != 0 {
+        return Some("meta");
+    }
+    if one.flags & S_ATTR_PURE_INSTRUCTIONS != 0 {
+        return Some("code");
+    }
+    if one.seg == "__TEXT" {
+        return Some("rodata");
+    }
+    if one.seg == "__DATA" {
+        return Some("data");
+    }
+    None
+}
+
+/// The colour map of a Mach-O file: the header with its chain of commands, the tables those commands
+/// point at, and every section the file holds bytes for.
+fn macho_spans(raw: &[u8]) -> Option<Vec<Span>> {
+    let file = MachO::parse(raw)?;
+    let head: u64 = if file.wide { 32 } else { 28 };
+    let mut spans = Vec::new();
+    spans.extend(span(0, head.checked_add(word_at(raw, 20, true)?)?, "header", "mach-o header", ""));
+    let entry = if file.wide { 16 } else { 12 };
+    spans.extend(span(file.symoff, file.nsyms.checked_mul(entry)?, "tables", "symbol table", ""));
+    spans.extend(span(file.stroff, file.strsize, "tables", "symbol names", ""));
+    if let Some((where_at, size)) = file.indirect {
+        spans.extend(span(where_at, size, "tables", "indirect symbols", ""));
+    }
+    for one in &file.sections {
+        if one.nreloc > 0 {
+            spans.extend(span(
+                one.reloff,
+                one.nreloc.checked_mul(8)?,
+                "tables",
+                &format!("relocations in {}", one.sect),
+                "",
+            ));
+        }
+        let kind = macho_kind(one)?;
+        spans.extend(span(
+            one.offset,
+            one.size,
+            kind,
+            &format!("{},{}", one.seg, one.sect),
+            &format!("loaded at {:#x}", one.addr),
+        ));
+    }
+    Some(spans)
+}
+
+/// The name of a relocation type as `llvm-objdump -r` and `llvm-readobj --relocs` spell it, for the
+/// architecture that owns the record. Only numbers those two printed beside the eight bytes this walk
+/// read are here: an invented name decodes someone else's instruction.
+fn macho_reloc_name(cputype: u64, number: u64) -> Option<&'static str> {
+    let table: &[(u64, &str)] = match cputype {
+        CPU_X86_64 => &[
+            (0, "X86_64_RELOC_UNSIGNED"),
+            (1, "X86_64_RELOC_SIGNED"),
+            (2, "X86_64_RELOC_BRANCH"),
+        ],
+        CPU_ARM64 => &[
+            (0, "ARM64_RELOC_UNSIGNED"),
+            (2, "ARM64_RELOC_BRANCH26"),
+            (3, "ARM64_RELOC_PAGE21"),
+            (4, "ARM64_RELOC_PAGEOFF12"),
+        ],
+        CPU_I386 => &[(0, "GENERIC_RELOC_VANILLA")],
+        _ => return None,
+    };
+    table.iter().find(|(one, _)| *one == number).map(|(_, name)| *name)
+}
+
+/// IDA's relocation list for a Mach-O object: the eight bytes per record, split the way the struct
+/// declares them. `r_symbolnum` is 24 bits, then `r_pcrel`, `r_length`, `r_extern` and `r_type` share
+/// the last byte and a half, and `r_type` is the three bits the architecture names.
+///
+/// The symbol column is only filled for an extern record, whose number indexes the symbol table. A
+/// non-extern one indexes the *local* symbols as the file means it, while both readers print the
+/// section that number reaches instead - `macho64.o` shows the two answers for the same byte - so the
+/// number stands and the name stays `-`.
+fn macho_reloc_rows(raw: &[u8]) -> Vec<String> {
+    let Some(file) = MachO::parse(raw) else {
+        return Vec::new();
+    };
+    let mut tables: Vec<String> = Vec::new();
+    let mut fixes: Vec<String> = Vec::new();
+    let mut entries = 0usize;
+    let mut external = 0usize;
+    let mut scattered = 0usize;
+    for section in &file.sections {
+        if section.nreloc == 0 {
+            continue;
+        }
+        let start = match usize::try_from(section.reloff) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let mut counted = 0usize;
+        for each in 0..section.nreloc as usize {
+            let (Some(address), Some(info)) = (
+                word_at(raw, start + each * 8, true),
+                word_at(raw, start + each * 8 + 4, true),
+            ) else {
+                break;
+            };
+            if address & RELOC_SCATTERED != 0 {
+                scattered += 1;
+                continue;
+            }
+            counted += 1;
+            let index = info & 0xff_ff_ff;
+            let pcrel = (info >> 24) & 1;
+            let shift = (info >> 25) & 3;
+            let extern_ = (info >> 27) & 1;
+            let number = (info >> 28) & 7;
+            if extern_ != 0 {
+                external += 1;
+            }
+            let spelled = if extern_ == 0 {
+                "-".to_owned()
+            } else {
+                usize::try_from(index)
+                    .ok()
+                    .and_then(|one| file.symbol_name(raw, one))
+                    .unwrap_or_else(|| "-".to_owned())
+            };
+            let name = macho_reloc_name(file.cputype, number).unwrap_or("-");
+            fixes.push(format!(
+                "fixup\t0x{address:x}\ttype\t{number}\tname\t{name}\tlen\t{}\tpcrel\t{}\textern\t{}\tsym\t{spelled}\tindex\t{index}\tsection\t{}",
+                1u64 << shift,
+                if pcrel == 0 { "no" } else { "yes" },
+                if extern_ == 0 { "no" } else { "yes" },
+                section.sect,
+            ));
+        }
+        entries += counted;
+        if counted > 0 {
+            tables.push(format!(
+                "table\t{}\tentries\t{counted}\tslot_bytes\t8\taddend\tno",
+                section.sect
+            ));
+        }
+    }
+    let mut out = vec![format!(
+        "relocs\tkind\tsect\ttables\t{}\tentries\t{entries}\texternal\t{external}\tscattered\t{scattered}\tbits\t{}",
+        tables.len(),
+        if file.wide { 64 } else { 32 }
+    )];
+    out.append(&mut tables);
+    let listed = fixes.len();
+    for (index, row) in fixes.into_iter().enumerate() {
+        if index >= MAX_LISTED {
+            break;
+        }
+        out.push(row);
+    }
+    if listed > MAX_LISTED {
+        out.push(format!("cut\tfixups\t{listed}\tlisted\t{MAX_LISTED}"));
+    }
+    out
 }
 
 /// IDA's Exports window: what a PE hands out, by ordinal and by name.
@@ -3439,7 +3801,13 @@ fn elf_reloc_rows(raw: &[u8]) -> Vec<String> {
 /// rather than with an entry invented past it.
 fn reloc_rows(raw: &[u8]) -> Vec<String> {
     let Some(pe) = Pe::parse(raw) else {
-        return elf_reloc_rows(raw);
+        let elf = elf_reloc_rows(raw);
+        // A stripped ELF and a Mach-O both come back with nothing from that walk, so the Mach-O
+        // chain is asked next. It answers for itself and stays silent for every other file.
+        if !elf.is_empty() {
+            return elf;
+        }
+        return macho_reloc_rows(raw);
     };
     // Directory five: the base-relocation table, eight bytes of RVA and size at a fixed distance into
     // the directory array.
@@ -3577,7 +3945,10 @@ fn map_rows(raw: &[u8]) -> (Vec<String>, Vec<String>) {
         Some(found) => (found.0, found.1),
         None => match pe_spans(raw) {
             Some(found) => (found, Vec::new()),
-            None => return (Vec::new(), Vec::new()),
+            None => match macho_spans(raw) {
+                Some(found) => (found, Vec::new()),
+                None => return (Vec::new(), Vec::new()),
+            },
         },
     };
     spans.sort_by(|left, right| {

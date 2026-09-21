@@ -896,18 +896,30 @@ function appendLists(box, state) {
     return rows;
   }
   const fixups = relocList(state.mod);
-  const fixupHead = field((fixups && fixups[0]) ? fixups[0].split('\t') : [], 'kind') === 'dyn';
-  const halted = field((fixups && fixups[0]) ? fixups[0].split('\t') : [], 'stopped');
+  const fixupCells = (fixups && fixups[0]) ? fixups[0].split('\t') : [];
+  const fixupKind = field(fixupCells, 'kind');
+  const fixupHead = fixupKind === 'dyn';
+  const fixupSect = fixupKind === 'sect';
+  const halted = field(fixupCells, 'stopped');
   if (fixups && (fixups.length > 1 || halted)) {
     const head = fixups[0].split('\t');
     const title = document.createElement('p');
-    // One window, two shapes: a PE is told where its fixups are by a data directory of page blocks, an
-    // ELF by one table per section, and the totals row says which of the two it is.
+    // One window, three shapes: a PE is told where its fixups are by a data directory of page blocks,
+    // an ELF by one table per section, and a Mach-O hangs each record on the section itself - the
+    // totals row says which of the three it is.
     title.textContent = fixupHead
       ? `重定位（ELF 没有目录，只有一张张表：${field(head, 'tables')} 张、共 ${field(head, 'entries')} 条修补，`
         + `其中 ${field(head, 'symbolic')} 条写着要改哪个符号、${field(head, 'relative')} 条只写「加载地址 + addend」，`
         + `没有符号可指。机器 ${field(head, 'machine')}、${field(head, 'bits')} 位 —— 同一个类型号在 x86-64 和 i386 下`
         + '是两个名字，所以名字按机器配，没在这两份文件里一起见过的只给号：'
+      : fixupSect
+      ? `重定位（Mach-O 没有目录也没有独立的重定位节，每条记录挂在节自己身上：${field(head, 'tables')} 个节有记录、`
+        + `共 ${field(head, 'entries')} 条，其中 ${field(head, 'external')} 条的 24 位号要拿去符号表查名字。`
+        + `${field(head, 'scattered')} 条是散列记录 —— 那种记录的地址最高位当标记、另一半把值直接存在下一条里，`
+        + '两个读者一个把它折成一个表达式、一个干脆标 n/a，这里只数不解释。'
+        + `${field(head, 'bits')} 位；类型号的名字只写 llvm-objdump -r 与 llvm-readobj --relocs 在同一份文件里`
+        + '一起见过的那几个。不 extern 的号，文件按局部符号表解释、两个读者按节解释，两种读法在同一份 fixture 里'
+        + '都看得到，所以名字那栏留空，只给号：'
       : `基址重定位（加载器要把哪些地址改写：目录在 ${field(head, 'section') || '?'} `
       + `${field(head, 'dir') || '?'}，${field(head, 'bytes') || '?'} 字节，`
       + `${field(head, 'blocks') || 0} 个页块、${field(head, 'entries') || 0} 条修补。`
@@ -926,6 +938,14 @@ function appendLists(box, state) {
         if (cell[0] === 'table') {
           return `  表 ${cell[1]}  ${field(cell, 'entries')} 条  每条 ${field(cell, 'slot_bytes')} 字节  `
             + `自带加数 ${field(cell, 'addend') === 'yes' ? '是' : '否'}`;
+        }
+        if (fixupSect) {
+          const kind = field(cell, 'name');
+          const sym = field(cell, 'sym');
+          return `    ${cell[1]}  ${kind === '-' ? '类型 ' + field(cell, 'type') : kind}`
+            + `  ${field(cell, 'len')} 字节  ${field(cell, 'pcrel') === 'yes' ? '相对地址' : '绝对地址'}`
+            + `  ${field(cell, 'extern') === 'yes' ? `符号 ${sym === '-' ? '没有' : sym}` : `号 ${field(cell, 'index')}`}`
+            + `  在 ${field(cell, 'section')}`;
         }
         if (fixupHead) {
           const kind = field(cell, 'name');

@@ -666,6 +666,32 @@ the table leaves them out. Both shapes are stored over one 90-function source, i
 is reachable in `.hash` and in `.gnu.hash` by the same count - and the two tables disagree about nothing
 except how wide a mask word is: 8 bytes in an ELF64, 4 in an ELF32, which is why the same 22 buckets need
 32 mask words in one file and 64 in the other.
+**The Mach-O map, symbol homes and relocation list** (`region_count` / `region_at`, `reloc_count` /
+`reloc_at`, and the `symbol` rows of `analyse_at`) read the format whose every table sits behind one kind
+of record: the header counts its load commands, each command states its own length, and the sections, the
+symbol table and the relocations are found by walking that chain. Three claims needed files of its own,
+and each is one a reader can get wrong with nothing complaining:
+
+- `n_sect` counts from **one**, so the section a symbol names is the one the file's own section list calls
+  `n_sect - 1`. `macho64.o` shows the three together: the file says 1, `llvm-nm -m` prints
+  `(__TEXT,__text)` beside the name, and the section list calls that section 0. Read the number straight
+  and every name in the file sits in its neighbour.
+- A section earns its colour from its own attribute word: `S_ATTR_PURE_INSTRUCTIONS` for the bytes a
+  processor runs, `S_ATTR_DEBUG` for the ones that only describe them. `llvm-objdump -h` answers `TEXT` for
+  exactly those sections and for no other, in all four files, which is what makes the rule the file's
+  rather than this reader's. A `S_ZEROFILL` section has a size in memory and none in the file, so there is
+  nothing to colour and the probe says `disk no`.
+- A relocation is eight bytes split 24/1/2/1/3 - symbol, pc-relative, length, extern, type - which is why
+  `X86_64_RELOC_BRANCH` is the number **2** here. Only numbers two readers printed beside the same record
+  are named. A *scattered* record, which is what an i386 object uses, is counted and left unnamed: one
+  reader folds it with the `_PAIR` record behind it into an expression, the other prints `n/a` for a field
+  that has no meaning there. A non-extern record's number is an index into the local symbols as the file
+  means it and into the sections as both readers print it, so the row gives the number and no name.
+
+A linked image (`ld.lld`'s Darwin back end, no SDK and no macOS box needed) answers with a map whose
+segments carry real protections - `__PAGEZERO` with no bytes at all, `__TEXT` r-x, `__DATA` rw-,
+`__LINKEDIT` r-- - and with a totals row that says there is nothing left to apply.
+
 **The note window** (`note_count` / `note_at`) reads what an ELF tells itself: three words - a name length,
 a descriptor length, a type - then the owner's name and the descriptor, each padded to a multiple of four.
 That padding is the whole difficulty, because it is the only thing separating one note from the next: a
@@ -898,6 +924,12 @@ ninety globals: hgnu.so (.gnu.hash, 22 buckets, 2 of them empty), hsys.so (.hash
 the walk, llvm-readobj --gnu-hash-table / --hash-table and pyelftools must agree on the header words and
 both arrays, and the chain walk must reach every named symbol at or above the floor and no other, before
 hash.probe.json is written
+python scripts/make-macho-fixtures.py                    # clang -c writes macho64.o, macho-arm.o and
+macho32.o from one C file for x86-64, arm64 and i386, and ld64.lld links macho.mh out of two of them with
+`-platform_version macos 11.0 11.0` - no SDK and no macOS box; the walk, llvm-readobj --file-headers /
+--macho-segment / --relocs / --macho-dysymtab, llvm-objdump -h / -r and llvm-nm -m must agree on every
+segment word, section address, length and offset, on each symbol's value and one-based section number, and
+on all four parts of a relocation's info word, before macho.probe.json is written
 python scripts/make-note-fixtures.py                     # clang for x86_64-unknown-linux-gnu writes note.o
 (note), note1.elf (IBT only), note.elf (-fcf-protection=full plus -Wl,--build-id=sha1, which lands in two
 PT_NOTE segments) and notelab.elf (a .note written by hand in assembly: a four-byte name, a five-byte

@@ -1,0 +1,99 @@
+{
+ "macho-arm.o": {
+  "rows": [
+   "sect\t0\t__TEXT,__text\toff\t552\tsize\t92\tdisk\tyes\tkind\tcode\treader\tTEXT",
+   "sect\t1\t__TEXT,__const\toff\t644\tsize\t18\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t2\t__DATA,__data\toff\t664\tsize\t8\tdisk\tyes\tkind\tdata\treader\tDATA",
+   "sect\t3\t__LD,__compact_unwind\toff\t672\tsize\t64\tdisk\tyes\tkind\tmeta\treader\tDATA",
+   "sym\t0\tltmp0\taddr\t0\tsect\t0\tn_sect\t1\textern\tno",
+   "sym\t1\t_lab_hidden\taddr\t76\tsect\t0\tn_sect\t1\textern\tno",
+   "sym\t2\tltmp1\taddr\t92\tsect\t1\tn_sect\t2\textern\tno",
+   "sym\t3\tltmp2\taddr\t112\tsect\t2\tn_sect\t3\textern\tno",
+   "sym\t4\tltmp3\taddr\t120\tsect\t3\tn_sect\t4\textern\tno",
+   "sym\t5\t_lab_count\taddr\t112\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t6\t_lab_run\taddr\t0\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t7\t_lab_static\taddr\t116\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t8\t_lab_text\taddr\t92\tsect\t1\tn_sect\t2\textern\tyes",
+   "sym\t9\t_lab_external\taddr\t0\tsect\t-\tn_sect\t0\textern\tyes",
+   "relocs\tkind\tsect\ttables\t2\tentries\t10\texternal\t8\tscattered\t0\tbits\t64",
+   "table\t__text\tentries\t8\tslot_bytes\t8\taddend\tno",
+   "table\t__compact_unwind\tentries\t2\tslot_bytes\t8\taddend\tno",
+   "fixup\t0x50\ttype\t4\tname\tARM64_RELOC_PAGEOFF12\tlen\t4\tpcrel\tno\textern\tyes\tsym\t_lab_static\tindex\t7\tsection\t__text",
+   "fixup\t0x4c\ttype\t3\tname\tARM64_RELOC_PAGE21\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_static\tindex\t7\tsection\t__text",
+   "fixup\t0x30\ttype\t2\tname\tARM64_RELOC_BRANCH26\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_hidden\tindex\t1\tsection\t__text",
+   "fixup\t0x28\ttype\t2\tname\tARM64_RELOC_BRANCH26\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_external\tindex\t9\tsection\t__text",
+   "fixup\t0x24\ttype\t4\tname\tARM64_RELOC_PAGEOFF12\tlen\t4\tpcrel\tno\textern\tyes\tsym\t_lab_count\tindex\t5\tsection\t__text",
+   "fixup\t0x20\ttype\t4\tname\tARM64_RELOC_PAGEOFF12\tlen\t4\tpcrel\tno\textern\tyes\tsym\t_lab_count\tindex\t5\tsection\t__text",
+   "fixup\t0x18\ttype\t4\tname\tARM64_RELOC_PAGEOFF12\tlen\t4\tpcrel\tno\textern\tyes\tsym\t_lab_count\tindex\t5\tsection\t__text",
+   "fixup\t0x14\ttype\t3\tname\tARM64_RELOC_PAGE21\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_count\tindex\t5\tsection\t__text",
+   "fixup\t0x20\ttype\t0\tname\tARM64_RELOC_UNSIGNED\tlen\t8\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind",
+   "fixup\t0x0\ttype\t0\tname\tARM64_RELOC_UNSIGNED\tlen\t8\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind"
+  ]
+ },
+ "macho.mh": {
+  "rows": [
+   "sect\t0\t__TEXT,__text\toff\t1056\tsize\t159\tdisk\tyes\tkind\tcode\treader\tTEXT",
+   "sect\t1\t__TEXT,__const\toff\t1216\tsize\t18\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t2\t__TEXT,__unwind_info\toff\t1236\tsize\t4152\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t3\t__TEXT,__eh_frame\toff\t5392\tsize\t48\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t4\t__DATA,__data\toff\t8192\tsize\t8\tdisk\tyes\tkind\tdata\treader\tDATA",
+   "sym\t0\t_lab_hidden\taddr\t4294968496\tsect\t0\tn_sect\t1\textern\tno",
+   "sym\t1\t_main\taddr\t4294968368\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t2\t_lab_external\taddr\t4294968352\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t3\t_lab_run\taddr\t4294968432\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t4\t_lab_text\taddr\t4294968512\tsect\t1\tn_sect\t2\textern\tyes",
+   "sym\t5\t_lab_count\taddr\t4294975488\tsect\t4\tn_sect\t5\textern\tyes",
+   "sym\t6\t_lab_static\taddr\t4294975492\tsect\t4\tn_sect\t5\textern\tyes",
+   "sym\t7\t__mh_execute_header\taddr\t4294967296\tsect\t0\tn_sect\t1\textern\tyes",
+   "relocs\tkind\tsect\ttables\t0\tentries\t0\texternal\t0\tscattered\t0\tbits\t64"
+  ]
+ },
+ "macho32.o": {
+  "rows": [
+   "sect\t0\t__TEXT,__text\toff\t544\tsize\t84\tdisk\tyes\tkind\tcode\treader\tTEXT",
+   "sect\t1\t__TEXT,__const\toff\t628\tsize\t18\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t2\t__DATA,__data\toff\t648\tsize\t8\tdisk\tyes\tkind\tdata\treader\tDATA",
+   "sect\t3\t__LD,__compact_unwind\toff\t656\tsize\t40\tdisk\tyes\tkind\tmeta\treader\tDATA",
+   "sect\t4\t__TEXT,__eh_frame\toff\t696\tsize\t80\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sym\t0\t_lab_hidden\taddr\t64\tsect\t0\tn_sect\t1\textern\tno",
+   "sym\t1\t_lab_count\taddr\t104\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t2\t_lab_run\taddr\t0\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t3\t_lab_static\taddr\t108\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t4\t_lab_text\taddr\t84\tsect\t1\tn_sect\t2\textern\tyes",
+   "sym\t5\t_lab_external\taddr\t0\tsect\t-\tn_sect\t0\textern\tyes",
+   "relocs\tkind\tsect\ttables\t2\tentries\t4\texternal\t1\tscattered\t8\tbits\t32",
+   "table\t__text\tentries\t2\tslot_bytes\t8\taddend\tno",
+   "table\t__compact_unwind\tentries\t2\tslot_bytes\t8\taddend\tno",
+   "fixup\t0x30\ttype\t0\tname\tGENERIC_RELOC_VANILLA\tlen\t4\tpcrel\tyes\textern\tno\tsym\t-\tindex\t1\tsection\t__text",
+   "fixup\t0x28\ttype\t0\tname\tGENERIC_RELOC_VANILLA\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_external\tindex\t5\tsection\t__text",
+   "fixup\t0x14\ttype\t0\tname\tGENERIC_RELOC_VANILLA\tlen\t4\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind",
+   "fixup\t0x0\ttype\t0\tname\tGENERIC_RELOC_VANILLA\tlen\t4\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind"
+  ]
+ },
+ "macho64.o": {
+  "rows": [
+   "sect\t0\t__TEXT,__text\toff\t632\tsize\t79\tdisk\tyes\tkind\tcode\treader\tTEXT",
+   "sect\t1\t__TEXT,__const\toff\t712\tsize\t18\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sect\t2\t__DATA,__data\toff\t732\tsize\t8\tdisk\tyes\tkind\tdata\treader\tDATA",
+   "sect\t3\t__LD,__compact_unwind\toff\t744\tsize\t64\tdisk\tyes\tkind\tmeta\treader\tDATA",
+   "sect\t4\t__TEXT,__eh_frame\toff\t808\tsize\t104\tdisk\tyes\tkind\trodata\treader\tDATA",
+   "sym\t0\t_lab_hidden\taddr\t64\tsect\t0\tn_sect\t1\textern\tno",
+   "sym\t1\t_lab_count\taddr\t100\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t2\t_lab_run\taddr\t0\tsect\t0\tn_sect\t1\textern\tyes",
+   "sym\t3\t_lab_static\taddr\t104\tsect\t2\tn_sect\t3\textern\tyes",
+   "sym\t4\t_lab_text\taddr\t80\tsect\t1\tn_sect\t2\textern\tyes",
+   "sym\t5\t_lab_external\taddr\t0\tsect\t-\tn_sect\t0\textern\tyes",
+   "relocs\tkind\tsect\ttables\t2\tentries\t8\texternal\t6\tscattered\t0\tbits\t64",
+   "table\t__text\tentries\t6\tslot_bytes\t8\taddend\tno",
+   "table\t__compact_unwind\tentries\t2\tslot_bytes\t8\taddend\tno",
+   "fixup\t0x46\ttype\t1\tname\tX86_64_RELOC_SIGNED\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_static\tindex\t3\tsection\t__text",
+   "fixup\t0x29\ttype\t2\tname\tX86_64_RELOC_BRANCH\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_hidden\tindex\t0\tsection\t__text",
+   "fixup\t0x21\ttype\t2\tname\tX86_64_RELOC_BRANCH\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_external\tindex\t5\tsection\t__text",
+   "fixup\t0x1c\ttype\t1\tname\tX86_64_RELOC_SIGNED\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_count\tindex\t1\tsection\t__text",
+   "fixup\t0x16\ttype\t1\tname\tX86_64_RELOC_SIGNED\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_count\tindex\t1\tsection\t__text",
+   "fixup\t0x10\ttype\t1\tname\tX86_64_RELOC_SIGNED\tlen\t4\tpcrel\tyes\textern\tyes\tsym\t_lab_count\tindex\t1\tsection\t__text",
+   "fixup\t0x20\ttype\t0\tname\tX86_64_RELOC_UNSIGNED\tlen\t8\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind",
+   "fixup\t0x0\ttype\t0\tname\tX86_64_RELOC_UNSIGNED\tlen\t8\tpcrel\tno\textern\tno\tsym\t-\tindex\t1\tsection\t__compact_unwind"
+  ]
+ }
+}

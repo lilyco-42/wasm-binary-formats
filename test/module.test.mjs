@@ -804,6 +804,94 @@ test('the hash tables the readers parsed are the ones the module reports', async
   }
 });
 
+test('the Mach-O map, symbol homes and relocations two readers named are the ones reported', async () => {
+  // scripts/make-macho-fixtures.py compiles one C file for x86-64, arm64 and i386 with clang, links a
+  // fourth file with ld64.lld, and writes a row only where the byte walk agrees with
+  // `llvm-readobj --file-headers / --macho-segment / --relocs / --macho-dysymtab`, `llvm-objdump -h / -r`
+  // and `llvm-nm -m`. Three of its claims are the reason the fixtures exist: a section's colour comes
+  // from its own attribute word, a symbol's section number counts from one, and a relocation's eight
+  // bytes split 24/1/2/1/3 - which is why X86_64_RELOC_BRANCH is the number 2 here.
+  const probe = JSON.parse(await readFile('test/fixtures/macho.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('\t');
+    return parts[parts.indexOf(key) + 1];
+  };
+  const colours = new Set();
+  const machines = new Set();
+  let scattered = 0;
+  for (const name of Object.keys(probe).sort()) {
+    const bytes = new Uint8Array(await readFile(`test/fixtures/${name}`));
+    report(bytes);
+    const head = text('analyse_at', 0).split('\t');
+    assert.equal(head[1], 'macho', `${name} is Mach-O to the reader`);
+    machines.add(field(head, 'machine'));
+    const want = probe[name].rows;
+    const rows = Array.from({ length: ex.analyse_count() }, (_, index) => text('analyse_at', index));
+    const got = Array.from({ length: ex.reloc_count() }, (_, index) => text('reloc_at', index));
+    const listed = want.filter((one) => !one.startsWith('sect\t') && !one.startsWith('sym\t'));
+    assert.equal(got.length, listed.length, `${name}: ${got.length} rows, the readers said ${listed.length}`);
+    for (let index = 0; index < listed.length; index += 1) {
+      assert.equal(got[index], listed[index], `${name} reloc row ${index}`);
+    }
+    scattered += Number(cell(got[0], 'scattered'));
+    const regions = Array.from({ length: ex.region_count() }, (_, index) => text('region_at', index));
+    const totals = regions[0].split('\t');
+    assert.equal(Number(field(totals, 'file')), bytes.length, `${name}: the map counts this file`);
+    assert.equal(
+      Number(field(totals, 'claimed')) + Number(field(totals, 'unloaded'))
+        + Number(field(totals, 'loaded-unaddressed')),
+      bytes.length,
+      `${name}: the map does not tile the file`
+    );
+    for (const one of want.filter((two) => two.startsWith('sect\t'))) {
+      const place = one.split('\t')[2];
+      const off = cell(one, 'off');
+      const size = cell(one, 'size');
+      const drawn = regions.filter((row) => {
+        const parts = row.split('\t');
+        return parts[0] === 'region' && parts[1] === off && parts[2] === size;
+      });
+      const kind = cell(one, 'kind');
+      if (kind !== '-') colours.add(kind);
+      if (cell(one, 'disk') === 'no') {
+        assert.equal(drawn.length, 0, `${name}: ${place} has no bytes in the file, yet the map drew it`);
+        continue;
+      }
+      assert.equal(drawn.length, 1, `${name}: ${place} should be drawn once, found ${drawn.length}`);
+      const parts = drawn[0].split('\t');
+      assert.equal(parts[3], kind, `${name}: ${place} is coloured ${kind} in the file`);
+      assert.equal(parts[4], place, `${name}: ${place} is named by the map`);
+      assert.equal(cell(one, 'reader') === 'TEXT', kind === 'code', `${name}: ${place}`);
+    }
+    for (const one of want.filter((two) => two.startsWith('sym\t'))) {
+      const index = one.split('\t')[1];
+      const mine = (rows.find((row) => row.startsWith(`symbol\t${index}\t`)) || '').split('\t');
+      assert.ok(mine.length > 1, `${name}: no symbol row ${index} in this file's listing`);
+      assert.equal(field(mine, 'addr'), cell(one, 'addr'), `${name}: symbol ${index} stands elsewhere`);
+      const home = cell(one, 'sect');
+      assert.equal(
+        field(mine, 'section'),
+        home === '-' ? '-' : home,
+        `${name}: symbol ${index} is in the section the file's list calls ${home}`
+      );
+      assert.equal(
+        Number(cell(one, 'n_sect')),
+        home === '-' ? 0 : Number(home) + 1,
+        `${name}: symbol ${index} writes its section one-based`
+      );
+    }
+  }
+  // All four colours the rule can earn have to turn up, or one of the branches proves nothing; the
+  // i386 object is also the only one with scattered records, and they are counted, not named.
+  for (const one of ['code', 'data', 'rodata', 'meta']) {
+    assert.ok(colours.has(one), `the map never coloured anything ${one}`);
+  }
+  for (const one of ['x86_64', 'aarch64', 'i386']) {
+    assert.ok(machines.has(one), `the fixtures never named the machine ${one}`);
+  }
+  assert.ok(scattered > 0, 'no scattered relocation was counted, so that branch proved nothing');
+});
+
 test('the notes both listings read are the ones the module reports', async () => {
   // scripts/make-note-fixtures.py compiles the same four lines of C as an object, as an image linked
   // with -fcf-protection=full and a build ID, and as one with branch tracking alone, then adds a file
