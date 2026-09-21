@@ -33,10 +33,11 @@
   "scanErrors": [
    "UnexpectedEndOfComment"
   ],
-  "strict": "no"
+  "strict": "no",
+  "trailing": 0
  },
  "lab.jsonc": {
-  "bytes": 649,
+  "bytes": 725,
   "comments": [
    "line",
    "line",
@@ -72,12 +73,12 @@
    {
     "error": 3,
     "length": 1,
-    "offset": 647
+    "offset": 723
    },
    {
     "error": 4,
     "length": 1,
-    "offset": 647
+    "offset": 723
    }
   ],
   "parse": {
@@ -93,6 +94,9 @@
     "**/*.log": false,
     "**/tmp": true
    },
+   "preview.indent": -1,
+   "preview.opacity": 0.75,
+   "preview.theme": null,
    "search.exclude": [
     "out",
     "dist"
@@ -103,7 +107,7 @@
    }
   },
   "rows": [
-   "jsonc\tmembers\t8\tline\t3\tblock\t1\tstrict\tno\tdepth\t2\tbytes\t649",
+   "jsonc\tmembers\t11\tline\t3\tblock\t1\ttrailing\t4\tstrict\tno\tdepth\t2\tbytes\t725",
    "key\teditor.formatOnSave\t1\tboolean\ttrue",
    "key\teditor.tabSize\t1\tnumber\t4",
    "key\twindow.title\t1\tstring\t\"${activeEditorShort}${separator}my workspace\"",
@@ -119,10 +123,14 @@
    "key\teditor.rulers[1]\t2\tnumber\t100",
    "key\teditor.rulers[2]\t2\tnumber\t120",
    "key\tworkbench.colorCustomizations\t1\tobject\t1",
-   "key\tworkbench.colorCustomizations.editor.background\t2\tstring\t\"#1e1e1e\""
+   "key\tworkbench.colorCustomizations.editor.background\t2\tstring\t\"#1e1e1e\"",
+   "key\tpreview.opacity\t1\tnumber\t0.75",
+   "key\tpreview.indent\t1\tnumber\t-1",
+   "key\tpreview.theme\t1\tnull\tnull"
   ],
   "scanErrors": [],
-  "strict": "no"
+  "strict": "no",
+  "trailing": 4
  },
  "trailing.jsonc": {
   "bytes": 51,
@@ -144,11 +152,12 @@
    "name": "trailing-comma-only"
   },
   "rows": [
-   "jsonc\tmembers\t2\tline\t0\tblock\t0\tstrict\tno\tdepth\t1\tbytes\t51",
+   "jsonc\tmembers\t2\tline\t0\tblock\t0\ttrailing\t1\tstrict\tno\tdepth\t1\tbytes\t51",
    "key\tname\t1\tstring\t\"trailing-comma-only\"",
    "key\tcount\t1\tnumber\t3"
   ],
   "scanErrors": [],
-  "strict": "no"
+  "strict": "no",
+  "trailing": 1
  }
 }

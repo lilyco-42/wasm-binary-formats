@@ -155,6 +155,7 @@ pub fn name() -> &'static str {
         FORMAT_TORRENT => "torrent",
         FORMAT_PGP => "pgp",
         FORMAT_PDB => "pdb",
+        FORMAT_JSONC => "jsonc",
         _ => "unknown",
     }
 }
@@ -7986,6 +7987,347 @@ fn pgp_is_key(tag: u8) -> bool {
     matches!(tag, 6 | 14)
 }
 
+// ------------------------------------------------------------------- JSONC: JSON with comments
+/// JSON that a strict parser refuses, which is what separates the `jsonc` label from `json`: the
+/// catalogue records `json` and `jsonl` as text with a mime and extensions, and `jsonc` with none of
+/// those three - so the distinction this reader has to earn is the comment and the trailing comma,
+/// not a signature it can be handed.
+pub const FORMAT_JSONC: i32 = 56;
+/// Members listed before the report says it stopped.
+const JSONC_MAX_KEYS: usize = 64;
+/// Nesting past this is refused: no editor configuration is that deep, and a recursive reader that
+/// does not stop is a stack overflow waiting for a hostile file.
+const JSONC_MAX_DEPTH: usize = 32;
+
+struct Jsonc<'a> {
+    raw: &'a [u8],
+    at: usize,
+    line: usize,
+    block: usize,
+    /// A comma with nothing but a closing bracket after it - the other half of what makes a file
+    /// JSONC rather than JSON, and independent of comments.
+    trailing: usize,
+    rows: Vec<(String, usize, String, String)>,
+    failed: bool,
+}
+
+impl<'a> Jsonc<'a> {
+    fn peek(&self) -> Option<u8> {
+        self.raw.get(self.at).copied()
+    }
+
+    fn starts(&self, with: &[u8]) -> bool {
+        self.raw.get(self.at..self.at + with.len()) == Some(with)
+    }
+
+    /// Whitespace and comments. An unterminated comment or string sets `failed`: the file did not
+    /// finish what it started, and a reader that guessed the rest would report a tree no parser
+    /// would accept.
+    fn ws(&mut self) {
+        loop {
+            match self.peek() {
+                Some(b' ') | Some(b'\t') | Some(b'\r') | Some(b'\n') => self.at += 1,
+                Some(b'/') if self.starts(b"//") => {
+                    self.line += 1;
+                    self.at += 2;
+                    while let Some(byte) = self.peek() {
+                        self.at += 1;
+                        if byte == b'\n' {
+                            break;
+                        }
+                    }
+                }
+                Some(b'/') if self.starts(b"/*") => {
+                    self.block += 1;
+                    self.at += 2;
+                    match self.raw[self.at..].windows(2).position(|pair| pair == b"*/") {
+                        Some(found) => self.at += found + 2,
+                        None => {
+                            self.failed = true;
+                            return;
+                        }
+                    }
+                }
+                _ => return,
+            }
+        }
+    }
+
+    /// A `"`-delimited string, returned as the bytes the file wrote - quotes and escapes included,
+    /// because re-escaping a value is where a reader starts disagreeing with the file.
+    fn string(&mut self) -> Option<String> {
+        if !self.starts(b"\"") {
+            return None;
+        }
+        let start = self.at;
+        let mut at = self.at + 1;
+        loop {
+            match self.raw.get(at)? {
+                b'"' => {
+                    self.at = at + 1;
+                    // The whole file was checked for UTF-8 before this ran, so a string that is not
+                    // valid text cannot reach here - but the reader does not rely on that to be safe.
+                    let text = std::str::from_utf8(self.raw.get(start..at + 1)?).ok()?;
+                    return Some(text.to_string());
+                }
+                b'\\' => at += 2,
+                b'\n' => {
+                    self.failed = true;
+                    return None;
+                }
+                _ => at += 1,
+            }
+        }
+    }
+
+    /// One value, and every value under it. The container's own row carries a member count, so it
+    /// can only be emitted after its children are known - which is why children are collected first.
+    fn value(&mut self, path: &str, depth: usize) -> Option<(String, String)> {
+        if depth > JSONC_MAX_DEPTH {
+            self.failed = true;
+            return None;
+        }
+        self.ws();
+        if self.failed {
+            return None;
+        }
+        match self.peek()? {
+            b'{' => {
+                self.at += 1;
+                // A container's row carries its member count, so it is reserved here and filled in
+                // once the members have been walked - which keeps the row ahead of the children it
+                // owns without holding them in a second list. The root is not a member of anything,
+                // so it reserves nothing: its own row would name an empty path.
+                let slot = self.reserve(path, depth, "object");
+                let mut members = 0usize;
+                loop {
+                    self.ws();
+                    match self.peek()? {
+                        b'}' => {
+                            self.at += 1;
+                            break;
+                        }
+                        _ => {}
+                    }
+                    if members > 0 {
+                        // A comma is required between members; the one before a closing brace is
+                        // the trailing comma, which is what strict JSON refuses over.
+                        if !self.eat(b',') {
+                            self.failed = true;
+                            return None;
+                        }
+                        self.ws();
+                        if self.peek()? == b'}' {
+                            self.trailing += 1;
+                            self.at += 1;
+                            break;
+                        }
+                    }
+                    if self.failed {
+                        return None;
+                    }
+                    let key = self.string()?;
+                    // A key that spells itself with an escape would have to be decoded to match the
+                    // name the witness gives it, and a decoded key could carry the very character the
+                    // rows are separated by. So the document is refused rather than guessed at.
+                    if key[1..key.len() - 1].contains('\\') {
+                        self.failed = true;
+                        return None;
+                    }
+                    self.ws();
+                    if !self.eat(b':') {
+                        self.failed = true;
+                        return None;
+                    }
+                    let name = key.trim_matches('"').to_string();
+                    let here = if path.is_empty() {
+                        name.clone()
+                    } else {
+                        format!("{}.{}", path, name)
+                    };
+                    self.value(&here, depth + 1)?;
+                    members += 1;
+                }
+                if let Some(at) = slot {
+                    self.rows[at].3 = members.to_string();
+                }
+                Some(("object".to_string(), members.to_string()))
+            }
+            b'[' => {
+                self.at += 1;
+                let slot = self.reserve(path, depth, "array");
+                let mut items = 0usize;
+                loop {
+                    self.ws();
+                    if self.peek()? == b']' {
+                        self.at += 1;
+                        break;
+                    }
+                    if items > 0 {
+                        if !self.eat(b',') {
+                            self.failed = true;
+                            return None;
+                        }
+                        self.ws();
+                        if self.peek()? == b']' {
+                            self.trailing += 1;
+                            self.at += 1;
+                            break;
+                        }
+                    }
+                    let here = format!("{}[{}]", path, items);
+                    self.value(&here, depth + 1)?;
+                    items += 1;
+                }
+                if let Some(at) = slot {
+                    self.rows[at].3 = items.to_string();
+                }
+                Some(("array".to_string(), items.to_string()))
+            }
+            b'"' => {
+                let text = self.string()?;
+                Some(self.scalar(path, depth, "string", &text))
+            }
+            b't' | b'f' | b'n' => {
+                for word in [b"true".as_slice(), b"false".as_slice(), b"null".as_slice()] {
+                    if self.starts(word) {
+                        self.at += word.len();
+                        let kind = if word == b"null" { "null" } else { "boolean" };
+                        let text = String::from_utf8_lossy(word).into_owned();
+                        return Some(self.scalar(path, depth, kind, &text));
+                    }
+                }
+                self.failed = true;
+                None
+            }
+            _ => {
+                // The grammar of a JSON number rather than a bag of number-ish characters: `+1`,
+                // `01`, `1e` and a lone `-` are not numbers, and a reader that ran over them would
+                // report a value no JSONC parser puts in the tree.
+                let start = self.at;
+                self.eat(b'-');
+                let int_at = self.at;
+                let int_digits = self.digits();
+                let well_formed = int_digits > 0
+                    && !(int_digits > 1 && self.raw[int_at] == b'0')
+                    && match self.peek() {
+                        Some(b'.') => {
+                            self.at += 1;
+                            self.digits() > 0
+                        }
+                        Some(b'e') | Some(b'E') => {
+                            self.at += 1;
+                            if !self.eat(b'-') {
+                                self.eat(b'+');
+                            }
+                            self.digits() > 0
+                        }
+                        _ => true,
+                    };
+                if !well_formed {
+                    self.at = start;
+                    self.failed = true;
+                    return None;
+                }
+                let text = String::from_utf8_lossy(self.raw.get(start..self.at)?).into_owned();
+                Some(self.scalar(path, depth, "number", &text))
+            }
+        }
+    }
+
+    /// Decimal digits, counted and consumed.
+    fn digits(&mut self) -> usize {
+        let start = self.at;
+        while matches!(self.peek(), Some(b'0'..=b'9')) {
+            self.at += 1;
+        }
+        self.at - start
+    }
+
+    /// A row for a container, with its member count filled in once the walk has one. The root is not
+    /// a member of anything, so it gets no row - its count goes on the summary line instead.
+    fn reserve(&mut self, path: &str, depth: usize, kind: &str) -> Option<usize> {
+        if depth == 0 {
+            return None;
+        }
+        self.rows.push((path.to_string(), depth, kind.to_string(), String::new()));
+        Some(self.rows.len() - 1)
+    }
+
+    /// A leaf's row, whose detail is the text the file used for it, and the same pair the parent's
+    /// count is built from.
+    fn scalar(&mut self, path: &str, depth: usize, kind: &str, text: &str) -> (String, String) {
+        self.rows.push((path.to_string(), depth, kind.to_string(), text.to_string()));
+        (kind.to_string(), text.to_string())
+    }
+
+    fn eat(&mut self, byte: u8) -> bool {
+        if self.peek() == Some(byte) {
+            self.at += 1;
+            return true;
+        }
+        false
+    }
+}
+
+/// JSON that carries the two things strict JSON forbids - comments and a comma before a closing
+/// bracket. That is also the acceptance rule: a file with neither is plain JSON, and a file whose
+/// comment never closes is refused rather than finished by guesswork. The root has to be an object,
+/// which is what a settings document is and what the witness counts members of.
+///
+/// The rows name the counts, then the members in the order the file holds them - a container first,
+/// then what hangs under it, with its path. `strict no` is not a measurement but a consequence of
+/// the rule above, and `scripts/make-jsonc-fixtures.py` refuses to write its probe unless
+/// `json.loads` does refuse the same file while Microsoft's `jsonc-parser` accepts it.
+fn read_jsonc(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 3 || bytes.len() > 4_000_000 || std::str::from_utf8(bytes).is_err() {
+        return None;
+    }
+    let mut scan = Jsonc {
+        raw: bytes,
+        at: 0,
+        line: 0,
+        block: 0,
+        trailing: 0,
+        rows: Vec::new(),
+        failed: false,
+    };
+    scan.ws();
+    if scan.failed || !scan.starts(b"{") {
+        // A settings document is an object; the witness reports members of the root only, so a
+        // bare array or scalar is not read here even though both would be valid JSON.
+        return None;
+    }
+    let (_kind, info) = scan.value("", 0)?;
+    scan.ws();
+    if scan.failed || scan.at != bytes.len() {
+        return None;
+    }
+    if scan.line + scan.block + scan.trailing == 0 {
+        return None;
+    }
+    let members: usize = info.parse().unwrap_or(0);
+    let depth = scan.rows.iter().map(|each| each.1).max().unwrap_or(0);
+    let mut rows = vec![format!(
+        "jsonc\tmembers\t{members}\tline\t{}\tblock\t{}\ttrailing\t{}\tstrict\tno\tdepth\t{depth}\tbytes\t{}",
+        scan.line,
+        scan.block,
+        scan.trailing,
+        bytes.len()
+    )];
+    if scan.rows.len() > JSONC_MAX_KEYS {
+        for (path, at, what, detail) in scan.rows.iter().take(JSONC_MAX_KEYS) {
+            rows.push(format!("key\t{path}\t{at}\t{what}\t{detail}"));
+        }
+        rows.push(format!("cut\tkeys\t{}", scan.rows.len()));
+        return Some(rows);
+    }
+    for (path, at, what, detail) in scan.rows {
+        rows.push(format!("key\t{path}\t{at}\t{what}\t{detail}"));
+    }
+    Some(rows)
+}
+
 // ----------------------------------------------------------------- MSF 7.00, the container of a .pdb
 const PDB_MAGIC: &[u8] = b"Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
 /// Streams listed before the report says it stopped; the count is still the file's own.
@@ -8354,8 +8696,15 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_pdb(bytes) {
         return accept(FORMAT_PDB, lines);
     }
+    // Last, because a JSON document carries no signature at all: its claim is that the whole file
+    // parses and that a strict parser would refuse it, which nothing here can satisfy by accident.
+    // Every container with a real magic answers first, and a plain JSON file is refused by this one -
+    // it stays in the `json` label, which magika counts as text rather than as a gap.
+    if let Some(lines) = read_jsonc(bytes) {
+        return accept(FORMAT_JSONC, lines);
+    }
     reject(
-        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, JSONC document, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

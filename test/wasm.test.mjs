@@ -334,6 +334,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['rsa.crt', 48], ['ec.crt', 48],
     ['encoded.7z', 49], ['plain.7z', 49], ['libarchive.7z', 49],
     ['rgb.psd', 50], ['grey.psd', 50], ['rgba.psd', 50], ['raw.psd', 50],
+    ['lab.jsonc', 56], ['trailing.jsonc', 56],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -894,6 +895,28 @@ test('OpenPGP is accepted by the packet lengths tiling the file and stops at a s
   }
 });
 
+test('a commented settings document crosses the ABI as the tree its parser built', () => {
+  // The rows are `jsonc-parser`'s, held in the probe by `scripts/make-jsonc-fixtures.py` - which
+  // refuses to write it unless `json.loads` rejects the same file. So the comparison below is against
+  // a second implementation, not against a transcription of this one's output.
+  const probe = JSON.parse(readFileSync('test/fixtures/jsonc.probe.json', 'utf8'));
+  for (const file of ['lab.jsonc', 'trailing.jsonc']) {
+    const seen = assertReadable('container', file, 56);
+    assert.equal(seen.name, 'jsonc');
+    assert.deepEqual(seen.rows, probe[file].rows, `${file} is not the witness's tree`);
+  }
+  assert.equal(probe['lab.jsonc'].rows.length, 20, 'the probe itself has to hold a tree');
+  // Strict JSON is the `json` label, and an open comment is nothing: both answer "not this format".
+  for (const [label, body] of [
+    ['strict JSON', '{\n  "a": 1\n}\n\n\n\n'],
+    ['open comment', '{\n  "a": 1,\n  /* never closed\n\n\n'],
+    ['array root', '[\n  "a",\n// c\n  "b"\n]\n'],
+  ]) {
+    const seen = driveBytes('container', new TextEncoder().encode(body));
+    assert.ok(seen.code !== 56, `${label} was read as JSONC: ${seen.code}`);
+  }
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -942,6 +965,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],
+    ['container', 'lab.jsonc', 'jsonc'], ['container', 'trailing.jsonc', 'jsonc'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

@@ -9,21 +9,22 @@ a JSONC file and a JSON file, and the tree is the content.
 
     temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py
 
-`jsonc-parser` lives in `temp/npm/node_modules` (git-ignored), installed with
-`npm install --prefix temp/npm jsonc-parser`. The fixtures are authored here, because
-a text format has no producer to ask: what the witness settles is not the bytes but
-what they mean, and every claim the reader makes is checked against that.
+`jsonc-parser` is a git-ignored npm dependency (MIT, `microsoft/node-jsonc-parser`): install it with
+`npm install jsonc-parser` in the repo root, which is where Node looks for it from. The fixtures are
+authored here, because a text format has no producer to ask: what the witness settles is not the bytes
+but what they mean, and every claim the reader makes is checked against that.
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 FIX = os.path.join(ROOT, "test", "fixtures")
-NODE = os.path.join(ROOT, "temp", "npm", "node_modules")
+NODE = os.path.join(ROOT, "node_modules")
 
 # A settings file of the shape VS Code actually keeps: two comment styles, a trailing
 # comma, and the two traps a scanner has to survive - `//` inside a string, and `/*`
@@ -42,12 +43,15 @@ SETTINGS = """\
     "**/*.log": false,
   },
   "search.exclude": ["out", "dist",],
+  "editor.rulers": [80, 100, 120],
   /* a block comment
      across lines, with a brace { inside it */
-  "editor.rulers": [80, 100, 120],
   "workbench.colorCustomizations": {
     "editor.background": "#1e1e1e",
   },
+  "preview.opacity": 0.75,
+  "preview.indent": -1,
+  "preview.theme": null,
 }
 """
 
@@ -134,7 +138,43 @@ def pair(node):
     return children[0], children[1]
 
 
-def walk(node, path, out, depth=1):
+def scalar_spelling(text, node):
+    """Every scalar row is the source spelling of the value, so the generator checks that this
+    fixture's scalars are written the way both readers would print them - and refuses the fixture
+    if a number or string ever makes that a lie."""
+    raw = text[node["offset"]:node["offset"] + node["length"]]
+    want = json.dumps(node.get("value"), ensure_ascii=False)
+    if node["type"] in ("number", "string") and raw != want:
+        raise SystemExit("%s: the file writes %r, the reader would print %r"
+                         % (node["type"], raw, want))
+    return raw
+
+
+def trailing_commas(node, text):
+    """One per container whose last member is followed by a comma before the closing bracket.
+
+    The gap is cut from the file at the offsets the witness tree reports, so it holds nothing but the
+    whitespace, the comma and the bracket - a fixture that puts a comment there is refused rather than
+    guessed at, because `stripComments` collapses the text it removes and offsets would then lie."""
+    children = node.get("children") or []
+    count = 0
+    if node["type"] in ("object", "array") and children:
+        last = children[-1]
+        gap = text[last["offset"] + last["length"]:node["offset"] + node["length"]]
+        # A container's own span runs to just past its closing bracket, and a property node's stops
+        # at its value, so what is left between them is the comma - if the file wrote one.
+        closer = "}" if node["type"] == "object" else "]"
+        if not re.fullmatch(r"[\s,]*" + re.escape(closer), gap):
+            raise SystemExit("a container closes on %r, which is not a comma and whitespace" % gap)
+        if gap.count(",") > 1:
+            raise SystemExit("the gap %r holds more than one comma" % gap)
+        count += gap.count(",")
+    for child in children:
+        count += trailing_commas(child, text)
+    return count
+
+
+def walk(node, path, out, depth=1, text=""):
     """The rows, in the order a reader that stops at a cap would emit them: a member, then
     everything under it."""
     kind = node["type"]
@@ -143,14 +183,16 @@ def walk(node, path, out, depth=1):
         out.append((path, depth, kind, str(len(children))))
         for child in children:
             key, value = pair(child)
-            walk(value, "%s.%s" % (path, key["value"]), out, depth + 1)
+            walk(value, "%s.%s" % (path, key["value"]), out, depth + 1, text)
         return
     if kind == "array":
         out.append((path, depth, kind, str(len(children))))
         for number, child in enumerate(children):
-            walk(child, "%s[%d]" % (path, number), out, depth + 1)
+            walk(child, "%s[%d]" % (path, number), out, depth + 1, text)
         return
-    out.append((path, depth, kind, json.dumps(node.get("value"), ensure_ascii=False)))
+    spelled = (scalar_spelling(text, node) if kind in ("number", "string")
+               else json.dumps(node.get("value")))
+    out.append((path, depth, kind, spelled))
 
 
 def main():
@@ -174,7 +216,9 @@ def main():
         root = found["tree"]
         # Comment removal has to leave the comments out and the content in: the stripped text
         # keeps every top-level key the tree has, and no line of it starts with a comment marker.
-        # (It may still carry a trailing comma, which is a separate fact from having comments.)
+        # (It may still carry a trailing comma, which is a separate fact from having comments, and
+        # it is not offset-preserving, so the comma count below is taken from the file itself.)
+        trailing = 0
         if root and found["tree"]["type"] == "object":
             stripped_lines = [each.strip() for each in found["stripped"].splitlines()]
             if [each for each in stripped_lines if each.startswith("//") or each.startswith("/*")]:
@@ -193,9 +237,11 @@ def main():
             listed = []
             for child in root.get("children") or []:
                 key, value = pair(child)
-                walk(value, key["value"], listed)
-            rows.append("jsonc\tmembers\t%d\tline\t%d\tblock\t%d\tstrict\t%s\tdepth\t%d\tbytes\t%d"
-                        % (len(root.get("children") or []), len(lines), len(blocks), strict,
+                walk(value, key["value"], listed, 1, text)
+            trailing = trailing_commas(root, text)
+            rows.append("jsonc\tmembers\t%d\tline\t%d\tblock\t%d\ttrailing\t%d\tstrict\t%s\tdepth\t%d\tbytes\t%d"
+                        % (len(root.get("children") or []), len(lines), len(blocks), trailing,
+                           strict,
                            max((each[1] for each in listed), default=0),
                            len(text.encode("utf-8"))))
             rows += ["key\t%s\t%d\t%s\t%s" % each for each in listed]
@@ -203,6 +249,7 @@ def main():
             "bytes": len(text.encode("utf-8")),
             "strict": strict,
             "comments": found["comments"],
+            "trailing": trailing,
             "errors": found["errors"],
             "scanErrors": found["scanErrors"],
             "rows": rows,
@@ -214,17 +261,26 @@ def main():
     lab = probe["lab.jsonc"]
     if sorted(lab["comments"]) != ["block", "line", "line", "line"]:
         raise SystemExit("the witness did not find the four comments: %s" % lab["comments"])
+    # Four containers close on a trailing comma here: the nested object, the nested array, the
+    # colour object and the root. A count that came out differently means the gap scan is not
+    # measuring what it claims, and the reader's `trailing` column would be a guess.
+    if lab["trailing"] != 4:
+        raise SystemExit("the settings file holds four trailing commas, the witness counted %d"
+                         % lab["trailing"])
     if lab["strict"] != "no":
         raise SystemExit("a file with comments must not parse as strict JSON")
     trailing = probe["trailing.jsonc"]
     if trailing["strict"] != "no" or trailing["comments"]:
         raise SystemExit("a trailing comma alone is still not strict JSON, and has no comment")
+    if trailing["trailing"] != 1:
+        raise SystemExit("one trailing comma was written, the witness counted %d"
+                         % trailing["trailing"])
     broken = probe["broken.jsonc"]
     if "UnexpectedEndOfComment" not in broken["scanErrors"]:
         raise SystemExit("the unterminated comment was not reported: %s" % broken["scanErrors"])
     if broken["rows"]:
         raise SystemExit("a file that does not finish its comment lists no rows")
-    for name in ("lab.jsonc", "trailing.jsonc"):
+    for name in ("lab.jsonc", "trailing.jsonc", "broken.jsonc"):
         with open(os.path.join(FIX, name), "w", encoding="utf-8", newline="\n") as handle:
             handle.write(written[name][1])
     with open(os.path.join(FIX, "jsonc.probe.json"), "w", encoding="utf-8") as handle:

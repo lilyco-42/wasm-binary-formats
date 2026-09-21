@@ -263,15 +263,15 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 53 | 24.2% |
-| own Rust reader, container framing only | 28 | 12.8% |
+| own Rust reader, named header fields decoded | 54 | 24.7% |
+| own Rust reader, container framing only | 29 | 13.2% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **97** | 44.3% |
-| **covered, any level** | **123** | 56.2% |
+| **no parser at all - real gap** | **95** | 43.4% |
+| **covered, any level** | **124** | 56.6% |
 
-Top binary gap groups by count: unknown 52, archive 10, image 8, application 7, document 6,
-code 5, executable 4, inode 3, text 1.
+Top binary gap groups by count: unknown 50, archive 10, image 8, application 7, document 6,
+code 5, executable 4, inode 3, text 1, undefined 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
 Draw document) and then refuses the store with `SfxBaseModel::impl_store ... 0x81a`, and nothing on
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 123 of 219 binary labels have a parser
-that runs here (53 field-level and 29 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 97 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 124 of 219 binary labels have a parser
+that runs here (54 field-level and 29 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 95 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 123 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 124 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, and the CodeView type records a `.debug$T` section carries |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -508,6 +508,7 @@ temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + l
 temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
 temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
+npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
@@ -618,8 +619,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **123 covered** (53 field-level and 29
-container-level from this repo's own readers, 41 generated and mostly load-gated), **97 with no
+Coverage is scored against magika's 219 binary labels: **124 covered** (54 field-level and 29
+container-level from this repo's own readers, 41 generated and mostly load-gated), **95 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -998,6 +999,18 @@ does not re-derive them:
   check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
   file's size and not the torrent's, so named values are read at the key they were reached under, and
   the shape row says `single` or `multi` from which of the two the file actually has.
+* JSONC (+1 field-level label, 124 covered, 95 gaps) is JSON with the two things strict JSON forbids. It is
+  the fifth format here with nothing to recognise it by - the claim is that the whole file parses and that a
+  strict parser would refuse it - and the first whose witness is a *second parser* rather than a writer:
+  `scripts/make-jsonc-fixtures.py` authors the settings file, then Microsoft's `jsonc-parser` - the parser
+  VS Code uses for its own configuration - supplies the comment count, the member tree with its paths and
+  depths, and the byte spans the trailing-comma count is taken from, while `json.loads` supplies the
+  refusal that makes the file JSONC at all. The script will not write the probe unless both answers arrive,
+  so a fixture that was only half-distinguished from plain JSON cannot be credited. The reader's own
+  acceptance rule is the whole file parsing plus at least one comment or trailing comma, which is what
+  keeps `json` out of this label; a document with an unclosed comment, a root that is not an object, text
+  after the closing brace, an escaped key (a path nobody would recognise) or a number outside the JSON
+  grammar - `01`, `+1`, `1e`, `1.` - is refused rather than completed by guesswork.
 * MSF 7.00 (+1 container-level label, 123 covered, 96 gaps) is the `.pdb` a linker writes, and it is the
   file the types actually live in once a binary is linked. The page size, block count and free-page map come
   from the superblock; the stream table comes from the pages it names - two inline, the rest through the list
