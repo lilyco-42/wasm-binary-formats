@@ -1,0 +1,74 @@
+{
+ "broken.gpx": {
+  "bytes": 84,
+  "refused": "ParseError",
+  "rows": []
+ },
+ "hand.gpx": {
+  "bytes": 280,
+  "counts": {
+   "rte": 1,
+   "rtept": 2,
+   "trk": 1,
+   "trkpt": 1,
+   "trkseg": 1,
+   "wpt": 0
+  },
+  "decoded": [
+   "A <road> & a stop"
+  ],
+  "gpxpy": {
+   "creator": "hand-written",
+   "route_points": 2,
+   "routes": 1,
+   "segments": 1,
+   "track_points": 1,
+   "tracks": 1,
+   "version": "1.0",
+   "waypoints": 0
+  },
+  "rows": [
+   "gpx\tversion\t1.0\tcreator\thand-written\twpt\t0\trte\t1\trtept\t2\ttrk\t1\ttrkseg\t1\ttrkpt\t1\tlat\t46.5\tlon\t-122.4\tmaxlat\t47.60\tmaxlon\t-122.30\tbytes\t280",
+   "rte\t0\tname\tA <road> & a stop\tpts\t2",
+   "trk\t0\tname\tnone\tsegs\t1\tpts\t1",
+   "seg\t0\t0\tpts\t1"
+  ],
+  "wpt_rows": 0
+ },
+ "lab.gpx": {
+  "bytes": 809,
+  "counts": {
+   "rte": 1,
+   "rtept": 1,
+   "trk": 1,
+   "trkpt": 4,
+   "trkseg": 2,
+   "wpt": 2
+  },
+  "decoded": [
+   "Home & base's",
+   "Round",
+   "There"
+  ],
+  "gpxpy": {
+   "creator": "lab",
+   "route_points": 1,
+   "routes": 1,
+   "segments": 2,
+   "track_points": 4,
+   "tracks": 1,
+   "version": "1.1",
+   "waypoints": 2
+  },
+  "rows": [
+   "gpx\tversion\t1.1\tcreator\tlab\twpt\t2\trte\t1\trtept\t1\ttrk\t1\ttrkseg\t2\ttrkpt\t4\tlat\t47.5\tlon\t-122.5\tmaxlat\t47.7\tmaxlon\t-122.3\tbytes\t809",
+   "wpt\t0\tlat\t47.6\tlon\t-122.3\tele\t4.0\tname\tHome & base's",
+   "wpt\t1\tlat\t47.5\tlon\t-122.5\tele\tnone\tname\tnone",
+   "rte\t0\tname\tThere\tpts\t1",
+   "trk\t0\tname\tRound\tsegs\t2\tpts\t4",
+   "seg\t0\t0\tpts\t3",
+   "seg\t0\t1\tpts\t1"
+  ],
+  "wpt_rows": 2
+ }
+}

@@ -156,6 +156,7 @@ pub fn name() -> &'static str {
         FORMAT_PGP => "pgp",
         FORMAT_PDB => "pdb",
         FORMAT_JSONC => "jsonc",
+        FORMAT_GPX => "gpx",
         _ => "unknown",
     }
 }
@@ -7987,6 +7988,443 @@ fn pgp_is_key(tag: u8) -> bool {
     matches!(tag, 6 | 14)
 }
 
+// ------------------------------------------------------------------- GPX: a GPS exchange file
+/// What magika labels a GPX log. The format is XML, so the acceptance rule is a tree: the root element
+/// is `gpx`, it states a `version`, and the whole document parses. Nothing about the file name, the
+/// namespace URI or the extension is a signature - all three are claims a reader can be talked into.
+pub const FORMAT_GPX: i32 = 57;
+/// Elements walked before the file is called too big to read. A track log of any length passes this
+/// *before* it passes a report that lists its points, so the cap is about the reader's stack and
+/// allocation, not about what a visitor gets told.
+const GPX_MAX_NODES: usize = 4096;
+/// Nesting past this is refused: GPX is five levels deep at its worst.
+const GPX_MAX_DEPTH: usize = 32;
+/// Rows listed per kind before the report says where it stopped. The counts are still the file's own.
+const GPX_MAX_LISTED: usize = 64;
+
+/// The five entities XML defines by name, so a document that spells `&amp;` and a document that spells
+/// `&` say the same thing to this reader - which is what `ElementTree` and `gpxpy` both do with them.
+/// Anything else starting with an `&` is refused: an external entity has its meaning somewhere else,
+/// and a reader that echoed it would be reporting bytes it did not read.
+fn xml_named_entity(name: &str) -> Option<char> {
+    match name {
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" => Some('\''),
+        _ => None,
+    }
+}
+
+/// Decode one attribute value or text run, entities included. `None` refuses the file.
+fn xml_text(raw: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(raw).ok()?;
+    if !text.contains('&') {
+        return Some(text.to_string());
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
+        out.push_str(rest.get(..at)?);
+        let tail = rest.get(at + 1..)?;
+        let end = tail.find(';')?;
+        let name = tail.get(..end)?;
+        rest = tail.get(end + 1..)?;
+        if let Some(one) = xml_named_entity(name) {
+            out.push(one);
+            continue;
+        }
+        let code = if let Some(hex) = name
+            .strip_prefix("#x")
+            .or_else(|| name.strip_prefix("#X"))
+        {
+            u32::from_str_radix(hex, 16).ok()?
+        } else if let Some(ten) = name.strip_prefix('#') {
+            ten.parse::<u32>().ok()?
+        } else {
+            return None;
+        };
+        out.push(char::from_u32(code)?);
+    }
+    out.push_str(rest);
+    Some(out)
+}
+
+/// The name a GPX element is known by. A prefix is a document-local alias for a namespace URI, so it
+/// says nothing about which element this is; the part after the colon does.
+fn xml_local(name: &str) -> &str {
+    match name.rfind(':') {
+        Some(at) => name.get(at + 1..).unwrap_or(name),
+        None => name,
+    }
+}
+
+/// One element of the tree, with the text directly inside it and the elements under that.
+struct Node {
+    name: String,
+    attrs: Vec<(String, String)>,
+    text: String,
+    kids: Vec<Node>,
+}
+
+impl Node {
+    fn attr(&self, key: &str) -> Option<&str> {
+        self.attrs
+            .iter()
+            .find(|(one, _)| one == key)
+            .map(|(_, value)| value.as_str())
+    }
+
+    /// The text of a direct child, with the whitespace a formatted document puts around it taken off.
+    fn value(&self, name: &str) -> Option<&str> {
+        self.kids
+            .iter()
+            .find(|kid| kid.name == name)
+            .map(|kid| kid.text.trim())
+    }
+
+    fn held(&self, name: &str) -> usize {
+        self.kids.iter().filter(|kid| kid.name == name).count()
+    }
+
+    /// Every point of the tree, in document order: a waypoint is a child of the root, a track point is
+    /// a grandchild under a segment, so a reader that only looked one level down would miss the track.
+    fn points(&self, out: &mut Vec<(String, String)>) {
+        if matches!(self.name.as_str(), "wpt" | "rtept" | "trkpt") {
+            if let (Some(lat), Some(lon)) = (self.attr("lat"), self.attr("lon")) {
+                out.push((lat.to_string(), lon.to_string()));
+            }
+        }
+        for kid in &self.kids {
+            kid.points(out);
+        }
+    }
+}
+
+struct Xml<'a> {
+    raw: &'a [u8],
+    at: usize,
+    nodes: usize,
+    failed: bool,
+}
+
+impl<'a> Xml<'a> {
+    fn peek(&self) -> Option<u8> {
+        self.raw.get(self.at).copied()
+    }
+
+    fn starts(&self, with: &[u8]) -> bool {
+        self.raw.get(self.at..self.at + with.len()) == Some(with)
+    }
+
+    /// Up to and including `until`, returning what was before it.
+    fn take(&mut self, until: &[u8]) -> Option<&'a [u8]> {
+        let found = self.until(until)?;
+        self.at = self.at.checked_add(until.len())?;
+        Some(found)
+    }
+
+    /// Up to `until`, leaving the delimiter where the walk can read it next. An attribute value is
+    /// taken *through* its closing quote; a text run stops *before* the `<` that opens the tag after
+    /// it, so the two need different steps and only the first one moves past the delimiter.
+    fn until(&mut self, until: &[u8]) -> Option<&'a [u8]> {
+        let start = self.at;
+        let found = self.raw.get(start..)?.windows(until.len()).position(|pair| pair == until)?;
+        self.at = start.checked_add(found)?;
+        self.raw.get(start..start + found)
+    }
+
+    fn ws(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\t' | b'\r' | b'\n')) {
+            self.at += 1;
+        }
+    }
+
+    /// Whitespace, comments and processing instructions between elements. A comment or a `<?…?>` is
+    /// skipped; a `<![CDATA[` or a `<!DOCTYPE` is a construct whose reading this file does not have,
+    /// so the document is refused rather than half parsed.
+    fn between(&mut self) -> Option<()> {
+        loop {
+            self.ws();
+            if self.starts(b"<!--") {
+                self.at += 4;
+                self.take(b"-->")?;
+                continue;
+            }
+            if self.starts(b"<?") {
+                self.at += 2;
+                self.take(b"?>")?;
+                continue;
+            }
+            if self.starts(b"<!") {
+                self.failed = true;
+                return None;
+            }
+            return Some(());
+        }
+    }
+
+    fn name(&mut self) -> Option<&'a str> {
+        let start = self.at;
+        while let Some(byte) = self.peek() {
+            if matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-' | b'_' | b':') {
+                self.at += 1;
+            } else {
+                break;
+            }
+        }
+        if start == self.at {
+            self.failed = true;
+            return None;
+        }
+        std::str::from_utf8(self.raw.get(start..self.at)?).ok()
+    }
+
+    /// One element, its whole subtree included.
+    fn element(&mut self, depth: usize) -> Option<Node> {
+        if depth > GPX_MAX_DEPTH || self.nodes >= GPX_MAX_NODES {
+            self.failed = true;
+            return None;
+        }
+        if !self.starts(b"<") {
+            self.failed = true;
+            return None;
+        }
+        self.at += 1;
+        let name = xml_local(self.name()?).to_string();
+        let mut attrs: Vec<(String, String)> = Vec::new();
+        let mut closed = false;
+        loop {
+            self.ws();
+            if self.starts(b"/>") {
+                self.at += 2;
+                closed = true;
+                break;
+            }
+            if self.starts(b">") {
+                self.at += 1;
+                break;
+            }
+            let key = xml_local(self.name()?).to_string();
+            self.ws();
+            if !self.starts(b"=") {
+                self.failed = true;
+                return None;
+            }
+            self.at += 1;
+            self.ws();
+            let quote = self.peek()?;
+            if quote != b'"' && quote != b'\'' {
+                self.failed = true;
+                return None;
+            }
+            self.at += 1;
+            attrs.push((key, xml_text(self.take(&[quote])?)?));
+        }
+        self.nodes += 1;
+        let mut kids = Vec::new();
+        let mut text = String::new();
+        if !closed {
+            loop {
+                self.between()?;
+                if self.starts(b"</") {
+                    self.at += 2;
+                    self.ws();
+                    let closing = xml_local(self.name()?);
+                    if closing != name {
+                        self.failed = true;
+                        return None;
+                    }
+                    self.ws();
+                    if !self.starts(b">") {
+                        self.failed = true;
+                        return None;
+                    }
+                    self.at += 1;
+                    break;
+                }
+                if self.starts(b"<") {
+                    kids.push(self.element(depth + 1)?);
+                    continue;
+                }
+                text.push_str(&xml_text(self.until(b"<")?)?);
+            }
+        }
+        Some(Node {
+            name,
+            attrs,
+            text,
+            kids,
+        })
+    }
+}
+
+/// A latitude or a longitude, in the only spelling this lab has a witness for: an optional sign,
+/// digits, an optional fraction. `NaN`, `INF` and an exponent are all legal XML-schema doubles, and
+/// none of them is in a file that `gpxpy` wrote or that `ElementTree` read back here, so they are
+/// refused with the document instead of being quietly turned into a number the bounds would carry.
+fn xml_number(text: &str) -> Option<f64> {
+    let body = text.strip_prefix('-').or_else(|| text.strip_prefix('+')).unwrap_or(text);
+    let (whole, tail) = match body.find('.') {
+        Some(at) => (body.get(..at)?, body.get(at + 1..)?),
+        None => (body, ""),
+    };
+    if (whole.is_empty() && tail.is_empty())
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || !tail.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    text.parse::<f64>().ok()
+}
+
+/// The rows: one line of totals, then a line for each waypoint, route, track and segment, in the order
+/// the document lists them. Names are the decoded text the file carries; coordinates are the file's own
+/// spelling of each attribute, so nothing here is a float that came back through a formatter.
+fn read_gpx(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 32 || bytes.len() > 32_000_000 || std::str::from_utf8(bytes).is_err() {
+        return None;
+    }
+    let mut scan = Xml {
+        raw: bytes,
+        at: 0,
+        nodes: 0,
+        failed: false,
+    };
+    scan.between()?;
+    let root = scan.element(0)?;
+    scan.between()?;
+    if scan.failed || scan.at != bytes.len() || root.name != "gpx" {
+        return None;
+    }
+    // A GPX root says which version it is, and that is the only claim the reader insists on: the
+    // namespace URI is optional in the schema, and the creator is optional in 1.0. A file with no
+    // point at all is refused rather than reported with empty bounds, because the four numbers the row
+    // carries would then be nothing's.
+    let version = root.attr("version")?;
+    let creator = root.attr("creator").unwrap_or("none");
+    let mut points: Vec<(String, String)> = Vec::new();
+    root.points(&mut points);
+    if points.is_empty() || points.len() > GPX_MAX_NODES {
+        return None;
+    }
+    for (lat, lon) in &points {
+        xml_number(lat)?;
+        xml_number(lon)?;
+    }
+    // The bounds are the file's own spellings of the four extreme values, and the first point that
+    // reaches an extreme wins it, which is what `min` and `max` do over the same list in the probe.
+    let mut lowest = 0usize;
+    let mut highest = 0usize;
+    let mut west = 0usize;
+    let mut east = 0usize;
+    for (index, (lat, lon)) in points.iter().enumerate() {
+        if xml_number(lat)? < xml_number(&points[lowest].0)? {
+            lowest = index;
+        }
+        if xml_number(lat)? > xml_number(&points[highest].0)? {
+            highest = index;
+        }
+        if xml_number(lon)? < xml_number(&points[west].1)? {
+            west = index;
+        }
+        if xml_number(lon)? > xml_number(&points[east].1)? {
+            east = index;
+        }
+    }
+    let under = |name: &str| -> Vec<&Node> {
+        root.kids.iter().filter(|kid| kid.name == name).collect()
+    };
+    let (wpts, rtes, trks) = (under("wpt"), under("rte"), under("trk"));
+    let rtepts: usize = rtes.iter().map(|one| one.held("rtept")).sum();
+    let trksegs: usize = trks.iter().map(|one| one.held("trkseg")).sum();
+    let trkpts: usize = trks
+        .iter()
+        .flat_map(|one| one.kids.iter().filter(|seg| seg.name == "trkseg"))
+        .map(|seg| seg.held("trkpt"))
+        .sum();
+    let field = |one: &Node, key: &str| printable(one.value(key).unwrap_or("none"));
+    let mut rows = vec![format!(
+        "gpx\tversion\t{version}\tcreator\t{creator}\twpt\t{wpt}\trte\t{rte}\trtept\t{rtept}\ttrk\t{trk}\ttrkseg\t{trkseg}\ttrkpt\t{trkpt}\tlat\t{lat}\tlon\t{lon}\tmaxlat\t{maxlat}\tmaxlon\t{maxlon}\tbytes\t{size}",
+        creator = printable(creator),
+        wpt = wpts.len(),
+        rte = rtes.len(),
+        rtept = rtepts,
+        trk = trks.len(),
+        trkseg = trksegs,
+        trkpt = trkpts,
+        lat = printable(&points[lowest].0),
+        lon = printable(&points[west].1),
+        maxlat = printable(&points[highest].0),
+        maxlon = printable(&points[east].1),
+        size = bytes.len()
+    )];
+    let mut listed = [0usize; 3];
+    for kid in &root.kids {
+        let kind = match kid.name.as_str() {
+            "wpt" => 0usize,
+            "rte" => 1usize,
+            "trk" => 2usize,
+            _ => continue,
+        };
+        if listed[kind] >= GPX_MAX_LISTED {
+            continue;
+        }
+        let index = listed[kind];
+        listed[kind] += 1;
+        match kind {
+            0 => rows.push(format!(
+                "wpt\t{index}\tlat\t{}\tlon\t{}\tele\t{}\tname\t{}",
+                printable(kid.attr("lat").unwrap_or("none")),
+                printable(kid.attr("lon").unwrap_or("none")),
+                field(kid, "ele"),
+                field(kid, "name")
+            )),
+            1 => rows.push(format!(
+                "rte\t{index}\tname\t{}\tpts\t{}",
+                field(kid, "name"),
+                kid.held("rtept")
+            )),
+            _ => {
+                rows.push(format!(
+                    "trk\t{index}\tname\t{}\tsegs\t{}\tpts\t{}",
+                    field(kid, "name"),
+                    kid.held("trkseg"),
+                    kid.kids
+                        .iter()
+                        .filter(|seg| seg.name == "trkseg")
+                        .map(|seg| seg.held("trkpt"))
+                        .sum::<usize>()
+                ));
+                // The segment's own number within its track, counted from zero, which is how the two
+                // python readers number them; filtering before enumerating keeps the sequence
+                // contiguous when a track carries other children (`name`, `desc`) between segments.
+                for (number, seg) in kid
+                    .kids
+                    .iter()
+                    .filter(|seg| seg.name == "trkseg")
+                    .enumerate()
+                {
+                    if number >= GPX_MAX_LISTED {
+                        continue;
+                    }
+                    rows.push(format!(
+                        "seg\t{index}\t{number}\tpts\t{}",
+                        seg.held("trkpt")
+                    ));
+                }
+            }
+        }
+    }
+    for (kind, total) in [("wpt", wpts.len()), ("rte", rtes.len()), ("trk", trks.len())] {
+        if total > GPX_MAX_LISTED {
+            rows.push(format!("cut\t{kind}\t{total}"));
+        }
+    }
+    Some(rows)
+}
+
 // ------------------------------------------------------------------- JSONC: JSON with comments
 /// JSON that a strict parser refuses, which is what separates the `jsonc` label from `json`: the
 /// catalogue records `json` and `jsonl` as text with a mime and extensions, and `jsonc` with none of
@@ -8696,6 +9134,12 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_pdb(bytes) {
         return accept(FORMAT_PDB, lines);
     }
+    // Before JSONC and for the same reason: a GPX file is XML, and the claim is that the tree parses
+    // with `gpx` at its root and a version on it. Anything with a real magic has already answered, and
+    // a document that is merely well-formed is not this label - the root element's name is the rule.
+    if let Some(lines) = read_gpx(bytes) {
+        return accept(FORMAT_GPX, lines);
+    }
     // Last, because a JSON document carries no signature at all: its claim is that the whole file
     // parses and that a strict parser would refuse it, which nothing here can satisfy by accident.
     // Every container with a real magic answers first, and a plain JSON file is refused by this one -
@@ -8704,7 +9148,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_JSONC, lines);
     }
     reject(
-        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, JSONC document, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, GPX log, JSONC document, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

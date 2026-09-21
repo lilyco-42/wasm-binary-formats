@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<gpx version="1.0" creator="hand-written">
+  <rte>
+    <name>A &lt;road&gt; &amp; a stop</name>
+    <rtept lat="47.60" lon="-122.30"/>
+    <rtept lat="46.5" lon="-122.4"/>
+  </rte>
+  <trk><trkseg><trkpt lat="46.5" lon="-122.4"></trkpt></trkseg></trk>
+</gpx>

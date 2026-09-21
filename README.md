@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 54 | 24.7% |
+| own Rust reader, named header fields decoded | 55 | 25.1% |
 | own Rust reader, container framing only | 29 | 13.2% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **95** | 43.4% |
-| **covered, any level** | **124** | 56.6% |
+| **no parser at all - real gap** | **94** | 42.9% |
+| **covered, any level** | **125** | 57.1% |
 
-Top binary gap groups by count: unknown 50, archive 10, image 8, application 7, document 6,
+Top binary gap groups by count: unknown 49, archive 10, image 8, application 7, document 6,
 code 5, executable 4, inode 3, text 1, undefined 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 124 of 219 binary labels have a parser
-that runs here (54 field-level and 29 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 95 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 125 of 219 binary labels have a parser
+that runs here (55 field-level and 29 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 94 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 124 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 125 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, and the export and import tables a PE image keeps |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -546,6 +546,7 @@ temp/venv/Scripts/python.exe scripts/make-export-fixtures.py     # lld-link writ
 temp/venv/Scripts/python.exe scripts/make-import-fixtures.py     # csc.exe writes test/fixtures/lab.dll (the only PE this host can make with a real import table); ordinal.dll and noilt.dll are its bytes with one u32 changed, and both readers have to read the patched shape the same way
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
+temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
@@ -656,8 +657,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **124 covered** (54 field-level and 29
-container-level from this repo's own readers, 41 generated and mostly load-gated), **95 with no
+Coverage is scored against magika's 219 binary labels: **125 covered** (55 field-level and 29
+container-level from this repo's own readers, 41 generated and mostly load-gated), **94 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -1036,6 +1037,24 @@ does not re-derive them:
   check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
   file's size and not the torrent's, so named values are read at the key they were reached under, and
   the shape row says `single` or `multi` from which of the two the file actually has.
+* GPX (+1 field-level label, 125 covered, 94 gaps) is a log of positions, and it is XML, so the only
+  recognition available is the file's own claim: the root element is `gpx` and it carries a `version`
+  attribute. Everything the reader then says comes from the tree - the counts, the element order, the
+  waypoint names. `scripts/make-gpx-fixtures.py` writes `lab.gpx` with `gpxpy` (MIT) and has
+  `xml.etree.ElementTree` - a parser nobody in this chain wrote - walk the same bytes; the script refuses
+  to write the probe unless the two agree on every element, every attribute spelling and every decoded
+  text, *and* unless `gpxpy` reading its own file back reports the waypoint, route, track, segment and
+  point counts the summary row carries. `hand.gpx` is authored in the script and labelled as such because
+  no library will write the shapes it holds: GPX 1.0 with no namespace declaration, a self-closing point,
+  an attribute order of its own, and a latitude spelled `47.60` where a formatter would print `47.6`.
+  That last one is the point of the row design: coordinates are echoed as the file's own text and only
+  *checked* as numbers, so a reader that ran them through a float and back would disagree with the
+  witness, and the four extremes belong to the first point that reaches each of them. What is refused
+  carries the rest of the rule: a tree that does not close, text after the root, a mismatched close tag,
+  an unquoted attribute, an unknown entity (`&deg;` needs a definition the file did not carry with it), a
+  `<![CDATA[` section or a `<!DOCTYPE` (constructs whose reading this file does not have), a coordinate
+  written `NaN`, `INF` or `1e2` - no file here shows what such a value should do to a bound - and a log
+  with no point at all, which would otherwise report bounds that are nobody's.
 * JSONC (+1 field-level label, 124 covered, 95 gaps) is JSON with the two things strict JSON forbids. It is
   the fifth format here with nothing to recognise it by - the claim is that the whole file parses and that a
   strict parser would refuse it - and the first whose witness is a *second parser* rather than a writer:

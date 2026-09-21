@@ -335,6 +335,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['encoded.7z', 49], ['plain.7z', 49], ['libarchive.7z', 49],
     ['rgb.psd', 50], ['grey.psd', 50], ['rgba.psd', 50], ['raw.psd', 50],
     ['lab.jsonc', 56], ['trailing.jsonc', 56],
+    ['lab.gpx', 57], ['hand.gpx', 57],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -917,6 +918,47 @@ test('a commented settings document crosses the ABI as the tree its parser built
   }
 });
 
+test('a GPS log crosses the ABI with its entities decoded and its numbers as spelled', () => {
+  // `gpxpy` wrote lab.gpx and `xml.etree.ElementTree` read the same bytes; the probe holds what those
+  // two agree the tree is, so the rows below are checked against other implementations rather than
+  // against a transcription of this one's output.
+  const probe = JSON.parse(readFileSync('test/fixtures/gpx.probe.json', 'utf8'));
+  for (const file of ['lab.gpx', 'hand.gpx']) {
+    const seen = assertReadable('container', file, 57);
+    assert.equal(seen.name, 'gpx');
+    assert.deepEqual(seen.rows, probe[file].rows, `${file} is not the witnesses' tree`);
+    // The text behind `&amp;`, `&lt;` and `&apos;` is the part most likely to come back as the five
+    // bytes the file spells it with, because it is the only part of the row that is not ASCII in the
+    // file and ASCII out of it. Each is compared as a whole tab-separated field.
+    for (const text of probe[file].decoded) {
+      assert.ok(seen.rows.some((row) => row.split('\t').includes(text)), `${file}: ${text} did not cross`);
+    }
+  }
+  // The counts on the summary line are gpxpy's answer about the file its own library wrote.
+  const total = assertReadable('container', 'lab.gpx', 57).rows[0].split('\t');
+  const column = (key) => Number(total[total.indexOf(key) + 1]);
+  for (const [key, field] of [
+    ['wpt', 'waypoints'], ['rte', 'routes'], ['rtept', 'route_points'],
+    ['trk', 'tracks'], ['trkseg', 'segments'], ['trkpt', 'track_points'],
+  ]) {
+    assert.equal(column(key), probe['lab.gpx'].gpxpy[field], `gpxpy counts ${field} differently`);
+  }
+  // A latitude written `47.60` stays `47.60`: the summary carries the file's own text for the extremes,
+  // so a reader that ran it through a float and back would print 47.6 and disagree with hand.gpx.
+  const hand = assertReadable('container', 'hand.gpx', 57).rows[0];
+  assert.ok(hand.includes('\tmaxlat\t47.60\t'), `the spelling was reformatted: ${hand}`);
+  // An XML tree that never closes is not a log, and neither is a well-formed document whose root is
+  // something else: both answer "not this format" instead of a summary whose bounds belong to nothing.
+  assert.notEqual(drive('container', 'broken.gpx').code, 57, 'an unclosed document read as a GPS log');
+  for (const [label, body] of [
+    ['a KML document', '<?xml version="1.0"?>\n<kml version="1.0"><Placemark/></kml>\n\n'],
+    ['a log with no point', '<?xml version="1.0"?>\n<gpx version="1.1" creator="empty"><metadata/></gpx>\n\n'],
+  ]) {
+    const seen = driveBytes('container', new TextEncoder().encode(body));
+    assert.notEqual(seen.code, 57, `${label} was read as GPX`);
+  }
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -966,6 +1008,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],
     ['container', 'lab.jsonc', 'jsonc'], ['container', 'trailing.jsonc', 'jsonc'],
+    ['container', 'lab.gpx', 'gpx'], ['container', 'hand.gpx', 'gpx'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

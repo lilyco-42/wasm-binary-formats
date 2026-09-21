@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 54,
+    "selfFields": 55,
     "selfContainer": 29,
     "binarySpecAvailable": 0,
-    "gaps": 95,
+    "gaps": 94,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -19,7 +19,7 @@
       "run:apk-web-assets"
     ],
     "gapByGroup": {
-      "unknown": 50,
+      "unknown": 49,
       "image": 8,
       "archive": 10,
       "code": 5,
@@ -1531,8 +1531,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "gradle",
