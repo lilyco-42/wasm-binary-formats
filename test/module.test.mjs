@@ -81,6 +81,7 @@ test('the analysis module stands on its own exports', () => {
     'symver_count', 'symver_at',
     'tls_count', 'tls_at',
     'note_count', 'note_at',
+    'hash_count', 'hash_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -171,6 +172,7 @@ test('the base module the page always downloads carries none of this', async () 
     'symver_count', 'symver_at',
     'tls_count', 'tls_at',
     'note_count', 'note_at',
+    'hash_count', 'hash_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -733,6 +735,72 @@ test('the thread-local table the loader walks is the one the module reports', as
   for (const name of ['lab.so', 'lab32.so', 'answer.obj', 'res.dll']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.tls_count(), 0, `${name} answered with a PE's TLS directory`);
+  }
+});
+
+test('the hash tables the readers parsed are the ones the module reports', async () => {
+  // scripts/make-hash-fixtures.py links one C file of ninety globals four ways - .gnu.hash alone, .hash
+  // alone, both in one file, and both for i386 - and writes a row only where the byte walk,
+  // `llvm-readobj --gnu-hash-table` / `--hash-table` and pyelftools agree on the header words and both
+  // arrays. The traversal itself is derived in that script and re-checked here by arithmetic.
+  const probe = JSON.parse(await readFile('test/fixtures/hash.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('	');
+    return parts[parts.indexOf(key) + 1];
+  };
+  const kinds = new Set();
+  const widths = new Set();
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.hash_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the readers said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('hash_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+    if (want.length === 0) {
+      continue;
+    }
+    // One table row per table, one bucket row per bucket at most, and the lengths of the runs adding up
+    // to what the table says it reaches. A run that ended in the wrong place would show up here.
+    assert.equal(want.filter((one) => one.startsWith('table	')).length, Number(cell(want[0], 'tables')));
+    for (const sheet of want.filter((one) => one.startsWith('table	'))) {
+      const which = sheet.split('	')[1];
+      kinds.add(cell(sheet, 'kind'));
+      const rungs = want.filter((one) => one.startsWith('bucket	') && one.split('	')[1] === which);
+      const stated = Number(cell(sheet, 'buckets'));
+      assert.ok(rungs.length <= stated, `${name}: ${rungs.length} bucket rows for ${stated} buckets`);
+      if (rungs.length === stated) {
+        const steps = rungs.filter((one) => cell(one, 'head') !== '-')
+          .reduce((sum, one) => sum + Number(cell(one, 'length')), 0);
+        assert.equal(steps, Number(cell(sheet, 'reach')), `${name}: the runs of table ${which} do not add up`);
+      }
+      const empty = rungs.filter((one) => cell(one, 'head') === '-').length;
+      assert.ok(empty <= Number(cell(sheet, 'empty')), `${name}: counts the same bucket twice`);
+      const parts = sheet.split('	');
+      if (parts.includes('wordsize')) widths.add(cell(sheet, 'wordsize'));
+      const floor = Number(cell(sheet, 'floor'));
+      for (const one of want.filter((two) => two.startsWith('unfound	') && two.split('	')[1] === which)) {
+        assert.ok(Number(one.split('	')[2]) < floor, `${name}: ${one} is below no floor`);
+      }
+    }
+  }
+  // Both shapes and both word sizes have to turn up, or the 32-bit arm and the old table prove nothing.
+  assert.ok(kinds.has('gnu') && kinds.has('sysv'), `kinds seen: ${Array.from(kinds).join(', ')}`);
+  assert.ok(widths.has('8') && widths.has('4'), `word sizes seen: ${Array.from(widths).join(', ')}`);
+  // `lab.so` is the case the window exists for: two of its nine dynamic symbols are in the symbol table
+  // and nowhere in the hash, so a loader can never be asked to find them by name.
+  report(new Uint8Array(await readFile('test/fixtures/lab.so')));
+  const lab = Array.from({ length: ex.hash_count() }, (_, index) => text('hash_at', index));
+  const hidden = lab.filter((one) => one.startsWith('unfound	'));
+  assert.deepEqual(hidden.map((one) => cell(one, 'name')), ['data_at', 'call_me']);
+  assert.ok(Number(cell(lab[1], 'reach')) < Number(cell(lab[0], 'dynsym')),
+    'the table reaches every symbol, which is the claim not to make');
+  // A static executable has no dynamic symbol table to index, and a PE no such table at all.
+  for (const name of ['lab.elf', 'res.dll', 'answer.obj', 'dbg.exe']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.hash_count(), 0, `${name} answered with a hash table`);
   }
 });
 

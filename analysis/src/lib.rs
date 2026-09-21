@@ -218,6 +218,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DEBUG.with(|slot| slot.borrow_mut().clear());
     TLS.with(|slot| slot.borrow_mut().clear());
     NOTES.with(|slot| slot.borrow_mut().clear());
+    SHEETS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -369,6 +370,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     TLS.with(|slot| *slot.borrow_mut() = storage);
     let noted = note_rows(bytes);
     NOTES.with(|slot| *slot.borrow_mut() = noted);
+    let looked = hash_rows(bytes);
+    SHEETS.with(|slot| *slot.borrow_mut() = looked);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1195,6 +1198,8 @@ thread_local! {
     static TLS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// What an ELF's note segments and note sections say.
     static NOTES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The symbol lookup tables: `.gnu.hash`, `.hash`, and what each one leaves out.
+    static SHEETS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -2826,6 +2831,430 @@ pub extern "C" fn note_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     NOTES.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// The two hash tables a dynamic object can carry, by section name.
+const GNU_HASH_SECTION: &str = ".gnu.hash";
+const SYSV_HASH_SECTION: &str = ".hash";
+
+/// The GNU name hash, and the older System V one. Both are computed here rather than read from the
+/// tables, because a chain word that agrees with the hash of its own name is the proof that the run was
+/// walked in the right direction - no listing prints a per-symbol hash for both shapes.
+fn gnu_hash(text: &str) -> u64 {
+    let mut total = 5381u64;
+    for one in text.as_bytes() {
+        total = (total.wrapping_mul(33).wrapping_add(u64::from(*one))) & 0xFFFF_FFFF;
+    }
+    total
+}
+
+fn elf_hash(text: &str) -> u64 {
+    let mut total = 0u64;
+    for one in text.as_bytes() {
+        total = ((total << 4) + u64::from(*one)) & 0xFFFF_FFFF;
+        let high = total & 0xF000_0000;
+        if high != 0 {
+            total ^= high >> 24;
+        }
+        total &= !high;
+    }
+    total & 0xFFFF_FFFF
+}
+
+/// The section table of an ELF file, with the fields a hash table needs. `note_rows` reads the same
+/// header by hand for its own one question; this is the shared form for the readers that need more.
+struct ElfTable {
+    wide: bool,
+    little: bool,
+    entries: Vec<ElfSection>,
+}
+
+struct ElfSection {
+    name: String,
+    kind: u64,
+    offset: u64,
+    size: u64,
+    link: u64,
+    info: u64,
+}
+
+impl ElfTable {
+    fn parse(raw: &[u8]) -> Option<ElfTable> {
+        if raw.len() < 64 || raw.get(..4) != Some(b"\x7fELF") {
+            return None;
+        }
+        let wide = raw.get(4) == Some(&2);
+        let little = raw.get(5) == Some(&1);
+        let word = |at: usize, size: usize| -> Option<u64> {
+            let stop = at.checked_add(size)?;
+            let body = raw.get(at..stop)?;
+            let mut buf = [0u8; 8];
+            buf[..size].copy_from_slice(body);
+            Some(if little {
+                u64::from_le_bytes(buf)
+            } else {
+                u64::from_be_bytes(buf)
+            })
+        };
+        let at_sh = word(if wide { 0x28 } else { 0x20 }, if wide { 8 } else { 4 })?;
+        let entsize = word(if wide { 0x3a } else { 0x2e }, 2)?;
+        let count = word(if wide { 0x3c } else { 0x30 }, 2)?;
+        let link = word(if wide { 0x3e } else { 0x32 }, 2)?;
+        if entsize < (if wide { 64 } else { 40 }) {
+            return None;
+        }
+        let strings_at = usize::try_from(link).ok()
+            .and_then(|which| which.checked_mul(usize::try_from(entsize).unwrap_or(0)))
+            .and_then(|step| usize::try_from(at_sh.checked_add(u64::try_from(step).ok()?)?).ok())
+            .and_then(|base| word(base + if wide { 0x18 } else { 0x10 }, if wide { 8 } else { 4 }))
+            .and_then(|where_| usize::try_from(where_).ok())?;
+        let mut entries = Vec::new();
+        for index in 0..usize::try_from(count).unwrap_or(0) {
+            let Some(at) = usize::try_from(
+                u64::try_from(index).unwrap_or(0)
+                    .checked_mul(entsize)?
+                    .checked_add(at_sh)?).ok() else {
+                break;
+            };
+            let Some(name_at) = word(at, 4) else { break };
+            let Some(tail) = strings_at.checked_add(usize::try_from(name_at).unwrap_or(usize::MAX))
+                .and_then(|where_| raw.get(where_..)) else {
+                break;
+            };
+            entries.push(ElfSection {
+                name: String::from_utf8_lossy(tail.split(|byte| *byte == 0).next()?).into_owned(),
+                kind: word(at + 4, 4)?,
+                offset: word(at + if wide { 0x18 } else { 0x10 }, if wide { 8 } else { 4 })?,
+                size: word(at + if wide { 0x20 } else { 0x14 }, if wide { 8 } else { 4 })?,
+                link: word(at + if wide { 0x28 } else { 0x18 }, 4)?,
+                info: word(at + if wide { 0x2c } else { 0x1c }, 4)?,
+            });
+        }
+        Some(ElfTable { wide, little, entries })
+    }
+
+    fn words(&self, raw: &[u8], at: usize, count: usize, size: usize) -> Option<Vec<u64>> {
+        let mut out = Vec::with_capacity(count.min(4096));
+        for index in 0..count {
+            let start = at.checked_add(index.checked_mul(size)?)?;
+            let body = raw.get(start..)?;
+            if body.len() < size {
+                return None;
+            }
+            out.push(if size == 8 {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&body[..8]);
+                if self.little { u64::from_le_bytes(buf) } else { u64::from_be_bytes(buf) }
+            } else {
+                let mut buf = [0u8; 4];
+                buf.copy_from_slice(&body[..4]);
+                if self.little {
+                    u64::from(u32::from_le_bytes(buf))
+                } else {
+                    u64::from(u32::from_be_bytes(buf))
+                }
+            });
+        }
+        Some(out)
+    }
+
+    /// The dynamic symbol table's names, in the file's own order - the list a hash table indexes.
+    fn dynsym(&self, raw: &[u8]) -> Vec<String> {
+        let Some(table) = self.entries.iter().find(|one| one.kind == 11) else {
+            return Vec::new();
+        };
+        let Some(strings) = usize::try_from(table.link).ok().and_then(|link| self.entries.get(link)) else {
+            return Vec::new();
+        };
+        let step = if self.wide { 24usize } else { 16usize };
+        let count = usize::try_from(table.size).ok().and_then(|bytes| bytes.checked_div(step)).unwrap_or(0);
+        let mut out = Vec::new();
+        for index in 0..count {
+            let Some(at) = usize::try_from(index)
+                .ok()
+                .and_then(|each| each.checked_mul(step))
+                .and_then(|where_| usize::try_from(table.offset).ok()?.checked_add(where_)) else {
+                break;
+            };
+            let name_at = if self.little {
+                u32::from_le_bytes(raw.get(at..at + 4).map_or([0; 4], |one| one.try_into().unwrap_or([0; 4])))
+            } else {
+                u32::from_be_bytes(raw.get(at..at + 4).map_or([0; 4], |one| one.try_into().unwrap_or([0; 4])))
+            };
+            let text = usize::try_from(name_at)
+                .ok()
+                .and_then(|name| (strings.offset as usize).checked_add(name))
+                .and_then(|where_| raw.get(where_..))
+                .map(|tail| {
+                    String::from_utf8_lossy(tail.split(|byte| *byte == 0).next().unwrap_or(tail)).into_owned()
+                })
+                .unwrap_or_default();
+            out.push(text);
+        }
+        out
+    }
+}
+
+/// What a hash table holds and what it can be asked for: the words the file stores, and the runs its own
+/// bucket array spells out.
+struct HashSheet {
+    section: &'static str,
+    offset: u64,
+    bytes: u64,
+    info: u64,
+    buckets: Vec<u64>,
+    chains: Vec<u64>,
+    symoffset: Option<u64>,
+    masks: Option<u64>,
+    bits: u64,
+}
+
+/// The runs one table implies: where each bucket starts, how far its chain runs, how many symbols the
+/// walks touch, and how many words disagreed with the hash of their own name.
+///
+/// Both shapes store a symbol index in the bucket and 0 for an empty one, and they link differently: a
+/// `.hash` chain word is the index of the next symbol in the same bucket, zero ending the run, while a
+/// `.gnu.hash` chain is addressed by `index - symoffset`, runs forward through consecutive entries, and
+/// ends on the word whose bit 0 is set - that one stores the hash with bit 0 raised, the others with it
+/// cleared. Both rules were read off the fixtures rather than recalled: walked this way, every chain word
+/// equals the hash of the name it stands for and the runs together touch every symbol at or above the
+/// floor and no other, in all four generated files and both classes.
+fn swept(sheet: &HashSheet, names: &[String]) -> (Vec<(usize, u64, usize)>, Vec<u64>, usize, usize) {
+    let gnu = sheet.section == GNU_HASH_SECTION;
+    let floor = sheet.symoffset.unwrap_or(0);
+    let mut runs = Vec::new();
+    let mut reached = Vec::new();
+    let mut wrong = 0usize;
+    let mut empty = 0usize;
+    for (position, head) in sheet.buckets.iter().enumerate() {
+        if *head == 0 {
+            empty += 1;
+            runs.push((position, 0, 0));
+            continue;
+        }
+        let mut at = *head;
+        let mut steps = 0usize;
+        loop {
+            let Some(slot) = at.checked_sub(if gnu { floor } else { 0 }) else {
+                wrong += 1;
+                break;
+            };
+            if steps > sheet.chains.len()
+                || slot >= sheet.chains.len() as u64
+                || usize::try_from(at).map_or(true, |each| each >= names.len())
+            {
+                wrong += 1;
+                break;
+            }
+            let word = sheet.chains[usize::try_from(slot).unwrap_or(usize::MAX)];
+            let text = &names[usize::try_from(at).unwrap_or(usize::MAX)];
+            reached.push(at);
+            steps += 1;
+            if gnu {
+                let want = gnu_hash(text);
+                let agreed = word == (want | 1) || word == (want & !1);
+                let placed = want % sheet.buckets.len() as u64 == position as u64;
+                if !agreed || !placed || word & 1 != 0 {
+                    wrong += usize::from(!agreed) + usize::from(!placed);
+                    break;
+                }
+                at += 1;
+            } else {
+                if elf_hash(text) % sheet.buckets.len() as u64 != position as u64 {
+                    wrong += 1;
+                    break;
+                }
+                if word == 0 {
+                    break;
+                }
+                at = word;
+            }
+        }
+        runs.push((position, *head, steps));
+    }
+    (runs, reached, wrong, empty)
+}
+
+/// IDA's symbol-lookup window: the hash tables a loader reads to find a name without scanning the
+/// symbol table, and the symbols they leave out.
+///
+/// The floor is the claim worth having. A `.gnu.hash` table starts at `symoffset` and never lists what
+/// lies below it, so `lab.so`'s `data_at` and `call_me` are in the symbol table, are exported-looking
+/// names, and cannot be asked for by name at all - which no listing states as a sentence, so the row
+/// names them one by one and says `unfound`.
+fn hash_rows(raw: &[u8]) -> Vec<String> {
+    let table = match ElfTable::parse(raw) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let names = table.dynsym(raw);
+    let mut sheets: Vec<HashSheet> = Vec::new();
+    let mut broken: Vec<String> = Vec::new();
+    for section in table.entries.iter().filter(|one| {
+        one.name == GNU_HASH_SECTION || one.name == SYSV_HASH_SECTION
+    }) {
+        let (Some(at), Some(size)) = (usize::try_from(section.offset).ok(), usize::try_from(section.size).ok())
+        else {
+            broken.push(format!("{}\tno header", section.name));
+            continue;
+        };
+        let head = match table.words(raw, at, 4, 4) {
+            Some(words) => words,
+            None => {
+                broken.push(format!("{}\tno header", section.name));
+                continue;
+            }
+        };
+        if size < 16 {
+            broken.push(format!("{}\tno header", section.name));
+            continue;
+        }
+        let (buckets, chains, symoffset, masks) = if section.name == GNU_HASH_SECTION {
+            let (count, offset, masks) = (head[0], head[1], head[2]);
+            let span = if table.wide { 8 } else { 4 };
+            let after = match at.checked_add(16).and_then(|where_| where_.checked_add(
+                usize::try_from(masks.checked_mul(u64::try_from(span).unwrap_or(0)).unwrap_or(u64::MAX))
+                    .unwrap_or(usize::MAX))) {
+                Some(where_) => where_,
+                None => {
+                    broken.push(format!("{}\tno mask words", section.name));
+                    continue;
+                }
+            };
+            let words = match after.checked_add(usize::try_from(count.checked_mul(4).unwrap_or(u64::MAX))
+                                                   .unwrap_or(usize::MAX)) {
+                Some(where_) => where_,
+                None => {
+                    broken.push(format!("{}\tno buckets", section.name));
+                    continue;
+                }
+            };
+            let Some(heads) = table.words(raw, after, usize::try_from(count).unwrap_or(0), 4) else {
+                broken.push(format!("{}\tno buckets", section.name));
+                continue;
+            };
+            let left = if words > at + size { 0 } else { at + size - words };
+            let Some(tail) = table.words(raw, words, left / 4, 4) else {
+                broken.push(format!("{}\tchains run past the section", section.name));
+                continue;
+            };
+            (heads, tail, Some(offset), Some(masks))
+        } else {
+            let (count, length) = (head[0], head[1]);
+            let after = match at.checked_add(8).and_then(|where_| where_.checked_add(
+                usize::try_from(count.checked_mul(4).unwrap_or(u64::MAX)).unwrap_or(usize::MAX))) {
+                Some(where_) => where_,
+                None => {
+                    broken.push(format!("{}\tarrays run past the section", section.name));
+                    continue;
+                }
+            };
+            let Some(heads) = table.words(raw, at + 8, usize::try_from(count).unwrap_or(0), 4) else {
+                broken.push(format!("{}\tarrays run past the section", section.name));
+                continue;
+            };
+            let Some(tail) = table.words(raw, after, usize::try_from(length).unwrap_or(0), 4) else {
+                broken.push(format!("{}\tarrays run past the section", section.name));
+                continue;
+            };
+            (heads, tail, None, None)
+        };
+        sheets.push(HashSheet {
+            section: if section.name == GNU_HASH_SECTION { GNU_HASH_SECTION } else { SYSV_HASH_SECTION },
+            offset: section.offset,
+            bytes: section.size,
+            info: section.info,
+            buckets,
+            chains,
+            symoffset,
+            masks,
+            bits: if table.wide { 64 } else { 32 },
+        });
+    }
+    let mut head = vec![
+        "hash".to_owned(),
+        format!("tables\t{}", sheets.len()),
+        format!("dynsym\t{}", names.len()),
+        format!("bits\t{}", if table.wide { 64 } else { 32 }),
+        format!("gnu\t{}", sheets.iter()
+            .filter(|one| one.section == GNU_HASH_SECTION).count()),
+        format!("sysv\t{}", sheets.iter()
+            .filter(|one| one.section == SYSV_HASH_SECTION).count()),
+    ];
+    if !broken.is_empty() {
+        head.push(format!("broken\t{}", broken.join("; ")));
+    }
+    let mut rows = vec![head.join("\t")];
+    for (index, sheet) in sheets.iter().enumerate() {
+        let gnu = sheet.section == GNU_HASH_SECTION;
+        let (runs, reached, _wrong, empty) = swept(sheet, &names);
+        let floor = sheet.symoffset.unwrap_or(1);
+        let mut row = vec![
+            "table".to_owned(),
+            index.to_string(),
+            format!("kind\t{}", if gnu { "gnu" } else { "sysv" }),
+            format!("off\t{}", sheet.offset),
+            format!("bytes\t{}", sheet.bytes),
+            format!("info\t{}", sheet.info),
+            format!("buckets\t{}", sheet.buckets.len()),
+            format!("chains\t{}", sheet.chains.len()),
+        ];
+        if gnu {
+            row.push(format!("symoffset\t{}", sheet.symoffset.unwrap_or(0)));
+            row.push(format!("masks\t{}", sheet.masks.unwrap_or(0)));
+            row.push(format!("wordsize\t{}", if sheet.bits == 64 { 8 } else { 4 }));
+        }
+        let distinct: Vec<u64> = {
+            let mut seen = reached.clone();
+            seen.sort_unstable();
+            seen.dedup();
+            seen
+        };
+        row.push(format!("empty\t{empty}"));
+        row.push(format!("reach\t{}", distinct.len()));
+        row.push(format!("floor\t{floor}"));
+        rows.push(row.join("\t"));
+        for (position, at, steps) in runs.iter().take(MAX_LISTED) {
+            rows.push(format!(
+                "bucket\t{index}\t{position}\thead\t{}\tlength\t{steps}",
+                if *at == 0 { "-".to_owned() } else { at.to_string() }
+            ));
+        }
+        if runs.len() > MAX_LISTED {
+            rows.push(format!("cut\tbuckets\t{}\ttable\t{index}\tlisted\t{MAX_LISTED}", runs.len()));
+        }
+        let hidden: Vec<usize> = (0..usize::try_from(floor).unwrap_or(0).min(names.len()))
+            .filter(|each| !names[*each].is_empty())
+            .collect();
+        for each in hidden.iter().take(MAX_LISTED) {
+            rows.push(format!("unfound\t{index}\t{each}\tname\t{}", clean(&names[*each])));
+        }
+        if hidden.len() > MAX_LISTED {
+            rows.push(format!("cut\tunfound\t{}\ttable\t{index}\tlisted\t{MAX_LISTED}", hidden.len()));
+        }
+    }
+    rows
+}
+
+/// How many rows the lookup-table window fills. Nothing here has a hash table: a static ELF, a PE and a
+/// COFF object all answer with nothing, and a position-independent executable that imports nothing answers
+/// with a table that lists nothing.
+#[no_mangle]
+pub extern "C" fn hash_count() -> i32 {
+    SHEETS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then one row per table, its buckets, and the names the table leaves out. Row zero
+/// is the totals.
+#[no_mangle]
+pub extern "C" fn hash_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    SHEETS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

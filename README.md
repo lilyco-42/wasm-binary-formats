@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point, and the notes an ELF leaves for itself in its PT_NOTE segments |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point, the notes an ELF leaves for itself in its PT_NOTE segments, and the hash tables it looks names up in |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -645,6 +645,27 @@ callbacks that come back in the file's own order and not sorted by address. Noth
 there is no 32-bit Windows toolchain on this host, so `bits` is 64 in every row here, and the PE32 fixtures in
 the directory answer with no rows at all.
 
+**The lookup window** (`hash_count` / `hash_at`) reads the tables a loader hashes into to find a name
+without scanning the symbol table: `.gnu.hash`, and the older `.hash`. A bucket holds a symbol index, and
+0 marks an empty bucket; a `.hash` chain word is the index of the next symbol in the same bucket, zero
+ending the run, while a `.gnu.hash` chain starts at the bucket's symbol and steps forward through the chain
+array, ending on the entry whose **bit 0** is set - that entry stores the hash of its name with bit 0
+raised and the others with it cleared.
+
+That bit-0 rule is not the one the documentation nearby repeats, and it was not taken from anywhere: it
+was found by walking a generated file with 91 hashed names in 22 buckets and checking, name by name, that
+each stored word equals the hash computed over the name it stands for, and that the runs together cover
+every named symbol at or above the table's floor and no other. Walked the other way - ending a run on bit
+31, as the usual account says - `lab.so` reaches one of its six hashed symbols while two independent
+libraries resolve all six, so the usual account is what is wrong for these files, and this reader says so
+in its own words rather than quietly copying a rule.
+
+The row worth reading is `unfound`. `.gnu.hash` starts at `symoffset`, so `lab.so`'s `data_at` and
+`call_me` are dynamic symbols with plain names that no loader can be asked to find: the file lists them and
+the table leaves them out. Both shapes are stored over one 90-function source, in both classes, so a symbol
+is reachable in `.hash` and in `.gnu.hash` by the same count - and the two tables disagree about nothing
+except how wide a mask word is: 8 bytes in an ELF64, 4 in an ELF32, which is why the same 22 buckets need
+32 mask words in one file and 64 in the other.
 **The note window** (`note_count` / `note_at`) reads what an ELF tells itself: three words - a name length,
 a descriptor length, a type - then the owner's name and the descriptor, each padded to a multiple of four.
 That padding is the whole difficulty, because it is the only thing separating one note from the next: a
@@ -871,6 +892,12 @@ never mentions _Thread_local); the walk, llvm-readobj --coff-tls-directory, pefi
 must agree on all six fields and on how long the array is, and Windows itself must run the callbacks in the
 order the array lists them, before tls.probe.json is written. Two runs give back the same rows and not the same
 bytes, so nothing hashes these two files
+python scripts/make-hash-fixtures.py                     # clang -fcf-protection + lld, from one source of
+ninety globals: hgnu.so (.gnu.hash, 22 buckets, 2 of them empty), hsys.so (.hash, 92 buckets), hboth.so
+(both tables over the same symbols) and hboth32.so (the same for i386, where the mask words are 4 bytes);
+the walk, llvm-readobj --gnu-hash-table / --hash-table and pyelftools must agree on the header words and
+both arrays, and the chain walk must reach every named symbol at or above the floor and no other, before
+hash.probe.json is written
 python scripts/make-note-fixtures.py                     # clang for x86_64-unknown-linux-gnu writes note.o
 (note), note1.elf (IBT only), note.elf (-fcf-protection=full plus -Wl,--build-id=sha1, which lands in two
 PT_NOTE segments) and notelab.elf (a .note written by hand in assembly: a four-byte name, a five-byte
