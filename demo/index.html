@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流（.debug$T，clang -gcodeview 写的目标文件里就有）时列出 —— DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。',
   },
   {
     id: 'disasm',
@@ -218,25 +218,30 @@ function paintRegions(state) {
   if (previous) previous.remove();
   if (!picked) return;
   const rows = regionRows(state.mod);
+  const box = document.createElement('div');
+  box.className = 'regions';
   if (rows === null) {
-    // An older cached module has no map to give: say that rather than paint an empty strip.
+    // An older cached module has no map to give: say that rather than paint an empty strip. The lists
+    // below do not depend on the map, so they are still rendered.
     const note = document.createElement('p');
-    note.className = 'regions';
     note.textContent = '分区图：这个模块没有 region_* 导出（多半是浏览器里缓存的旧版），'
       + '硬刷新后再看。';
-    host.out.parentElement.insertBefore(note, host.out.nextSibling);
+    box.appendChild(note);
+    appendLists(box, state);
+    host.out.parentElement.insertBefore(box, host.out.nextSibling);
     return;
   }
   if (!rows.length) {
+    // A COFF object is the case this note is really about - and it is also the file that carries a
+    // CodeView type stream, so refusing to draw a map must not refuse the lists.
     const note = document.createElement('p');
-    note.className = 'regions';
     note.textContent = '分区图：这个文件既不是 ELF 也不是 PE（目标文件只有一张节表，'
       + '没有加载段可言），所以不画。';
-    host.out.parentElement.insertBefore(note, host.out.nextSibling);
+    box.appendChild(note);
+    appendLists(box, state);
+    host.out.parentElement.insertBefore(box, host.out.nextSibling);
     return;
   }
-  const box = document.createElement('div');
-  box.className = 'regions';
   const strip = document.createElement('div');
   strip.style.cssText = 'display:flex;height:20px;border-radius:4px;overflow:hidden;'
     + 'border:1px solid var(--line)';
@@ -283,6 +288,13 @@ function paintRegions(state) {
   box.appendChild(legend);
   box.appendChild(total);
   box.appendChild(caveat);
+  appendLists(box, state);
+  host.out.parentElement.insertBefore(box, host.out.nextSibling);
+}
+
+/// The string list and the type list, appended to whatever panel is being painted. Both stand on
+/// their own: a file the map refuses can still carry types.
+function appendLists(box, state) {
   const listed = stringList(state.mod);
   if (listed && listed.length > 1) {
     const head = listed[0].split('\t');
@@ -327,7 +339,6 @@ function paintRegions(state) {
     box.appendChild(title);
     box.appendChild(table);
   }
-  host.out.parentElement.insertBefore(box, host.out.nextSibling);
 }
 
 /// The type list, or null when the loaded module does not have it (an older cached build). A file
