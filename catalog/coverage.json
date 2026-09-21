@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 49,
+    "selfFields": 50,
     "selfContainer": 28,
     "binarySpecAvailable": 0,
-    "gaps": 101,
+    "gaps": 100,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -28,7 +28,6 @@
       "text": 1,
       "application": 9,
       "inode": 3,
-      "font": 1,
       "undefined": 1
     }
   },
@@ -2907,8 +2906,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "outlook",

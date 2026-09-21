@@ -263,12 +263,12 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 49 | 22.4% |
+| own Rust reader, named header fields decoded | 50 | 22.8% |
 | own Rust reader, container framing only | 28 | 12.8% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **101** | 46.1% |
-| **covered, any level** | **118** | 53.9% |
+| **no parser at all - real gap** | **100** | 45.7% |
+| **covered, any level** | **119** | 54.3% |
 
 Top binary gap groups by count: unknown 53, archive 10, image 8, application 9, document 6,
 code 5, executable 4, inode 3, text 1.
@@ -278,17 +278,18 @@ Draw document) and then refuses the store with `SfxBaseModel::impl_store ... 0x8
 this host opens as an Impress document, so no ppt can be produced to read at all - an older note here
 blamed a 640 KB padding size, which this round could not reproduce because nothing was written.
 Then `chm`, `bzip3`, `arc`/`arj`,
-`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, the bare `ebml` label, and `otf` -
-`otf` because no CFF charstring writer runs here. `woff2`, `coff`, `crt` and `sevenzip` were on that list
-as the row before: the first for a reason that turned out to be about the interpreter on PATH rather than
+`dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, and the bare `ebml` label. `woff2`, `coff`, `crt`,
+`sevenzip` and `otf` were on that list as the row before: the first for a reason that turned out to be
+about the interpreter on PATH rather than
 about the machine, the second because no Kaitai spec covers it, the third because the earlier sweep for
 "cheap specs to generate" keyed on label names and so never matched `crt` to the `asn1_der` spec that
 does exist upstream, and `sevenzip` because `py7zr` turned out to be installed as both a writer and a
-reader for it here - see below.
+reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
+charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 118 of 219 binary labels have a parser
-that runs here (49 field-level and 28 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 101 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 119 of 219 binary labels have a parser
+that runs here (50 field-level and 28 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 100 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -302,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 118 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 119 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -457,6 +458,7 @@ temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes
 temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
 temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
 temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
+temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -565,8 +567,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **118 covered** (49 field-level and 28
-container-level from this repo's own readers, 41 generated and mostly load-gated), **101 with no
+Coverage is scored against magika's 219 binary labels: **119 covered** (50 field-level and 28
+container-level from this repo's own readers, 41 generated and mostly load-gated), **100 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -903,6 +905,20 @@ does not re-derive them:
   re-read with `zipfile`, and the script refuses to commit unless the two content types differ in that
   one word and nothing else - which is also why only `dotx` is credited: `xltx` and `potx` are not magika
   labels at all, so this is one label rather than a family.
+* OpenType with PostScript outlines (+1 field-level label, 119 covered, 100 gaps) was on the blocker list
+  as "no CFF charstring writer runs here", and the writer has been in this repo's own venv the whole time:
+  fontTools' `FontBuilder(isTTF=False)` writes a real CFF font. The reader is the same sfnt walk that has
+  read `tiny.ttf` for rounds - `OTTO` sits in the four-byte flavour slot and the table directory is
+  identical - so what was missing was the bookkeeping and one cross-check: `otf` is credited only when a
+  `CFF ` table is *listed* (tag and all, trailing space included, since those four bytes are the tag)
+  **and** the flavour agrees, and the row says what was found either way. A `glyf` font retagged `OTTO` -
+  hand-built, labelled as such, because writers do not ship contradictions - therefore keeps the `ttf`
+  label with `agrees no` printed beside it: a flavour tag is a claim, the outline table is the evidence,
+  and where they disagree the weaker name stands. `CFF2` is not credited as `otf` at all, because nothing
+  here writes one to prove anything about it. The second implementation is FreeType through Pillow, which
+  shares no code with fontTools: it reports the family, an advance of 24 px for a 600-unit width in a
+  1000-em font at 40 px, and metrics (32, 8) for the 800/-200 `hhea` pair - so the fixture is refused
+  unless a program from another project reads the numbers the bytes state.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

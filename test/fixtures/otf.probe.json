@@ -1,0 +1,78 @@
+{
+ "bytes": 648,
+ "fields": {
+  "ascender": 800,
+  "descender": -200,
+  "file_bytes": 648,
+  "flavour_tag": "OTTO",
+  "name_records": 4,
+  "num_glyphs": 3,
+  "outline_tables": [
+   "CFF "
+  ],
+  "tables_end_highest": 648,
+  "tables_in_directory": [
+   "CFF ",
+   "OS/2",
+   "cmap",
+   "head",
+   "hhea",
+   "hmtx",
+   "maxp",
+   "name",
+   "post"
+  ],
+  "units_per_em": 1000
+ },
+ "flavour": "OTTO",
+ "freetype": {
+  "advance_A": 24.0,
+  "metrics": [
+   32,
+   8
+  ],
+  "name": [
+   "Lab",
+   "Regular"
+  ],
+  "size": 40
+ },
+ "tables": {
+  "CFF ": {
+   "length": 118,
+   "offset": 520
+  },
+  "OS/2": {
+   "length": 96,
+   "offset": 256
+  },
+  "cmap": {
+   "length": 52,
+   "offset": 436
+  },
+  "head": {
+   "length": 54,
+   "offset": 156
+  },
+  "hhea": {
+   "length": 36,
+   "offset": 212
+  },
+  "hmtx": {
+   "length": 8,
+   "offset": 640
+  },
+  "maxp": {
+   "length": 6,
+   "offset": 248
+  },
+  "name": {
+   "length": 84,
+   "offset": 352
+  },
+  "post": {
+   "length": 32,
+   "offset": 488
+  }
+ }
+}

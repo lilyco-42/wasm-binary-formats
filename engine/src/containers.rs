@@ -143,6 +143,7 @@ pub fn name() -> &'static str {
         FORMAT_DER => "der",
         FORMAT_SEVENZIP => "sevenzip",
         FORMAT_PSD => "psd",
+        FORMAT_OTF => "otf",
         _ => "unknown",
     }
 }
@@ -1883,6 +1884,55 @@ fn read_sfnt(bytes: &[u8]) -> Option<Vec<String>> {
         bytes.len().saturating_sub(highest)
     ));
     Some(entries)
+}
+
+/// A CFF-flavoured OpenType font - what `otf` names. The number is outside the 27/28 font band because
+/// codes are appended in the order readers land on them, not grouped by family.
+pub const FORMAT_OTF: i32 = 51;
+
+/// Which outline format the table directory actually carries, and whether the flavour tag the file
+/// opens with agrees with it. The answer decides between 27 and 51, and `otf` is credited only on
+/// positive evidence: a `CFF ` table, tagged with the trailing space that is part of its four bytes, in
+/// a file that says `OTTO`. Everything weaker - `CFF2`, both outline kinds at once, a `glyf` file
+/// claiming to be OTTO - keeps the older label, because `otf` means PostScript outlines in particular
+/// and no fixture here proves anything about the rest. The row reports what was found either way, so
+/// the label and the evidence can disagree in the open.
+fn sfnt_outlines(bytes: &[u8], lines: &mut Vec<String>) -> i32 {
+    // The directory did not fit in the file: the walk stopped at its own header row, so there is no
+    // table list to speak of and "no outline table" would be a claim about a file this reader never
+    // saw the inside of. Say nothing and keep the older label.
+    if lines.first().is_some_and(|head| head.ends_with("\t1")) {
+        return FORMAT_TTF;
+    }
+    let flavour = match bytes.get(0..4) {
+        Some(b"OTTO") => "OTTO",
+        Some(b"true") => "true",
+        Some([0x00, 0x01, 0x00, 0x00]) => "1.0",
+        _ => "?",
+    };
+    let listed = |tag: &str| {
+        lines
+            .iter()
+            .any(|row| row.starts_with(&format!("table\t{tag}\t")))
+    };
+    let (cff, cff2, glyf) = (listed("CFF "), listed("CFF2"), listed("glyf"));
+    let found = match (cff, cff2, glyf) {
+        (true, false, false) => "cff",
+        (false, true, false) => "cff2",
+        (false, false, true) => "glyf",
+        (false, false, false) => "none",
+        _ => "mixed",
+    };
+    let agrees = (flavour == "OTTO") == matches!(found, "cff" | "cff2");
+    lines.push(format!(
+        "outlines\t{found}\tflavour\t{flavour}\tagrees\t{}",
+        if agrees { "yes" } else { "no" }
+    ));
+    if agrees && found == "cff" {
+        FORMAT_OTF
+    } else {
+        FORMAT_TTF
+    }
 }
 
 /// WOFF wraps an sfnt: the same table tags, but each entry carries a compressed length next to its
@@ -7170,8 +7220,9 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_wasm(bytes) {
         return accept(FORMAT_WASM, lines);
     }
-    if let Some(lines) = read_sfnt(bytes) {
-        return accept(FORMAT_TTF, lines);
+    if let Some(mut lines) = read_sfnt(bytes) {
+        let code = sfnt_outlines(bytes, &mut lines);
+        return accept(code, lines);
     }
     if let Some(lines) = read_woff(bytes) {
         return accept(FORMAT_WOFF, lines);

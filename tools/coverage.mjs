@@ -37,7 +37,7 @@ const SELF = {
   '3gp': ['fields'], asf: ['container'], wma: ['container'], wmv: ['container'],
   flv: ['container'], cab: ['container'], sevenzip: ['container'], mpegts: ['fields'],
   flac: ['fields'], mp3: ['fields'], mp2: ['fields'], ogg: ['fields'], wav: ['fields'],
-  pdf: ['fields'], pbm: ['fields'], wasm: ['fields'], ttf: ['fields'], woff: ['fields'], icns: ['fields'],
+  pdf: ['fields'], pbm: ['fields'], wasm: ['fields'], ttf: ['fields'], otf: ['fields'], woff: ['fields'], icns: ['fields'],
   applebplist: ['fields'], qoi: ['fields'], jp2: ['fields'], woff2: ['fields'], npy: ['fields'], h5: ['container'], avro: ['fields'],
   // Only the two labels a generated `microsoft_cfb` reader does not carry: magika names the Word and
   // Excel documents by what is inside the compound file, and this reader stops at the container.

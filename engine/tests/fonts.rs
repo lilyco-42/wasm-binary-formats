@@ -1,17 +1,22 @@
 //! Font containers: the sfnt table directory, and the WOFF wrapper around it.
 //!
-//! `scripts/make-font-fixtures.py` compiles both fixtures with fontTools - a two-glyph font built
-//! from nothing, so no third-party outline is committed and the bytes still come from an
+//! `scripts/make-font-fixtures.py` compiles the TrueType and WOFF fixtures with fontTools - a two-glyph
+//! font built from nothing, so no third-party outline is committed and the bytes still come from an
 //! implementation this repo does not control. `test/fixtures/tiny_ttf.probe.json` and
 //! `tiny_woff.probe.json` are that same library's reading of the finished files, and every number
 //! asserted here was taken from them or from the bytes.
+//!
+//! `lab.otf` is the third case and the one with a second implementation behind it: fontTools writes a
+//! CFF-flavoured font and FreeType, reached through Pillow, reads the family, the advance and the
+//! metrics back out of the bytes (see `test/fixtures/otf.probe.json`). fontTools re-reading its own
+//! output would prove only that one library agrees with itself.
 //!
 //! The interesting property is not the table list but the *dependency*: `units_per_em`, `ascender`,
 //! `num_glyphs` and `name_records` are read at offsets the directory gave for `head`, `hhea`, `maxp`
 //! and `name`. A walk that miscounted the directory entries could not land on four different tables
 //! and still print the numbers fontTools wrote.
 
-use apk_lens::containers::{at, count, kind, name, parse, FORMAT_TTF, FORMAT_WOFF};
+use apk_lens::containers::{at, count, kind, name, parse, FORMAT_OTF, FORMAT_TTF, FORMAT_WOFF};
 use std::fs;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test/fixtures/");
@@ -25,6 +30,16 @@ fn fixture(file: &str) -> Vec<u8> {
 
 fn report() -> Vec<String> {
     (0..count()).filter_map(at).collect()
+}
+
+/// Rows are found by prefix, not by index: this reader's row list grows as it learns to check more of
+/// a file, and a positional assertion goes stale on the commit that adds a row.
+fn row(lines: &[String], named: &str) -> String {
+    lines
+        .iter()
+        .find(|entry| entry.starts_with(named))
+        .cloned()
+        .unwrap_or_else(|| panic!("no row starting {named:?} in {lines:#?}"))
 }
 
 #[test]
@@ -52,7 +67,58 @@ fn reads_the_table_directory_fonttools_compiled() {
             "num_glyphs\t2",
             "name_records\t4",
             "tables_end\t634\tuncovered\t2",
+            "outlines\tglyf\tflavour\t1.0\tagrees\tyes",
         ]
+    );
+}
+
+#[test]
+fn a_cff_flavoured_font_is_named_by_the_outline_table_it_carries() {
+    // `lab.otf` comes from `scripts/make-otf-fixtures.py`: fontTools writes it and FreeType, which
+    // shares no code with the writer, reads the family name, the advance and the metrics back
+    // (`test/fixtures/otf.probe.json` holds both readings). The point of the row below is that the
+    // label does not come from the four-byte flavour tag alone: the directory has to name a `CFF `
+    // table, and the tag and the table have to agree.
+    let bytes = fixture("lab.otf");
+    assert_eq!(parse(&bytes), FORMAT_OTF);
+    assert_eq!(kind(), FORMAT_OTF, "kind() must agree with the return code");
+    assert_eq!(name(), "otf");
+    let lines = report();
+    assert_eq!(lines[0], "sfnt\tOTTO\t9\t0", "{lines:#?}");
+    assert_eq!(
+        row(&lines, "table\tCFF "),
+        "table\tCFF \t520\t118",
+        "the tag keeps the trailing space that is part of its four bytes: {lines:#?}"
+    );
+    assert_eq!(row(&lines, "units_per_em"), "units_per_em\t1000");
+    assert_eq!(row(&lines, "num_glyphs"), "num_glyphs\t3");
+    assert_eq!(
+        row(&lines, "tables_end"),
+        "tables_end\t648\tuncovered\t0",
+        "the directory accounts for every byte of this font"
+    );
+    assert_eq!(
+        row(&lines, "outlines"),
+        "outlines\tcff\tflavour\tOTTO\tagrees\tyes"
+    );
+
+    // The same reader on the TrueType control keeps its older label, and says which table it saw.
+    assert_eq!(parse(&fixture("tiny.ttf")), FORMAT_TTF);
+    assert_eq!(name(), "ttf");
+    assert_eq!(
+        row(&report(), "outlines"),
+        "outlines\tglyf\tflavour\t1.0\tagrees\tyes"
+    );
+
+    // Self-authored contradiction: a `glyf` font retagged OTTO. Writing CFF outlines by hand to make
+    // the lie convincing is not the point - the point is that a flavour tag on its own does not earn
+    // the `otf` name, so the label stays where the evidence is and the disagreement is printed.
+    let mut lied = fixture("tiny.ttf");
+    lied[..4].copy_from_slice(b"OTTO");
+    assert_eq!(parse(&lied), FORMAT_TTF, "a tag is not an outline format");
+    assert_eq!(
+        row(&report(), "outlines"),
+        "outlines\tglyf\tflavour\tOTTO\tagrees\tno"
     );
 }
 
