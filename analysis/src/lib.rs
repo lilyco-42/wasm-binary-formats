@@ -868,8 +868,8 @@ fn type_record(index: u32, leaf: u16, body: &[u8]) -> Vec<String> {
         }
         LF_PROCEDURE => {
             let returns = type_label(cv_u32(body, 0).unwrap_or(0));
-            let count = cv_u16(body, 4).unwrap_or(0);
-            let args = hex(cv_u32(body, 6).unwrap_or(0));
+            let count = cv_u16(body, 6).unwrap_or(0);
+            let args = hex(cv_u32(body, 8).unwrap_or(0));
             rows.push(format!(
                 "type\t{head}\tprocedure\treturns\t{returns}\targs\t{count}\t{args}"
             ));
