@@ -102,6 +102,7 @@
    ],
    "type": "dict"
   },
+  "depth": 6,
   "files": 2,
   "info_keys": [
    "files",
@@ -109,7 +110,9 @@
    "piece length",
    "pieces"
   ],
+  "keys": 3,
   "name": "lab-dir",
+  "nodes": 18,
   "piece_length": 16384,
   "pieces": 20,
   "root_keys": [
@@ -203,6 +206,7 @@
    ],
    "type": "dict"
   },
+  "depth": 4,
   "files": 0,
   "info_keys": [
    "length",
@@ -210,7 +214,9 @@
    "piece length",
    "pieces"
   ],
+  "keys": 6,
   "name": "lab.bin",
+  "nodes": 15,
   "piece_length": 16384,
   "pieces": 40,
   "root_keys": [

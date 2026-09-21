@@ -2,7 +2,10 @@
 //!
 //! `scripts/make-torrent-fixtures.py` writes both fixtures with `bencode.py`, which is also the witness:
 //! the probe records that the library re-encodes the file to identical bytes and what it decodes back -
-//! so `keys 6`, `pieces 40` and `files 2` are another implementation's numbers, not this repo's own.
+//! its root keys, the size of the tree those keys hold, how deep it goes, the length of `pieces` - so
+//! `keys 6`, `nodes 15`, `pieces 40` and `files 2` are another implementation's numbers, not this repo's
+//! own. `bencode.py` is producer and witness of the same encoding rather than two independent ones (as
+//! FreeType and psd-tools are elsewhere), so the claim stays inside what those counts can carry.
 //! The format has no magic, so what makes a file a torrent here is that a walk of exact lengths lands on
 //! the last byte *and* finds an `info` dictionary on the way; `tools/torrent-sim.py` is the shadow whose
 //! rows these assertions were taken from.
@@ -79,11 +82,21 @@ fn the_walk_tiles_the_file_and_the_info_dictionary_says_which_shape_it_is() {
         ]
     );
     let record = String::from_utf8(fixture("torrent.probe.json")).unwrap();
+    // The whole first row of each reading, field by field: `bencode.py` decoded the file into a Python
+    // tree and counted it there (`scripts/make-torrent-fixtures.py`'s `measure`), so these are not this
+    // repo's walk agreeing with itself. `keys` is the root dictionary's size, `nodes` every value it
+    // holds at any depth, `depth` how far down the last one sits.
     for field in [
         "\"keys\": 6",
+        "\"nodes\": 15",
+        "\"depth\": 4",
+        "\"bytes\": 378",
+        "\"keys\": 3",
+        "\"nodes\": 18",
+        "\"depth\": 6",
+        "\"bytes\": 261",
         "\"pieces\": 40",
         "\"files\": 2",
-        "\"bytes\": 378",
     ] {
         assert!(record.contains(field), "the probe does not record {field}");
     }
@@ -114,12 +127,14 @@ fn key_order_is_reported_rather_than_demanded_and_a_tiling_that_fails_is_refused
     assert_eq!(row(&odd, "files"), "files\t-");
 
     // Four refusals, each a different reason: bencode that is not a torrent, a value whose stated
-    // length runs off the end, a dictionary that never closes, and something that is not a tree.
+    // length runs off the end, a dictionary that never closes, and a tree whose root is a list. Each is
+    // asked for the code -2 ("nothing here is a container we know"), which is only reachable past the
+    // eight-byte floor that every reader in this module shares, so the floor gets its own case below.
     let refusals: Vec<(&str, &[u8])> = vec![
         ("no info", b"d8:announce7:trackeree".as_slice()),
         ("length past the end", b"d4:name99:abce".as_slice()),
         ("never closed", b"d4:infod6:lengthi1e".as_slice()),
-        ("not a dict", b"i42e".as_slice()),
+        ("root is a list", b"li1ei2ei3ei4ei5e1:ae".as_slice()),
     ];
     for (label, bytes) in refusals {
         assert_eq!(
@@ -130,4 +145,8 @@ fn key_order_is_reported_rather_than_demanded_and_a_tiling_that_fails_is_refused
         );
         assert_eq!(count(), 0, "{label} left rows behind");
     }
+    // A bare integer is well-formed bencode and far too small to carry any container's header, so the
+    // answer is the size floor rather than a rejection: -1 says "too short to say", not "not a torrent".
+    assert_eq!(parse(b"i42e"), -1, "four bytes cannot hold a header");
+    assert_eq!(count(), 0, "the too-small answer left rows behind");
 }

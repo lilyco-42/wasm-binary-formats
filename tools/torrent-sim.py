@@ -190,8 +190,12 @@ CASES = {
     'unsorted': dictionary([(b'info', INFO), (b'announce', text(b'tracker'))]),
     # A dict that never closes.
     'truncated': b'd4:infod6:lengthi1e',
-    # Not a dict at the root at all.
+    # Not a dict at the root at all. (The engine answers this one earlier: four bytes is below the
+    # eight-byte floor every container reader shares, so its code is "too small", not "not a torrent".)
     'not-a-dict': number(42),
+    # A well-formed bencode tree whose root is a list: past the size floor, and still refused, because
+    # the torrent's own fields live in a dictionary.
+    'root-list': b'li1ei2ei3ei4ei5e1:ae',
     # A string length that runs off the end of the file.
     'over-read': b'd4:name99:abce',
     # A pieces value that is not a whole number of SHA-1 hashes.

@@ -12,10 +12,11 @@ things a reader can demand rather than assume, and both are what these fixtures 
     file, not in the reader.
 
 `bencode.py` is both the producer and the witness - it writes the bytes and decodes them again, and the
-probe records what it gets back (root keys, each value's type, the `info` keys, the length of `pieces`).
-That is one library agreeing with itself about *encoding*, which is weaker than the FreeType/psd-tools
-pairs elsewhere in this repo, so the claim is kept to what the lengths alone can prove: the reader reports
-structure, and no row prints a hash, a name it did not have to, or a byte it cannot show safely.
+probe records what it gets back (root keys, how many values the decoded tree holds and how deep it goes,
+each value's type, the `info` keys, the length of `pieces`). That is one library agreeing with itself
+about *encoding*, which is weaker than the FreeType/psd-tools pairs elsewhere in this repo, so the claim
+is kept to what the lengths alone can prove: the reader reports structure, and no row prints a hash, a
+name it did not have to, or a byte it cannot show safely.
 
 Two fixtures rather than one because the format has two shapes: a single-file `info` with `length`, and a
 multi-file one with a `files` list whose entries each carry a `path` list.
@@ -94,6 +95,23 @@ def describe_key(key):
     return key.decode("utf8", "replace") if isinstance(key, bytes) else str(key)
 
 
+def measure(value, depth=1):
+    """(nodes, deepest) counted over the decoded tree, by the same convention the reader uses.
+
+    A dictionary's *keys* are not nodes - only its values are - because bencode reads a key as a string
+    and then reads whatever follows it, so counting both would double the tree. Recursing over the
+    library's decoded structure rather than the bytes is the point: the reader's `nodes` and `depth` are
+    walk statistics, and this says what an independent parse of the same file walks to.
+    """
+    if isinstance(value, dict):
+        each = [measure(v, depth + 1) for v in value.values()]
+    elif isinstance(value, list):
+        each = [measure(v, depth + 1) for v in value]
+    else:
+        each = []
+    return 1 + sum(n for n, _ in each), max([depth] + [d for _, d in each])
+
+
 def main():
     os.makedirs(SCRATCH, exist_ok=True)
     report = {}
@@ -116,8 +134,14 @@ def main():
         pieces = info["pieces"]
         if len(pieces) % 20:
             raise SystemExit("pieces is {} bytes, not a multiple of a SHA-1".format(len(pieces)))
+        walked, deepest = measure(back)
+        if "info" not in back or walked < 2:
+            raise SystemExit("{} is not a tree worth recording".format(label))
         report[label] = {
             "bytes": len(raw),
+            "keys": len(keys),
+            "nodes": walked,
+            "depth": deepest,
             "root_keys": keys,
             "info_keys": sorted(info.keys()),
             "pieces": len(pieces),
@@ -129,7 +153,7 @@ def main():
         }
         with open(os.path.join(OUT, label), "wb") as handle:
             handle.write(raw)
-        print("== {} {} bytes, keys {}".format(label, len(raw), ",".join(keys)))
+        print("== {} {} bytes, keys {} nodes {} depth {}".format(label, len(raw), len(keys), walked, deepest))
         print("   info {} pieces {} x20 ok".format(sorted(info.keys()), len(pieces)))
     with open(os.path.join(OUT, "torrent.probe.json"), "w", encoding="utf8", newline="\n") as handle:
         json.dump(report, handle, indent=1, sort_keys=True, default=lambda each: {
