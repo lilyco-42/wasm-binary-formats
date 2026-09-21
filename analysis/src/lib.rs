@@ -7,11 +7,19 @@
 //! clicked, and which reports its own exports and byte size once it is there.
 //!
 //! What it says is the layout, not the meaning: the container's own section table, its symbol table,
-//! and the counts the two add up to. Nothing is loaded into memory, nothing is relocated, and no byte
-//! of a section is executed or interpreted as an instruction - instruction decoding is a separate
-//! module with its own download.
+//! the counts the two add up to, and an index from address to name over those tables. Nothing is loaded
+//! into memory, nothing is relocated, and no byte of a section is executed or interpreted as an
+//! instruction - instruction decoding is a separate module with its own download.
+//!
+//! The address index is the part an analyser is named for. A symbol table is a list; a disassembly
+//! needs the other direction, so [`name_for`] answers what `objdump -d` prints beside an instruction -
+//! `answer` at a symbol, `helper+0x9` nine bytes into one. It covers the formats the object reader
+//! covers, which is images *and* a `clang -c` object: `object`'s `read` feature includes COFF, and its
+//! file-kind dispatch keys on the machine field at byte zero, so a relocatable object comes back with
+//! `kind relocatable` and section-relative symbol addresses - the same basis the disassembler is handed
+//! for one of those files.
 
-use object::{Object, ObjectSection, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol, SymbolKind};
 use std::cell::RefCell;
 
 /// Rows past this are counted but not listed, so a 4 000-section file cannot make the report huge.
@@ -19,6 +27,9 @@ const MAX_LISTED: usize = 64;
 
 thread_local! {
     static REPORT: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// The address index behind [`name_for`], rebuilt by every call to [`analyse`]. Sorted by address,
+    /// so it is the last file's: the rows and the names always describe the same bytes.
+    static NAMES: RefCell<Vec<(u64, String)>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -56,9 +67,58 @@ fn symbol_row<'data, T: ObjectSymbol<'data>>(prefix: &str, index: usize, symbol:
     )
 }
 
+/// A name the address index can carry, or `None` for a symbol that does not own an address.
+///
+/// Two exclusions, both from what the row already says: a *section* symbol names a range rather than a
+/// point (and an object file has one per section, all at offset zero), and a *file* symbol names a
+/// compilation unit. A symbol with no section is left out too - an import, an absolute value like
+/// clang's `@feat.00`, or a debug entry - because its address column is a zero the reader invented
+/// rather than a place something lives.
+fn name_pair<T: ObjectSymbol>(symbol: &T) -> Option<(u64, String)> {
+    if symbol.section_index().is_none() || symbol.is_undefined() {
+        return None;
+    }
+    if matches!(symbol.kind(), SymbolKind::Section | SymbolKind::File) {
+        return None;
+    }
+    let name = clean(symbol.name().unwrap_or(""));
+    if name.trim().is_empty() {
+        return None;
+    }
+    Some((symbol.address(), name))
+}
+
+/// The name an address answers with, in the spelling `objdump -d` uses: `answer` at the symbol itself,
+/// `helper+0x9` nine bytes past one. The nearest name *below* the address wins, with no bound on the
+/// distance - which is what objdump does, and what an object file permits, since a symbol there carries
+/// no size to stop it.
+pub fn name_for(address: u64) -> Option<String> {
+    NAMES.with(|names| {
+        let names = names.borrow();
+        let last = names
+            .partition_point(|(at, _)| *at <= address)
+            .checked_sub(1)?;
+        let (at, name) = &names[last];
+        Some(if *at == address {
+            name.clone()
+        } else {
+            format!("{name}+0x{:x}", address - at)
+        })
+    })
+}
+
+/// How many addresses the index carries, which is not the number of symbols the file has.
+pub fn names_len() -> usize {
+    NAMES.with(|names| names.borrow().len())
+}
+
 pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
+    // A file that is not an object file leaves no names standing either, for the same reason it leaves
+    // no rows: the panel would otherwise show the previous file's answers under this file's rows.
+    NAMES.with(|slot| slot.borrow_mut().clear());
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
+    let mut named: Vec<(u64, String)> = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
     let mut imported = 0usize;
@@ -93,12 +153,16 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         if index < MAX_LISTED {
             rows.push(symbol_row("symbol", index, &symbol));
         }
+        // The index is not capped by MAX_LISTED: a name is worth finding precisely when the table is
+        // too long to read as a list.
+        named.extend(name_pair(&symbol));
     }
     for (index, symbol) in file.dynamic_symbols().enumerate() {
         imported += 1;
         if index < MAX_LISTED {
             rows.push(symbol_row("dynsym", index, &symbol));
         }
+        named.extend(name_pair(&symbol));
     }
     if symbols > MAX_LISTED {
         rows.push(format!("cut\tsymbols\t{symbols}"));
@@ -106,6 +170,12 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     if imported > MAX_LISTED {
         rows.push(format!("cut\tdynsym\t{imported}"));
     }
+
+    // Two names for one address are the file's ambiguity, not the reader's: `sort_by` is stable, so the
+    // table's own order decides and the first listing keeps the name.
+    named.sort_by(|left, right| left.0.cmp(&right.0));
+    named.dedup_by(|later, earlier| later.0 == earlier.0);
+    NAMES.with(|slot| *slot.borrow_mut() = named);
 
     rows.insert(
         0,
@@ -193,6 +263,26 @@ pub extern "C" fn analyse_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         Some(row) => copy(row, out, cap),
         None => -1,
     })
+}
+
+/// How many addresses the index carries. This is not `symbols` from the header row: the table lists
+/// every symbol, the index keeps the ones that own an address.
+#[no_mangle]
+pub extern "C" fn names_count() -> i32 {
+    names_len() as i32
+}
+
+/// The name of the nearest address at or below `address`, objdump's spelling, or -1 when the index is
+/// empty - which is what a stripped binary leaves it as.
+#[no_mangle]
+pub extern "C" fn name_at(address: i64, out: *mut u8, cap: i32) -> i32 {
+    if address < 0 {
+        return -1;
+    }
+    match name_for(address as u64) {
+        Some(text) => copy(&text, out, cap),
+        None => -1,
+    }
 }
 
 /// Bumped whenever the row contract changes, so a page that was built against another build of this

@@ -4,9 +4,19 @@
 //! `sample_elf()` is an ELF64 object assembled here, byte by byte, so the expected rows do not depend
 //! on a compiler being present. `/bin/ls` is the opposite: a real distribution binary that the module
 //! has never seen, read only where it exists (the CI runner), and asserted loosely enough to survive
-//! a different distro - the shape of the report, not its section names.
+//! a different distro - the shape of the report, not its section names. In between sits
+//! `test/fixtures/answer.obj`, a real compiler's output that is committed, so the address-to-name
+//! index is checked against a file whose objdump listing is frozen in this repo.
 
-use apk_lens_analysis::{abi_version, analyse, sample_elf, self_test};
+use apk_lens_analysis::{abi_version, analyse, name_for, names_len, sample_elf, self_test};
+use std::fs;
+
+const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test/fixtures/");
+
+fn fixture(name: &str) -> Vec<u8> {
+    let path = format!("{FIXTURES}{name}");
+    fs::read(&path).unwrap_or_else(|error| panic!("{path} missing: {error}"))
+}
 
 fn rows(bytes: &[u8]) -> Vec<String> {
     analyse(bytes).expect("the input is an object file")
@@ -92,4 +102,95 @@ fn a_distribution_binary_comes_through_the_same_abi() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(0);
     assert!(declared >= 1, "the header row undercounts: {}", lines[0]);
+    // The same table read through the other direction: every listed symbol that the file says lives
+    // in a section has to answer for its own address. Skipping this is what would let the index be
+    // quietly empty for a real distribution binary.
+    let mut addressable = 0usize;
+    for line in &lines {
+        let cells: Vec<&str> = line.split('\t').collect();
+        if cells[0] != "symbol" && cells[0] != "dynsym" {
+            continue;
+        }
+        let column = |wanted: &str| {
+            cells
+                .iter()
+                .position(|field| *field == wanted)
+                .and_then(|at| cells.get(at + 1))
+                .copied()
+        };
+        if cells[2].is_empty() || column("section") == Some("-") {
+            continue;
+        }
+        if matches!(column("kind"), Some("section") | Some("file")) {
+            continue;
+        }
+        let Some(Ok(at)) = column("addr").map(str::parse::<u64>) else {
+            continue;
+        };
+        addressable += 1;
+        assert!(
+            name_for(at).is_some(),
+            "{} lives in a section at {at:#x} and answered with nothing",
+            cells[2]
+        );
+    }
+    assert!(addressable > 0, "no addressable symbol in {lines:#?}");
+}
+
+#[test]
+fn an_address_answers_with_the_name_objdump_prints_beside_the_instruction() {
+    // `answer.obj` is the `clang -c` object the base module's COFF reader was proved against, so the
+    // two names below and the offsets between them are not this crate's invention: objdump's `-t`
+    // listing and `-d` annotations are frozen in test/fixtures/coff.probe.json, which says
+    // `answer` at 0, `helper` at 16, and prints `call 19 <helper+0x9>` for the call site.
+    let lines = rows(&fixture("answer.obj"));
+    assert!(
+        lines[0].contains("kind\trelocatable"),
+        "an object is not a rejected input, it is a file with sections: {}",
+        lines[0]
+    );
+    assert_eq!(
+        names_len(),
+        2,
+        "eleven symbols are listed and two of them own an address: {lines:#?}"
+    );
+    assert_eq!(name_for(0).as_deref(), Some("answer"));
+    assert_eq!(name_for(5).as_deref(), Some("answer+0x5"));
+    assert_eq!(name_for(16).as_deref(), Some("helper"));
+    assert_eq!(name_for(19).as_deref(), Some("helper+0x9"));
+
+    // The exclusions, each of which the rows carry and the index does not: `.text` is a section symbol
+    // at the very address `answer` owns, `@feat.00` is clang's absolute feature word (no section), and
+    // the file symbol names the compilation unit (no section either). All three report address 0, so
+    // `name_for(0) == "answer"` above is what says none of them got indexed.
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("symbol\t0\t.text") && line.contains("kind\tsection")),
+        "no section symbol to exclude: {lines:#?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("@feat.00") && line.contains("section\t-")),
+        "@feat.00 should still be listed, and still have no section: {lines:#?}"
+    );
+}
+
+#[test]
+fn a_file_with_no_symbol_table_leaves_the_index_empty() {
+    assert_eq!(rows(&sample_elf()).len(), 3);
+    assert_eq!(names_len(), 0);
+    assert_eq!(name_for(0), None);
+    assert_eq!(name_for(u64::MAX), None, "nothing is below nothing");
+
+    // And a refusal clears what the previous file left standing, on this thread at least.
+    rows(&fixture("answer.obj"));
+    assert_eq!(names_len(), 2);
+    assert!(analyse(b"plain text, not a binary").is_none());
+    assert_eq!(
+        names_len(),
+        0,
+        "a rejected file must not keep the last names"
+    );
 }

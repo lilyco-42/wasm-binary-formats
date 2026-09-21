@@ -85,7 +85,7 @@ const MODULES = [
     id: 'disasm',
     file: 'apk-lens-disasm.wasm',
     title: '反汇编（x86-64 / AArch64 / Thumb）',
-    detail: '把 .text 的字节翻成指令文本；架构与 .text 的位置由上面的分析模块给出 —— 只有 <code>.o</code> 目标文件是例外，它的机器与节位置就在基础模块的 COFF 行里。',
+    detail: '把 .text 的字节翻成指令文本；架构与 .text 的位置由上面的分析模块给出 —— 只有 .o 目标文件是例外，它的机器与节位置就在基础模块的 COFF 行里。文件自带的名字会按函数入口列在最后，没名字的按地址合成一个 sub_ 标签并标明是合成的。',
   },
 ];
 
@@ -139,14 +139,27 @@ function analyseHere(mod) {
     : [];
 }
 
+/* The analyser's answer about the file this page is standing on right now. A module loaded while a
+ * different file was open leaves a listing behind that describes the wrong bytes, so the held
+ * instance re-reads the current file instead of the page reusing stale rows - the same numbers also
+ * stand behind the address-to-name lookup below, which has to describe one file or none. */
+function analysisRows() {
+  const state = toolState.get('analysis');
+  if (!state) return null;
+  const fresh = state.mod ? analyseHere(state.mod) : null;
+  if (fresh) state.rows = fresh;
+  return state.rows || null;
+}
+
 /* The two modules compose the way the tools they stand for do: the analyser says which instruction
  * set and where the code is, and this hands that range to the disassembler. Without the first
  * module the second one has no honest way to know either.
  *
- * One file does not need the analyser: a `clang -c` object is none of the three image formats it
- * reads, so `analysis` has nothing to say about it - while the base module's own COFF rows already
- * carry the machine and every section's raw extent. For that case the range comes from the structure
- * panel, which is why the object path is checked first and named in the message. */
+ * An object file does not have to wait for the analyser, and this is not because it cannot read one -
+ * a COFF object is an object file, and the analyser lists its sections and symbols too. It is because
+ * the base module the page already downloaded carries the same two facts in its COFF rows, so opening
+ * a `clang -c` output costs one fetch rather than two. For that case the range comes from the
+ * structure panel, which is why the object path is checked first and named in the message. */
 function objectCode(structure) {
   if (!structure || structure.name !== 'coff') return null;
   const stated = field((structure.rows[0] || '').split('\t'), 'machine') || '';
@@ -168,7 +181,7 @@ function objectCode(structure) {
 function disasmPlan() {
   const object = picked && picked.structure ? objectCode(picked.structure) : null;
   if (object) return object;
-  const rows = (toolState.get('analysis') || {}).rows;
+  const rows = analysisRows();
   if (!rows || !rows.length) return null;
   const machine = field((rows[0] || '').split('\t'), 'machine');
   const arch = ARCHITECTURES[machine];
@@ -217,10 +230,15 @@ function disassembleHere(mod) {
       : `\n\n交叉引用：\n${edges.rows.join('\n')}`;
   }
   let flow = '';
+  let starts = [];
   if (typeof mod.disasm_funcs === 'function') {
     const split = pass((at) => mod.disasm_funcs(at, slice.length, BigInt(address), arch));
     flow = split.rc < 0 ? `\n\n函数划分：拒绝（返回 ${split.rc}）`
       : `\n\n函数与基本块：${split.rc} 个函数\n${split.rows.join('\n')}`;
+    // The addresses the name pass below labels: one per detected function, in the order found.
+    starts = split.rows.filter((row) => row.startsWith('func\t'))
+      .map((row) => field(row.split('\t'), 'start'))
+      .filter((value) => value && value.startsWith('0x'));
   }
   let graph = '';
   if (typeof mod.disasm_cfg === 'function') {
@@ -228,7 +246,38 @@ function disassembleHere(mod) {
     graph = arrows.rc < 0 ? `\n\n控制流图：拒绝（返回 ${arrows.rc}）`
       : `\n\n控制流边：${arrows.rc} 条\n${arrows.rows.join('\n')}`;
   }
-  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}${flow}${graph}`;
+  // Names, which is the fourth thing an analyser is for: the symbol table gives a name to the address
+  // a function starts on, and the disassembler says which addresses those are. Where the file names
+  // nothing, the label is made up here the way IDA does it - `sub_` plus the address - and says so,
+  // because an invented name and a name out of the file must never look alike on this page.
+  const analyser = toolState.get('analysis');
+  let named = '';
+  if (analyser && analyser.mod && typeof analyser.mod.name_at === 'function') {
+    // Re-read the open file first: on the object path nothing above needed the analyser's listing, and
+    // an index built from the file the visitor looked at before this one would name real addresses
+    // with someone else's symbols.
+    analysisRows();
+    const look = (value) => {
+      const room = 256;
+      const buffer = analyser.mod.alloc(room);
+      const written = analyser.mod.name_at(BigInt(value), buffer, room);
+      const answer = written < 0 ? '' : cString(analyser.mod, buffer);
+      analyser.mod.dealloc(buffer, room);
+      return answer;
+    };
+    const listed = (starts.length ? starts : [`0x${address.toString(16)}`]).map((start) => {
+      const found = look(start);
+      return `${start}\t${found || `sub_${start.slice(2).toUpperCase()}`}${found ? '' : '\t合成'}`;
+    });
+    const owned = listed.filter((row) => !row.endsWith('\t合成')).length;
+    named = `\n\n命名（${analyser.mod.names_count()} 个地址有名字，其中 ${owned}/${listed.length} 个是这里的函数入口）：\n${listed.join('\n')}`;
+  } else {
+    // Said out loud rather than left as a missing section: the names come from the symbol table, and
+    // the only module that reads one is the analyser, so no analyser means no names - and this page
+    // duplicates the rule for which symbol owns an address nowhere.
+    named = '\n\n命名：地址到名字要读符号表，那是上面「对象文件分析」模块的事；未加载（或是旧缓存的模块）时这里没有名字可列。';
+  }
+  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}${flow}${graph}${named}`;
 }
 
 function cString(mod, pointer) {
@@ -262,7 +311,12 @@ async function loadModule(spec, button, line, out) {
     state.exports = Object.keys(mod).sort();
     state.selftest = typeof mod.self_test === 'function' ? mod.self_test() : '无';
     if (spec.id === 'analysis') {
-      state.rows = analyseHere(mod) || [];
+      // Kept so the analyser can be asked again about whichever file is open later - the disassembler
+      // row needs its section table, the name pass needs its index, and neither should answer from a
+      // listing taken off a different file. The instance is in memory because it was asked for; it is
+      // still never fetched before the row is clicked.
+      state.mod = mod;
+      state.rows = analysisRows() || [];
       state.report = !picked
         ? '还没有选中文件。先选一个 .exe / .so / 可执行文件，再加载本模块。'
         : (state.rows.length

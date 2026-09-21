@@ -303,17 +303,20 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 118 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
-| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries and the control-flow edges between blocks, for x86-64, AArch64 and Thumb bytes |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
+| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
 to the disassembler, the same way `objdump -d` gets both from the binary. It is 1.86 MB, 601 KB
 gzipped, which is exactly why it is not in the module every visitor loads.
-One file skips the middle step: a `clang -c` object is none of the three image formats the analyser
-reads, so for `.o` the machine and the `.text` extent come from the base module's own COFF rows, and
-an object disassembles after one fetch instead of two. An i386 object says so rather than being decoded
-as something else, because the module carries x86-64, AArch64 and Thumb only.
+One file does not need to wait for the middle step, and the reason is worth stating exactly because an
+earlier draft of this paragraph had it wrong: a `clang -c` object **is** something the analyser reads -
+`object`'s `read` feature includes COFF, and its file-kind dispatch keys on the machine field at byte
+zero, so a relocatable object comes back with `kind relocatable` and section-relative symbol addresses.
+The base module simply carries the same two facts in its COFF rows already, so for `.o` the page takes
+them from there and an object disassembles after one fetch instead of two. An i386 object says so
+rather than being decoded as something else, because the module carries x86-64, AArch64 and Thumb only.
 
 The disassembler's C can be checked on any host that has a C compiler, without emsdk and without
 linking anything: `git clone --filter=blob:none --no-checkout --depth 1 --branch 5.0.5` the Capstone
@@ -340,7 +343,7 @@ something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no w
 multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
 200 KB demo. Instruction decoding, by contrast, turned out to be reachable the same day the question
 was measured, so it ships: what is left on this lane is the rest of the pipeline those tools are known
-for - names and types over the blocks and edges that now exist - one
+for - types over the blocks, edges and names that now exist - one
 opt-in module at a time. A decompiler is not on the list: the well-known one is proprietary, and
 "we ported it" would not be true.
 
@@ -380,7 +383,7 @@ destination sits at or below its source - the loop - and a block with no predece
 entry is counted `unreached`, which in compiler output is alignment padding and in a truncated window is
 a block whose other half the caller did not hand over.
 
-The fixture for this one is `scripts/make-cfg-fixture.py`: `clang -c` writes a function with a guard, a
+The fixture for the graph is `scripts/make-cfg-fixture.py`: `clang -c` writes a function with a guard, a
 loop and a three-way branch, and `objdump -d` reads it back, so every address and every branch target in
 the expected rows is another program's answer. The block boundaries themselves are this lab's rule applied
 to objdump's listing - objdump has no notion of a basic block - so what the test proves is that the module
@@ -394,6 +397,25 @@ rows now say which blocks nothing reaches, but they do not remove them. And a ca
 object - where the linker has not filled the displacement in yet - means the instruction *after* the
 call; `objdump -d` splits those same bytes at its symbol table instead, which a window of instructions
 does not have. The page therefore says how many functions it found, and shows the rows.
+
+Names are the fourth thing an analyser does, and they are what closes that last gap: the symbol table a
+window of instructions does not carry is exactly what the analysis module reads, so a name is looked up
+in the file rather than guessed from the bytes. It lives there rather than in the disassembler because
+a name is a fact about the file and not about an instruction. `name_at(address)` answers out of an index
+built while the symbol tables were being listed - every symbol the file says lives in a section, minus
+the two kinds that do not own an address: a **section** symbol names a range (and an object file has one
+per section, all of them at offset zero), and a **file** symbol names a compilation unit.
+`test/fixtures/answer.obj` is the witness, and it is a strict one: eleven symbols are listed, four of
+them report address 0 - `.text`, `@feat.00`, the file record and `answer` itself - and only `answer` is
+allowed to win that address, so the lookup says `answer` at 0, `answer+0x5` five bytes in, `helper` at
+0x10 and `helper+0x9` at the call site, which is what `objdump -d` prints for those same four bytes. The
+offset form is objdump's hex spelling rather than IDA's decimal one so the row can be diffed against the
+listing it was checked against. What the lookup does *not* do is bound a name to its size: a COFF symbol
+carries no size unless the compiler wrote an aux record, so the nearest name below an address wins
+however far below it is - which is objdump's rule too, and is why the page prints how many addresses are
+named rather than implying every byte of a section belongs to something. For a function entry the file
+does not name, the page synthesises IDA's `sub_<hex>` label and marks it `合成` in its own column: an
+invented name and one read out of the file must never look alike.
 
 ## Reproduce
 

@@ -70,7 +70,7 @@ function stubElf() {
 
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
-    'abi_version', 'self_test']) {
+    'names_count', 'name_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -94,6 +94,31 @@ test('a file that is not an object file is refused', () => {
   const { rc } = report(new TextEncoder().encode('this is a text file, not a binary'));
   assert.equal(rc, -2);
   assert.equal(ex.analyse_count(), 0, 'a refusal leaves no rows behind');
+  assert.equal(ex.names_count(), 0, 'a refusal leaves no names behind either');
+});
+
+test('an address answers with the name objdump prints beside the instruction', async () => {
+  // The base module's COFF reader was proved against this same object, whose objdump listing is
+  // frozen in test/fixtures/coff.probe.json: `answer` at 0, `helper` at 16, and the call at 19
+  // annotated `<helper+0x9>`. An object file is what the analyser hands the disassembler for one
+  // fetch, so the two bases have to be the same numbers - and they are, because a section of an
+  // object has no virtual address yet and a symbol's value is already its offset in one.
+  const bytes = new Uint8Array(await readFile('test/fixtures/answer.obj'));
+  const { rc, rows } = report(bytes);
+  assert.equal(rc, 0, `a clang -c object came back refused: ${rows[0]}`);
+  assert.match(rows[0], /^file\tcoff\b/, rows[0]);
+  assert.match(rows[0], /\tkind\trelocatable\t/, 'an object file is not a rejected input');
+  assert.equal(ex.names_count(), 2, `eleven symbols listed, two of them own an address: ${rows.join(' | ')}`);
+  assert.equal(text('name_at', 0n), 'answer');
+  assert.equal(text('name_at', 5n), 'answer+0x5');
+  assert.equal(text('name_at', 16n), 'helper');
+  assert.equal(text('name_at', 19n), 'helper+0x9');
+  assert.equal(text('name_at', -1n), '', 'a negative address is not an address');
+
+  // A file with no symbol table has no names, so a panel can say "no names" rather than guess.
+  report(stubElf());
+  assert.equal(ex.names_count(), 0);
+  assert.equal(text('name_at', 0n), '');
 });
 
 test('a distribution binary comes through the same ABI', async () => {
@@ -121,7 +146,8 @@ test('a distribution binary comes through the same ABI', async () => {
 test('the base module the page always downloads carries none of this', async () => {
   if (!basePath) return;
   const base = await instantiate(basePath);
-  for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'self_test']) {
+  for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
+    'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
