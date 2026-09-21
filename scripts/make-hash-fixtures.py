@@ -336,6 +336,10 @@ def through_pyelftools(path):
 # --------------------------------------------------------------------------------------- the agreements
 def rows(walked, by_index, dynsym_count, bits):
     tables = [one for one in walked if "broken" not in one]
+    if not tables and not [one for one in walked if "broken" in one]:
+        # Nothing to say and no refusal to explain: the same answer a PE, an object file and a note-less
+        # ELF give, so a panel does not show a table of zeroes for a file that has no table at all.
+        return []
     head = ["hash", "tables	%d" % len(tables), "dynsym	%d" % dynsym_count, "bits	%d" % bits,
             "gnu	%d" % len([one for one in tables if one["section"] == GNU_SECTION]),
             "sysv	%d" % len([one for one in tables if one["section"] == SYSV_SECTION])]

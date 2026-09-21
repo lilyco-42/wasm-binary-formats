@@ -301,9 +301,7 @@
  },
  "lab.elf": {
   "hash": false,
-  "rows": [
-   "hash\ttables\t0\tdynsym\t0\tbits\t64\tgnu\t0\tsysv\t0"
-  ],
+  "rows": [],
   "tables": 0
  },
  "lab.so": {

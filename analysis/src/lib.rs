@@ -3174,6 +3174,12 @@ fn hash_rows(raw: &[u8]) -> Vec<String> {
             bits: if table.wide { 64 } else { 32 },
         });
     }
+    // Nothing to say and no refusal to explain: an ELF with no hash table answers with no rows at all,
+    // which is the same answer a PE, an object file and a static executable give, so a panel never shows
+    // a table of zeroes for a file that has no table.
+    if sheets.is_empty() && broken.is_empty() {
+        return Vec::new();
+    }
     let mut head = vec![
         "hash".to_owned(),
         format!("tables\t{}", sheets.len()),
