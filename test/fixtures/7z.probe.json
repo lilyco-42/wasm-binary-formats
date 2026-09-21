@@ -21,6 +21,33 @@
    "walked\tend"
   ]
  },
+ "libarchive.7z": {
+  "bytes": 252,
+  "py7zr": [
+   [
+    ".",
+    0
+   ],
+   [
+    "./answer.txt",
+    10
+   ],
+   [
+    "./sub",
+    0
+   ],
+   [
+    "./sub/note.bin",
+    12
+   ]
+  ],
+  "rows": [
+   "7z\t252\tbroken\t0\tversion\t0.3\tpacked\t186\theader\tat\t218\tlen\t34\tkind\tencoded",
+   "crc\tstart\t18a8e7ca\tok\theader\t5e4b942e\tok",
+   "note\tthe header is itself a compressed stream, so only the envelope is read",
+   "walked\tend"
+  ]
+ },
  "plain.7z": {
   "bytes": 191,
   "py7zr": [

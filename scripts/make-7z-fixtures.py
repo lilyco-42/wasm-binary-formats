@@ -2,8 +2,7 @@
 """Write the 7z fixtures and print the rows a reader has to reproduce.
 
 `sevenzip` is magika's label for `.7z`, it has no Kaitai spec, and py7zr 1.1.3 is installed here as both
-producer and witness. Two archives are committed because the format has two shapes that a reader has to
-tell apart before it can say anything at all:
+producer and witness. Three archives are committed:
 
   * `encoded.7z` - what 7-Zip and every tool on this host write. `py7zr` compresses the *header* with its
     own filter (`DEFAULT_FILTERS.ENCODED_HEADER_FILTER`, LZMA2 preset 7) no matter which filters the
@@ -12,6 +11,11 @@ tell apart before it can say anything at all:
   * `plain.7z` - `set_encoded_header_mode(False)`, which writes the property tree in the open, starting
     with 0x01 (kHeader). The names are readable in it, which is what the next round on this format is
     about; this round only establishes where the header is and whether it is the walkable kind.
+  * `libarchive.7z` - written by **a second, unrelated program**: the `bsdtar` 3.8.4 that ships with
+    Windows (`--format=7zip`). It reports format version 0.3 rather than 0.4, packs differently, and
+    still starts its header with 0x17, so the envelope rows describe the format rather than one
+    library's habits. py7zr lists this archive's members without bsdtar having written it, and bsdtar
+    agrees with the list; the two member lists are compared before the fixture is kept.
 
 What the reader *can* always do is check the format against itself, and that is what these rows carry:
 the signature, the version pair, the start header's CRC over bytes 12..32, and the header block's own CRC
@@ -31,6 +35,8 @@ Usage: temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py
 import io
 import json
 import os
+import shutil
+import subprocess
 import struct
 import sys
 import zlib
@@ -60,9 +66,19 @@ ENVELOPE_NOTE = {
     "encoded": "note\tthe header is itself a compressed stream, so only the envelope is read",
 }
 
-TARGETS = [("encoded.7z", True), ("plain.7z", False)]
+TARGETS = [("encoded.7z", True), ("plain.7z", False), ("libarchive.7z", None)]
 MEMBER = "answer.txt"
 PAYLOAD = b"answer 42\n" * 8
+# Windows ships this one, and it is a different codebase from py7zr, so the third fixture is written by a
+# second producer rather than by a second flag on the first.
+SYSTEM_TAR = os.path.join(os.environ.get("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+
+
+def run(command):
+    made = subprocess.run(command, capture_output=True, shell=False)
+    if made.returncode != 0:
+        raise SystemExit("{} failed: {}".format(" ".join(command), made.stderr[:200]))
+    return made.stdout.decode("latin1")
 
 
 def read_uint64(data, at):
@@ -101,6 +117,8 @@ def check_codec():
 
 
 def write_fixture(label, encoded_header):
+    if encoded_header is None:
+        return write_libarchive(label)
     os.makedirs(SCRATCH, exist_ok=True)
     source = os.path.join(SCRATCH, MEMBER)
     with open(source, "wb") as handle:
@@ -115,6 +133,35 @@ def write_fixture(label, encoded_header):
     data = open(target, "rb").read()
     listed = [(info.filename, info.uncompressed) for info in py7zr.SevenZipFile(target, "r").list()]
     py7zr.SevenZipFile(target, "r").close()
+    return data, listed
+
+
+def write_libarchive(label):
+    """The second producer, which is also the second opinion.
+
+    bsdtar writes 7z version 0.3 where py7zr writes 0.4, and it lays the header out differently, so the
+    envelope rows stop being a description of one library's habits. The archive is then listed by *both*
+    readers - `py7zr`, which did not write it, and bsdtar itself - and the two member lists have to agree
+    before the fixture is committed at all."""
+    if not os.path.exists(SYSTEM_TAR):
+        raise SystemExit("{}: no system tar at {}".format(label, SYSTEM_TAR))
+    tree = os.path.join(SCRATCH, "tree")
+    shutil.rmtree(tree, ignore_errors=True)
+    os.makedirs(os.path.join(tree, "sub"))
+    with open(os.path.join(tree, MEMBER), "wb") as handle:
+        handle.write(b"answer 42\n")
+    with open(os.path.join(tree, "sub", "note.bin"), "wb") as handle:
+        handle.write(b"\x00\x01\x02\x03 binary\n")
+    target = os.path.join(SCRATCH, label)
+    if os.path.exists(target):
+        os.remove(target)
+    run([SYSTEM_TAR, "-cf", target, "--format=7zip", "-C", tree, "."])
+    data = open(target, "rb").read()
+    listed = sorted((info.filename, info.uncompressed) for info in py7zr.SevenZipFile(target, "r").list())
+    bsd = sorted((line.strip().rstrip("/") or ".") for line in run([SYSTEM_TAR, "-tf", target]).splitlines())
+    mine = sorted((name.rstrip("/") or ".") for name, _size in listed)
+    if bsd != mine:
+        raise SystemExit("the two readers disagree about the member list: {} vs {}".format(bsd, mine))
     return data, listed
 
 

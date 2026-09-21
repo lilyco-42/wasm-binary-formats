@@ -1,11 +1,12 @@
 //! 7z, read as an envelope: what the archive says about itself, and whether its own bytes agree.
 //!
 //! `test/fixtures/encoded.7z` and `test/fixtures/plain.7z` are written by py7zr 1.1.3 with a COPY
-//! filter, the second with `set_encoded_header_mode(False)`; `scripts/make-7z-fixtures.py` then lists
-//! the member back out of each archive and refuses to write its probe unless both CRCs recompute - the
-//! start header's over bytes 12..32 and the header block's over the bytes the offset points at. Every
-//! number below is one of those two recomputations, so the two `ok` states are the archive agreeing
-//! with itself rather than this reader's opinion about it.
+//! filter, the second with `set_encoded_header_mode(False)`; `test/fixtures/libarchive.7z` is written by
+//! the `bsdtar` 3.8.4 that ships with Windows. `scripts/make-7z-fixtures.py` lists the members back out
+//! of each archive - including the one py7zr did not write - and refuses to write its probe unless both
+//! CRCs recompute: the start header's over bytes 12..32 and the header block's over the bytes the offset
+//! points at. Every number below is one of those two recomputations, so the two `ok` states are the
+//! archive agreeing with itself rather than this reader's opinion about it.
 //!
 //! What the reader does not do is the point of the second fixture. File names live inside the header's
 //! property tree, and in the default shape that tree is itself a compressed stream; in the plain shape
@@ -62,6 +63,16 @@ fn reads_the_envelope_py7zr_wrote_and_verified() {
         "note\tthe header is a property tree, and reaching its names needs the streams-info walk"
     );
     assert_eq!(plain[3], "walked\tend");
+
+    // The third archive is not from py7zr at all: `bsdtar` 3.8.4 writes version 0.3 and packs the same
+    // two members into a different envelope, so the rows above are checked against a second producer.
+    let bsd = rows(&fixture("libarchive.7z"));
+    assert_eq!(
+        bsd[0],
+        "7z\t252\tbroken\t0\tversion\t0.3\tpacked\t186\theader\tat\t218\tlen\t34\tkind\tencoded"
+    );
+    assert_eq!(bsd[1], "crc\tstart\t18a8e7ca\tok\theader\t5e4b942e\tok");
+    assert_eq!(bsd[3], "walked\tend");
 }
 
 #[test]

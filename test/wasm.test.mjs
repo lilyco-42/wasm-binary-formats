@@ -330,7 +330,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['preview.eps', 46], ['plain.ps', 46],
     ['answer.obj', 47], ['i686.obj', 47],
     ['rsa.crt', 48], ['ec.crt', 48],
-    ['encoded.7z', 49], ['plain.7z', 49],
+    ['encoded.7z', 49], ['plain.7z', 49], ['libarchive.7z', 49],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -698,6 +698,17 @@ test('a 7z archive is checked against its own two CRCs, in both header shapes', 
   assert.equal(plain.rows[1], 'crc\tstart\t3d002d1f\tok\theader\tca020180\tok');
   assert.equal(plain.rows[2], 'note\tthe header is a property tree, and reaching its names needs the streams-info walk');
   assert.equal(plain.rows[3], 'walked\tend');
+
+  // A second producer, because two files from one library are one library's opinion. `bsdtar` 3.8.4 - the
+  // libarchive that ships with Windows - writes format version 0.3 with its own packing, py7zr lists the
+  // members of the archive it did not write, and the envelope still reads the same way.
+  const bsd = assertReadable('container', 'libarchive.7z', 49);
+  assert.deepEqual(bsd.rows, [
+    '7z\t252\tbroken\t0\tversion\t0.3\tpacked\t186\theader\tat\t218\tlen\t34\tkind\tencoded',
+    'crc\tstart\t18a8e7ca\tok\theader\t5e4b942e\tok',
+    'note\tthe header is itself a compressed stream, so only the envelope is read',
+    'walked\tend',
+  ]);
 
   // A file that cannot hold the header it promises is still a 7z, and says so without printing a CRC
   // for bytes that are not there.
