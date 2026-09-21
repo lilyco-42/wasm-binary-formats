@@ -79,7 +79,8 @@ fn a_linked_pdb_lists_the_streams_its_own_directory_holds() {
 }
 
 /// The same table the generator wrote, so the fixture and the probe cannot drift apart: the probe
-/// holds the rows this reader is expected to produce, escaped as JSON text.
+/// holds the rows this reader is expected to produce, escaped as JSON text. The signature is the
+/// linker's timestamp, so it moves whenever `lab.pdb` is regenerated - and then with it, together.
 #[test]
 fn the_probe_and_the_fixture_describe_the_same_file() {
     let probe = String::from_utf8(fixture("pdb.probe.json")).expect("the probe is UTF-8");
