@@ -9,8 +9,9 @@
 //! index is checked against a file whose objdump listing is frozen in this repo.
 
 use apk_lens_analysis::{
-    abi_version, alloc, analyse, dealloc, export_at, export_count, name_for, names_len, region_at,
-    region_count, sample_elf, self_test, string_at, string_count, type_at, type_count,
+    abi_version, alloc, analyse, dealloc, export_at, export_count, import_at, import_count, name_for,
+    names_len, region_at, region_count, sample_elf, self_test, string_at, string_count, type_at,
+    type_count,
 };
 use std::fs;
 
@@ -681,4 +682,73 @@ fn exports_all() -> Vec<String> {
             String::from_utf8(slot).expect("a row is text")
         })
         .collect()
+}
+
+fn imports(name: &str) -> Vec<String> {
+    rows(&fixture(name));
+    let total = import_count();
+    assert!(total > 0, "{name} answered with no imports");
+    let buffer = vec![0u8; 4096];
+    (0..total)
+        .map(|index| {
+            let mut slot = buffer.clone();
+            let written = import_at(index, slot.as_mut_ptr(), slot.len() as i32);
+            assert!(written > 0, "row {index}");
+            slot.truncate(written as usize);
+            String::from_utf8(slot).expect("a row is text")
+        })
+        .collect()
+}
+
+/// `lab.dll` is `csc`'s own output - a .NET library, because that is the one PE this host can produce
+/// with a real import table - and the rows below are `test/fixtures/imports.probe.json`'s, which the
+/// generator writes only after `objdump -x` and `llvm-readobj --coff-imports` both agree with its walk.
+#[test]
+fn a_dll_names_the_dll_and_the_symbol_it_asks_the_loader_for() {
+    assert_eq!(
+        imports("lab.dll"),
+        vec![
+            "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+            "import\tmscoree.dll\tilt\t0x22e4\tiat\t0x2000\tnames\tilt\tstamp\t0\tforward\t0",
+            "thunk\tmscoree.dll\t_CorDllMain\thint\t0\tslot\t0x2000\tname\t0x22f0",
+        ],
+        "one DLL, one name, and the slot the loader will fill in"
+    );
+}
+
+/// The two shapes the compiler would not write, produced by editing its bytes and read back by both
+/// witnesses. An ordinal import has no name to read at all - the number *is* the request - and a
+/// descriptor with no lookup table has to be read out of the address table, which is the same list
+/// before the loader touched it.
+#[test]
+fn an_ordinal_import_and_a_table_with_no_lookup_table_read_the_way_the_readers_do() {
+    assert_eq!(
+        imports("ordinal.dll"),
+        vec![
+            "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+            "import\tmscoree.dll\tilt\t0x22e4\tiat\t0x2000\tnames\tilt\tstamp\t0\tforward\t0",
+            "thunk\tmscoree.dll\t-\tordinal\t12\tslot\t0x2000",
+        ]
+    );
+    assert_eq!(
+        imports("noilt.dll"),
+        vec![
+            "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+            "import\tmscoree.dll\tilt\t0x0\tiat\t0x2000\tnames\tiat\tstamp\t0\tforward\t0",
+            "thunk\tmscoree.dll\t_CorDllMain\thint\t0\tslot\t0x2000\tname\t0x22f0",
+        ],
+        "the name survives, because the address table held it too"
+    );
+}
+
+#[test]
+fn a_file_that_imports_nothing_leaves_both_lists_empty() {
+    rows(&sample_elf());
+    assert_eq!(import_count(), 0, "an ELF's imports are in its dynamic symbol table");
+    assert_eq!(export_count(), 0);
+    rows(&fixture("answer.obj"));
+    assert_eq!(import_count(), 0, "a COFF object imports nothing yet");
+    assert_eq!(exports_all().len(), 0);
+    rows(&fixture("lab.pdb"));
+    assert_eq!(import_count(), 0, "and a database asks the loader for nothing");
 }

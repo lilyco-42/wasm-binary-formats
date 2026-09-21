@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出 / 导入）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。导入表也是 PE 的：按名字要的和按序号要的是两种写法，序号那种压根没有名字可读；文件没给查找表时，名字只能从地址表里读，行里会写明是哪一个。这里只说文件开口要了什么，不去解析也不去加载任何东西。',
   },
   {
     id: 'disasm',
@@ -364,6 +364,30 @@ function appendLists(box, state) {
     box.appendChild(title);
     box.appendChild(table);
   }
+  const asked = importList(state.mod);
+  if (asked && asked.length > 1) {
+    const head = asked[0].split('\t');
+    const title = document.createElement('p');
+    title.textContent = `导入（PE 向加载器要的东西：${field(head, 'dlls')} 个 DLL，共 ${field(head, 'thunks')} 个名字；`
+      + '表在 ' + (field(head, 'section') || '?') + ' ' + (field(head, 'rva') || '?') + '。'
+      + '按序号要的那个没有名字可读，地址表那一格会被加载器就地改写成真实地址：这两件事都写在行里）：';
+    const table = document.createElement('pre');
+    table.textContent = asked.slice(1).map((row) => {
+      const cell = row.split('\t');
+      if (cell[0] === 'cut') return `（导入表比列出来的多，共 ${cell[2]} 项，到这里为止）`;
+      if (cell[0] === 'import') {
+        return `${cell[1]}  ←  名字取自 ${field(cell, 'names')}  `
+          + `ILT ${field(cell, 'ilt')}  IAT ${field(cell, 'iat')}`;
+      }
+      if (cell[2] === '-') {
+        if (cell[3] === 'ordinal') return `    （按序号 ${cell[4]}）  槽 ${field(cell, 'slot')}`;
+        return `    （${cell[3] === 'unmapped' ? '这个名字的地址不在任何节里' : cell[3]}）`;
+      }
+      return `    ${cell[2]}  hint ${field(cell, 'hint')}  槽 ${field(cell, 'slot')}  条目 ${field(cell, 'name')}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+  }
 }
 
 /// The type list, or null when the loaded module does not have it (an older cached build). A file
@@ -418,6 +442,26 @@ function exportList(mod) {
     const room = 512;
     const buffer = mod.alloc(room);
     const written = mod.export_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
+}
+
+/// The import list of a PE, or null when the loaded module does not have it (an older cached build).
+/// Nothing here is resolved or loaded: the rows say which name the file asks for and which slot the
+/// loader would fill in, and that is all the bytes themselves settle.
+function importList(mod) {
+  if (!mod || typeof mod.import_count !== 'function' || typeof mod.import_at !== 'function') {
+    return null;
+  }
+  const total = mod.import_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.import_at(index, buffer, room);
     rows.push(written < 0 ? '' : cString(mod, buffer));
     mod.dealloc(buffer, room);
   }

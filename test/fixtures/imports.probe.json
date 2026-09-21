@@ -1,0 +1,89 @@
+{
+ "lab.dll": {
+  "bytes": 3072,
+  "dlls": [
+   {
+    "chain": 0,
+    "dll": "mscoree.dll",
+    "iat": 8192,
+    "ilt": 8932,
+    "names_from": "ilt",
+    "stamp": 0,
+    "thunks": [
+     {
+      "hint": 0,
+      "name": "_CorDllMain",
+      "ordinal": null,
+      "slot": 8192,
+      "thunk": 8944
+     }
+    ]
+   }
+  ],
+  "plus": false,
+  "rows": [
+   "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+   "import\tmscoree.dll\tilt\t0x22e4\tiat\t0x2000\tnames\tilt\tstamp\t0\tforward\t0",
+   "thunk\tmscoree.dll\t_CorDllMain\thint\t0\tslot\t0x2000\tname\t0x22f0"
+  ],
+  "wide": 4
+ },
+ "noilt.dll": {
+  "bytes": 3072,
+  "dlls": [
+   {
+    "chain": 0,
+    "dll": "mscoree.dll",
+    "iat": 8192,
+    "ilt": 0,
+    "names_from": "iat",
+    "stamp": 0,
+    "thunks": [
+     {
+      "hint": 0,
+      "name": "_CorDllMain",
+      "ordinal": null,
+      "slot": 8192,
+      "thunk": 8944
+     }
+    ]
+   }
+  ],
+  "plus": false,
+  "rows": [
+   "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+   "import\tmscoree.dll\tilt\t0x0\tiat\t0x2000\tnames\tiat\tstamp\t0\tforward\t0",
+   "thunk\tmscoree.dll\t_CorDllMain\thint\t0\tslot\t0x2000\tname\t0x22f0"
+  ],
+  "wide": 4
+ },
+ "ordinal.dll": {
+  "bytes": 3072,
+  "dlls": [
+   {
+    "chain": 0,
+    "dll": "mscoree.dll",
+    "iat": 8192,
+    "ilt": 8932,
+    "names_from": "ilt",
+    "stamp": 0,
+    "thunks": [
+     {
+      "hint": null,
+      "name": null,
+      "ordinal": 12,
+      "slot": 8192,
+      "thunk": null
+     }
+    ]
+   }
+  ],
+  "plus": false,
+  "rows": [
+   "imports\trva\t0x22bc\tbytes\t79\toff\t1212\tsection\t.text\tdlls\t1\tthunks\t1",
+   "import\tmscoree.dll\tilt\t0x22e4\tiat\t0x2000\tnames\tilt\tstamp\t0\tforward\t0",
+   "thunk\tmscoree.dll\t-\tordinal\t12\tslot\t0x2000"
+  ],
+  "wide": 4
+ }
+}

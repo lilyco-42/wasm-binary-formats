@@ -44,6 +44,9 @@ thread_local! {
     /// What a PE hands out: its export directory, one row per slot of the address table. Only a PE has
     /// one, so an ELF or a Mach-O leaves this empty - its exported names are already in the symbol rows.
     static EXPORTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// What a PE asks for instead: its import directory, a row per DLL and a row per name. The other half
+    /// of the same window, and empty for the same reason.
+    static IMPORTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -136,6 +139,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     STRINGS.with(|slot| slot.borrow_mut().clear());
     TYPES.with(|slot| slot.borrow_mut().clear());
     EXPORTS.with(|slot| slot.borrow_mut().clear());
+    IMPORTS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -218,6 +222,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     STRINGS.with(|slot| *slot.borrow_mut() = strings);
     TYPES.with(|slot| *slot.borrow_mut() = types);
     EXPORTS.with(|slot| *slot.borrow_mut() = export_rows(bytes));
+    IMPORTS.with(|slot| *slot.borrow_mut() = import_rows(bytes));
 
     rows.insert(
         0,
@@ -579,6 +584,7 @@ fn pe_kind(name: &str, chars: u64) -> &'static str {
 struct Pe {
     image_base: u64,
     dirs: usize,
+    wide: bool,
     sections: Vec<(u64, u64, u64, String)>,
 }
 
@@ -594,9 +600,10 @@ impl Pe {
         let nsec = half_at(raw, lfanew + 6, true)?;
         let optsz = half_at(raw, lfanew + 20, true)? as usize;
         let opt = lfanew.checked_add(24)?;
-        let plus = half_at(raw, opt, true)? == 0x20b;
-        let dirs = opt.checked_add(if plus { 112 } else { 96 })?;
-        let image_base = if plus {
+        // The optional-header magic, and with it the width of one thunk in the import tables.
+        let wide = half_at(raw, opt, true)? == 0x20b;
+        let dirs = opt.checked_add(if wide { 112 } else { 96 })?;
+        let image_base = if wide {
             addr_at(raw, opt + 24, true, true)?
         } else {
             word_at(raw, opt + 28, true)?
@@ -621,7 +628,7 @@ impl Pe {
             // wider - which is what lets a byte past the declared end still resolve to a section.
             sections.push((vaddr, vsize.max(rawsize), roff, String::from_utf8_lossy(name).into_owned()));
         }
-        Some(Pe { image_base, dirs, sections })
+        Some(Pe { image_base, dirs, wide, sections })
     }
 
     /// Where an RVA lies: a file offset and the section that owns it. `None` is the honest answer for
@@ -776,6 +783,143 @@ fn export_rows(raw: &[u8]) -> Vec<String> {
             offset,
             clean(section)
         ));
+    }
+    rows
+}
+
+/// IDA's Imports window: what a PE asks the loader to hand it, DLL by DLL.
+///
+/// The directory is a run of 20-byte descriptors that ends at an all-zero one, and each one names a DLL,
+/// a table of thunks to look names up in (the ILT), and the table the loader overwrites with the real
+/// addresses (the IAT). A thunk with the high bit set is an import by ordinal and the low sixteen bits
+/// are the number; anything else is the RVA of a two-byte hint and a name. A descriptor with no ILT is
+/// not broken - the names then have to be read out of the IAT, which is the same list before the loader
+/// touched it. Both readers called that out, and the fixtures here hold both shapes.
+fn import_rows(raw: &[u8]) -> Vec<String> {
+    let pe = match Pe::parse(raw) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let (dir_rva, dir_size) = match (word_at(raw, pe.dirs + 8, true), word_at(raw, pe.dirs + 12, true)) {
+        (Some(one), Some(two)) => (one, two),
+        _ => return Vec::new(),
+    };
+    if dir_rva == 0 || dir_size < 20 {
+        return Vec::new();
+    }
+    let (at, section) = match pe.at(dir_rva) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let width = if pe.wide { 8 } else { 4 };
+    let flag = 1u64 << if pe.wide { 63 } else { 31 };
+    let mut detail: Vec<String> = Vec::new();
+    let mut dlls = 0u64;
+    let mut thunks = 0u64;
+    // Two guards against a file whose tables never end, because a browser waits for this walk: a
+    // descriptor array of 256 and a thunk array of 1 024 are both far past any real import table.
+    let mut truncated = false;
+    for step in 0..256u64 {
+        truncated |= step == 255;
+        let base = match at.checked_add(usize::try_from(step * 20).unwrap_or(usize::MAX)) {
+            Some(where_) => where_,
+            None => break,
+        };
+        let (ilt, stamp, chain, name_at, iat) = match (
+            word_at(raw, base, true),
+            word_at(raw, base + 4, true),
+            word_at(raw, base + 8, true),
+            word_at(raw, base + 12, true),
+            word_at(raw, base + 16, true),
+        ) {
+            (Some(one), Some(two), Some(three), Some(four), Some(five)) => (one, two, three, four, five),
+            _ => break,
+        };
+        if (ilt, stamp, chain, name_at, iat) == (0, 0, 0, 0, 0) {
+            break;
+        }
+        let dll = cstr_at(raw, match pe.at(name_at) {
+            Some((where_, _)) => where_,
+            None => break,
+        });
+        dlls += 1;
+        if detail.len() < MAX_LISTED {
+            detail.push(format!(
+                "import\t{}\tilt\t{:#x}\tiat\t{:#x}\tnames\t{}\tstamp\t{}\tforward\t{}",
+                clean(&dll),
+                ilt,
+                iat,
+                if ilt == 0 { "iat" } else { "ilt" },
+                stamp,
+                chain
+            ));
+        }
+        // The loader overwrites the IAT in place, so the ILT is the list to read names from - and when
+        // the file has no ILT, the IAT is the only copy left, which is what `names\tiat` says.
+        let source = if ilt == 0 { iat } else { ilt };
+        for slot in 0..1024u64 {
+            truncated |= slot == 1023;
+            let where_ = match pe.at(source + slot * width) {
+                Some((where_, _)) => where_,
+                None => break,
+            };
+            let value = if pe.wide {
+                match addr_at(raw, where_, true, true) {
+                    Some(found) => found,
+                    None => break,
+                }
+            } else {
+                match word_at(raw, where_, true) {
+                    Some(found) => found,
+                    None => break,
+                }
+            };
+            if value == 0 {
+                break;
+            }
+            thunks += 1;
+            if detail.len() >= MAX_LISTED {
+                continue;
+            }
+            if value & flag != 0 {
+                detail.push(format!(
+                    "thunk\t{}\t-\tordinal\t{}\tslot\t{:#x}",
+                    clean(&dll),
+                    value & 0xffff,
+                    iat + slot * width
+                ));
+                continue;
+            }
+            let entry = match pe.at(value) {
+                Some((where_, _)) => where_,
+                None => {
+                    detail.push(format!(
+                        "thunk\t{}\t-\tunmapped\tslot\t{:#x}",
+                        clean(&dll),
+                        iat + slot * width
+                    ));
+                    continue;
+                }
+            };
+            let hint = half_at(raw, entry, true).unwrap_or(0);
+            detail.push(format!(
+                "thunk\t{}\t{}\thint\t{}\tslot\t{:#x}\tname\t{:#x}",
+                clean(&dll),
+                clean(&cstr_at(raw, entry + 2)),
+                hint,
+                iat + slot * width,
+                value
+            ));
+        }
+    }
+    let planned = dlls + thunks;
+    let mut rows = vec![format!(
+        "imports\trva\t{:#x}\tbytes\t{}\toff\t{}\tsection\t{}\tdlls\t{}\tthunks\t{}",
+        dir_rva, dir_size, at, clean(section), dlls, thunks
+    )];
+    rows.append(&mut detail);
+    if truncated || planned as usize > rows.len() - 1 {
+        rows.push(format!("cut\timports\t{planned}"));
     }
     rows
 }
@@ -1539,6 +1683,25 @@ pub extern "C" fn export_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     EXPORTS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many import rows the last file produced, including its totals row.
+#[no_mangle]
+pub extern "C" fn import_count() -> i32 {
+    IMPORTS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: `import` and then the DLL, or `thunk` with the DLL, the name (or `-` and an ordinal) and the
+/// address-table slot the loader fills in. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn import_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    IMPORTS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

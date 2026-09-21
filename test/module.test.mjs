@@ -71,7 +71,8 @@ function stubElf() {
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
-    'type_count', 'type_at', 'export_count', 'export_at', 'abi_version', 'self_test']) {
+    'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
+    'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -151,7 +152,7 @@ test('the base module the page always downloads carries none of this', async () 
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
-    'export_count', 'export_at', 'self_test']) {
+    'export_count', 'export_at', 'import_count', 'import_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -328,4 +329,31 @@ test('a DLL hands out the exports both readers say it does', async () => {
   // over from the DLL that was read a moment before.
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.export_count(), 0, 'an object file hands out nothing');
+});
+
+test('the imports a loader will fill in come through as the readers spell them', async () => {
+  // Three files, one producer: `csc.exe` wrote `lab.dll`, and the other two are its bytes with one
+  // u32 changed - the lookup-table entry, to ask for ordinal 12 instead of a name; and the
+  // descriptor's lookup-table pointer, to leave only the address table behind.
+  // `scripts/make-import-fixtures.py` refuses to write the probe unless `objdump -x` and
+  // `llvm-readobj --coff-imports` agree with its own walk on all three, so what is asserted below is
+  // what the two readers say about those bytes, not what this module chose to say first.
+  const probe = JSON.parse(await readFile('test/fixtures/imports.probe.json', 'utf8'));
+  for (const file of ['lab.dll', 'ordinal.dll', 'noilt.dll']) {
+    const want = probe[file].rows;
+    assert.equal(want.length, 3, `${file} lost rows: ${want.length}`);
+    const seen = report(new Uint8Array(await readFile(`test/fixtures/${file}`)));
+    assert.equal(seen.rc, 0, `${file} has to be accepted`);
+    assert.equal(ex.import_count(), want.length, `${file}: a different number of import rows`);
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(text('import_at', index), want[index], `${file} row ${index} moved`);
+    }
+  }
+  // The difference between the three files is one field each, and the rows show it: the same name read
+  // out of the other table, and an ordinal with no name to read at all.
+  assert.match(probe['noilt.dll'].rows[1], /\tilt\t0x0\tnames\tiat\b/);
+  assert.match(probe['ordinal.dll'].rows[2], /^thunk\tmscoree\.dll\t-\tordinal\t12\tslot\t0x2000$/);
+  assert.ok(!probe['ordinal.dll'].rows[2].includes('_CorDllMain'), 'an ordinal import has no name');
+  report(new Uint8Array(await readFile('test/fixtures/exp.dll')));
+  assert.equal(ex.import_count(), 0, 'a DLL that hands out names need not ask for any');
 });

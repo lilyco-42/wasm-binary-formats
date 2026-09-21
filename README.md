@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 124 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, and the export table a PE image keeps |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, and the export and import tables a PE image keeps |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -352,6 +352,21 @@ come first). `scripts/make-export-fixtures.py` walks the bytes a third time and 
 probe unless all three agree, so the eight rows the tests assert are the linkers' and the readers', and
 never a transcription of this one's. An ELF, a Mach-O or a COFF object answers with no rows: their names
 are already in the symbol list, and inventing an export directory for them is not this reader's job.
+
+**The import list** (`import_count` / `import_at`) is the other half of that window, and it needed a
+different producer: `lld-link` cannot write an import table on this host at all, because there is no
+Windows import library, no mingw sysroot and no SDK anywhere on it, so a call into `kernel32` has nothing
+to resolve against. `csc.exe` does write one - a .NET assembly always imports its runtime host - which
+also handed the reader a PE32 to go with the export fixture's PE32+, so the two directory bases
+(`opt+96` and `opt+112`) and the two thunk widths are both covered by committed files. Two shapes a
+compiler would not produce were made by changing one `u32` each and asking both readers what they now
+said: setting the high bit of a lookup-table entry (the low sixteen bits are the ordinal, and there is no
+name to read at all - `12` is this patch's number, not a real `mscoree` ordinal), and zeroing a
+descriptor's lookup-table pointer, which leaves the address table as the only copy of the names and is
+what the `names	iat` column reports. Both readers agreed with the walk on all three files before the
+probe was written. What the rows do not do: no name is resolved, no bound-import table is read (entry 11
+is empty in every file here), and delay-loaded imports - a different directory, a different structure -
+are not looked at, so a file whose only imports are delay imports reads as importing nothing.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -522,6 +537,7 @@ temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + l
 temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
 temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
 temp/venv/Scripts/python.exe scripts/make-export-fixtures.py     # lld-link writes test/fixtures/exp.dll with an aliased, a nameless, an empty and a forwarded export; llvm-readobj --coff-exports and objdump -x must both agree with the byte walk before the probe is written
+temp/venv/Scripts/python.exe scripts/make-import-fixtures.py     # csc.exe writes test/fixtures/lab.dll (the only PE this host can make with a real import table); ordinal.dll and noilt.dll are its bytes with one u32 changed, and both readers have to read the patched shape the same way
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
