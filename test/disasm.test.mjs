@@ -176,9 +176,11 @@ function cfg(code, pc, arch) {
 }
 
 test('a conditional branch gives a block two successors, which no linear walk can find', () => {
-  // jne +2 at 0x3000 targets the ret at 0x3004, so the nop at 0x3002 is reached only by falling through
-  // and the block that ends at 0x3002 closes because 0x3004 is a leader: three blocks, three arrows.
-  const { rc, rows } = cfg(new Uint8Array([0x75, 0x02, 0x90, 0xc3]), 0x3000, 0);
+  // jne +2 at 0x3000 resolves against the end of its own bytes, so it targets the ret at 0x3004 and the
+  // two nops in between are reached only by falling through. The window has to be five bytes: with one
+  // nop the ret sits at 0x3003 and the branch's target is outside the code in hand, which is the wrong
+  // test by exactly one byte. Three blocks, and three arrows out of them.
+  const { rc, rows } = cfg(new Uint8Array([0x75, 0x02, 0x90, 0x90, 0xc3]), 0x3000, 0);
   assert.equal(rc, 3, rows.join(' | '));
   assert.equal(rows[0], 'edge\t0\tfrom\t0x3000\tto\t0x3004\tkind\ttaken\tback\tno');
   assert.equal(rows[1], 'edge\t1\tfrom\t0x3000\tto\t0x3002\tkind\tfall\tback\tno');

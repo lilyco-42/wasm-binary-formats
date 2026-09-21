@@ -744,9 +744,11 @@ int self_test(void) {
   }
   /* A conditional branch is the smallest window whose graph is not a line: the taken edge and the
    * fallthrough both leave this block, and a pass that merely walks bytes cannot produce the pair.
-   * `jne +2` at 0x3000 lands on the ret at 0x3004, so the nop at 0x3002 is reached only by falling
-   * through - three edges over three blocks. */
-  static const uint8_t branch[] = {0x75, 0x02, 0x90, 0xc3};
+   * `jne +2` at 0x3000 resolves against the end of its own two bytes, so it lands on the ret at
+   * 0x3004 - two nops in between, which the taken edge skips over and the fallthrough walks through.
+   * Three blocks, three arrows, and the window has to be five bytes: with one nop the ret sits at
+   * 0x3003, the branch points at 0x3004, and the target is a byte outside the code in hand. */
+  static const uint8_t branch[] = {0x75, 0x02, 0x90, 0x90, 0xc3};
   int arrows = disasm_cfg(branch, sizeof(branch), 0x3000, 0);
   if (arrows != 3 || strstr(rows[0], "kind\ttaken") == NULL || strstr(rows[0], "to\t0x3004") == NULL) {
     return -9;
