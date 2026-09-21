@@ -14,6 +14,7 @@ Needs clang, lld-link and llvm-pdbutil on PATH. Compiled outside any profile: LL
 records the linker's command line and the module's source path inside the PDB.
 """
 
+import importlib.util
 import json
 import os
 import re
@@ -50,6 +51,16 @@ KNOWN = {0: ("old-msf-directory", "Old MSF Directory"),
 # interpretation, and the first draft's guess at one failed against this witness.
 PRESENT = [(1, "pdb"), (2, "tpi"), (3, "dbi"), (4, "ipi")]
 SUMMARY_FLAG = {"tpi": "types", "dbi": "debug info", "ipi": "ids"}
+
+
+def codeview():
+    """The CodeView leaf reader from `make-codeview-fixtures.py`, so the TPI records of a PDB are
+    decoded by exactly the walk whose layout was proved against an object stream."""
+    spec = importlib.util.spec_from_file_location(
+        "cv", os.path.join(HERE, "make-codeview-fixtures.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def run(cmd, cwd=None):
@@ -194,9 +205,28 @@ def count_records(body):
     return records, at
 
 
+def tpi_records(body, facts):
+    """Every record of the TPI stream, decoded by the walk whose layout was proved against an object
+    stream in `make-codeview-fixtures.py`: the index base and the record range come out of the TPI
+    header, which is why the same reader answers both files."""
+    cv = codeview()
+    records = []
+    at = facts["header"]
+    stop = facts["header"] + facts["total"]
+    index = facts["first"]
+    while at + 4 <= stop:
+        length, leaf = struct.unpack_from("<HH", body, at)
+        if length < 4 or at + length + 2 > stop:
+            break
+        records.append(cv.decode(index, leaf, body[at + 4:at + 2 + length], at, length + 2))
+        at += length + 2
+        index += 1
+    return records
+
+
 def witness(work):
     text = run(["llvm-pdbutil", "dump", "--summary", "--streams", "--stream-blocks",
-                "--type-stats", os.path.join(work, "lab.pdb")])
+                "--type-stats", "--types", os.path.join(work, "lab.pdb")])
     summary = {
         "page": number(text, r"Block Size:\s*(\d+)"),
         "blocks": number(text, r"Number of blocks:\s*(\d+)"),
@@ -315,6 +345,13 @@ def main():
         mine = present(container, index)
         if mine != flags[flag]:
             problems.append("has %s: ours %s, witness %s" % (name, mine, flags[flag]))
+    # The records inside the TPI stream, decoded by the object-stream walk and checked against the
+    # same witness: this is the row set the analysis module has to reproduce for a .pdb.
+    cv = codeview()
+    trecords = tpi_records(gather(raw, container, 2), tpiFacts)
+    tprimitives = cv.primitives_from(text)
+    typerows = cv.rows_for(trecords, tprimitives, tpiFacts["header"])
+    problems += cv.cross_check(trecords, text.splitlines())
     if problems:
         raise SystemExit("our reading and llvm-pdbutil disagree:\n  " + "\n  ".join(problems[:8]))
     shutil.copyfile(os.path.join(work, "lab.pdb"), os.path.join(FIX, "lab.pdb"))
@@ -322,6 +359,9 @@ def main():
         "lab.pdb": {
             "bytes": os.path.getsize(os.path.join(FIX, "lab.pdb")),
             "rows": rows,
+            "types": {"records": len(trecords), "primitives": dict(
+                (("0x%x" % k), v) for k, v in sorted(tprimitives.items())),
+                "rows": typerows},
             "witness": [line for line in text.splitlines() if line.strip()],
         }
     }

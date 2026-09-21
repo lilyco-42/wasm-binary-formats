@@ -340,7 +340,7 @@ def summarise(records):
 def rows_for(records, primitives, header):
     """The rows the Rust reader has to print, generated from the same decoded
     records so the two cannot disagree about a layout by accident."""
-    out = ["types\t%d\theader\t%d" % (len(records), records and 4 or 0)]
+    out = ["types\t%d\theader\t%d" % (len(records), header)]
     for each in records:
         index = "0x%x" % each["index"]
         kind = each["kind"]
