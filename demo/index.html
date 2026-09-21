@@ -651,13 +651,21 @@ function appendLists(box, state) {
     return rows;
   }
   const fixups = relocList(state.mod);
+  const fixupHead = field((fixups && fixups[0]) ? fixups[0].split('\t') : [], 'kind') === 'dyn';
   const halted = field((fixups && fixups[0]) ? fixups[0].split('\t') : [], 'stopped');
   if (fixups && (fixups.length > 1 || halted)) {
     const head = fixups[0].split('\t');
     const title = document.createElement('p');
-    title.textContent = `基址重定位（加载器要把哪些地址改写：目录在 ${field(head, 'section') || '?'} `
+    // One window, two shapes: a PE is told where its fixups are by a data directory of page blocks, an
+    // ELF by one table per section, and the totals row says which of the two it is.
+    title.textContent = fixupHead
+      ? `重定位（ELF 没有目录，只有一张张表：${field(head, 'tables')} 张、共 ${field(head, 'entries')} 条修补，`
+        + `其中 ${field(head, 'symbolic')} 条写着要改哪个符号、${field(head, 'relative')} 条只写「加载地址 + addend」，`
+        + `没有符号可指。机器 ${field(head, 'machine')}、${field(head, 'bits')} 位 —— 同一个类型号在 x86-64 和 i386 下`
+        + '是两个名字，所以名字按机器配，没在这两份文件里一起见过的只给号：'
+      : `基址重定位（加载器要把哪些地址改写：目录在 ${field(head, 'section') || '?'} `
       + `${field(head, 'dir') || '?'}，${field(head, 'bytes') || '?'} 字节，`
-      + `${field(head, 'blocks')} 个页块、${field(head, 'entries')} 条修补。`
+      + `${field(head, 'blocks') || 0} 个页块、${field(head, 'entries') || 0} 条修补。`
       + '类型号的名字只写两个读者在同一份文件里一起见过的那几个，没见过的就只给号；'
       + '读到文件自己说不通的地方就停下，并说是哪儿说不通'
       + (halted ? `），这回停在「${halted}」：` : '）：');
@@ -669,6 +677,17 @@ function appendLists(box, state) {
         if (cell[0] === 'cut') return `（修补比列出来的多，共 ${cell[2]} 条，到这里为止）`;
         if (cell[0] === 'block') {
           return `  页 ${field(cell, 'page')}  块长 ${field(cell, 'size')}  条数 ${field(cell, 'entries')}`;
+        }
+        if (cell[0] === 'table') {
+          return `  表 ${cell[1]}  ${field(cell, 'entries')} 条  每条 ${field(cell, 'slot_bytes')} 字节  `
+            + `自带加数 ${field(cell, 'addend') === 'yes' ? '是' : '否'}`;
+        }
+        if (fixupHead) {
+          const kind = field(cell, 'name');
+          const sym = field(cell, 'sym');
+          return `    ${cell[1]}  ${kind === '-' ? '类型 ' + field(cell, 'type') : kind}`
+            + `  符号 ${sym === '-' ? '没有' : sym}  addend ${field(cell, 'addend')}`
+            + `  ${field(cell, 'section')}`;
         }
         return `    ${cell[1]}  ${field(cell, 'name') || '类型 ' + field(cell, 'type')}`
           + `  文件偏移 ${field(cell, 'off')}  ${field(cell, 'section')}`;
