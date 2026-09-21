@@ -70,8 +70,8 @@ fn a_linked_pdb_lists_the_streams_its_own_directory_holds() {
             "has\ttpi\tyes",
             "has\tdbi\tyes",
             "has\tipi\tyes",
-            "header\tpdb\tversion\t20000404\tsignature\t1921718505\tage\t1",
-            "guid\te9188b72e8e4010b4c4c44205044422e",
+            "header\tpdb\tversion\t20000404\tsignature\t4202143942\tage\t1",
+            "guid\tc6a077faf192b9fc4c4c44205044422e",
             "features\t0x11",
             "tpi\tversion\t20040203\theader\t56\ttypes\t0x1000..0x100a\tbytes\t212",
         ]
@@ -87,7 +87,7 @@ fn the_probe_and_the_fixture_describe_the_same_file() {
     for want in [
         "container\\tpdb\\t7.00\\tblock\\t4096\\tpages\\t18",
         "stream\\t2\\tsize\\t268\\tblocks\\t1\\tname\\ttpi",
-        "header\\tpdb\\tversion\\t20000404\\tsignature\\t1921718505\\tage\\t1",
+        "header\\tpdb\\tversion\\t20000404\\tsignature\\t4202143942\\tage\\t1",
         "tpi\\tversion\\t20040203\\theader\\t56\\ttypes\\t0x1000..0x100a\\tbytes\\t212",
     ] {
         assert!(probe.contains(want), "the probe lost {want:?}");
