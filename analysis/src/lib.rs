@@ -208,6 +208,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     IMPORTS.with(|slot| slot.borrow_mut().clear());
     DEMANGLED.with(|slot| slot.borrow_mut().clear());
     RELOCS.with(|slot| slot.borrow_mut().clear());
+    FUNCTIONS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -220,6 +221,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
     let mut mangled: Vec<String> = Vec::new();
+    let mut funcs: Vec<(u64, u64, String, String)> = Vec::new();
     let mut types: Vec<String> = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
@@ -258,6 +260,28 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     // Two tables, because a distribution binary is usually stripped: `.symtab` may be empty while
     // every import and export is still in `.dynsym`. Reading only the first would report a real
     // program as having no symbols at all.
+    // A function the file names for itself, and where. A symbol has to say `function`, be defined, and
+    // own a section: an import's address is a slot the loader fills rather than a body, and a section
+    // symbol names a range rather than a point.
+    fn function_pair<'data, T: ObjectSymbol<'data>>(
+        file: &object::File<'_>,
+        symbol: &T,
+    ) -> Option<(u64, u64, String, String)> {
+        if !matches!(symbol.kind(), SymbolKind::Text) || symbol.is_undefined() {
+            return None;
+        }
+        let id = symbol.section_index()?;
+        let raw = clean(symbol.name().unwrap_or(""));
+        if raw.trim().is_empty() {
+            return None;
+        }
+        let where_ = file
+            .section_by_index(id)
+            .ok()
+            .map_or_else(|| id.0.to_string(), |one| clean(one.name().unwrap_or("?")));
+        Some((symbol.address(), symbol.size(), where_, raw))
+    }
+
     for (index, symbol) in file.symbols().enumerate() {
         symbols += 1;
         if index < MAX_LISTED {
@@ -267,6 +291,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         // too long to read as a list.
         named.extend(name_pair(&symbol));
         mangled.extend(mangled_name(&symbol));
+        funcs.extend(function_pair(&file, &symbol));
     }
     for (index, symbol) in file.dynamic_symbols().enumerate() {
         imported += 1;
@@ -275,6 +300,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         }
         named.extend(name_pair(&symbol));
         mangled.extend(mangled_name(&symbol));
+        funcs.extend(function_pair(&file, &symbol));
     }
     if symbols > MAX_LISTED {
         rows.push(format!("cut\tsymbols\t{symbols}"));
@@ -291,6 +317,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DEMANGLED.with(|slot| *slot.borrow_mut() = names);
     let fixups = reloc_rows(bytes);
     RELOCS.with(|slot| *slot.borrow_mut() = fixups);
+    let functions = function_rows(&funcs);
+    FUNCTIONS.with(|slot| *slot.borrow_mut() = functions);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1817,6 +1845,67 @@ pub extern "C" fn dealloc(ptr: *mut u8, len: i32) {
         return;
     }
     unsafe { drop(Vec::from_raw_parts(ptr, 0, len.max(0) as usize + 1)) };
+}
+
+thread_local! {
+    /// The Functions window: the addresses the file's own symbol tables call functions.
+    static FUNCTIONS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// One entry of the Functions window: address, the size the symbol carries (an object file's symbols do
+/// have them, so this is not the disassembler's estimate), the section the name lies in, and the name in
+/// both spellings - the table's raw bytes and, where two demanglers agree on one, the C++ reading.
+///
+/// The totals row separates what was counted from what was answered: `sized` and `demangled` are the
+/// columns that could be filled, so a file whose symbols carry no sizes says so in the first row instead
+/// of printing zeros that look like measurements.
+fn function_rows(entries: &[(u64, u64, String, String)]) -> Vec<String> {
+    let sized = entries.iter().filter(|(_, size, _, _)| *size != 0).count();
+    let spelled = entries
+        .iter()
+        .filter(|(_, _, _, raw)| demangle::demangle(raw).is_some())
+        .count();
+    let mut out = vec![format!(
+        "functions\ttotal\t{}\tsized\t{sized}\tdemangled\t{spelled}\tfrom\tsymtabs",
+        entries.len()
+    )];
+    for (index, (address, size, section, raw)) in entries.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        let name = match demangle::demangle(raw) {
+            Some(text) => clean(&text),
+            None => "-".to_owned(),
+        };
+        let size = if *size == 0 { "-".to_owned() } else { size.to_string() };
+        out.push(format!(
+            "func\t0x{address:x}\tsize\t{size}\tsection\t{section}\tsym\t{raw}\tname\t{name}"
+        ));
+    }
+    if entries.len() > MAX_LISTED {
+        out.push(format!("cut\tfunctions\t{}", entries.len()));
+    }
+    out
+}
+
+/// How many rows the Functions window has. Zero is an answer, not a failure: a stripped binary and a
+/// PE image with only an export table name no function in their symbol tables.
+#[no_mangle]
+pub extern "C" fn function_count() -> i32 {
+    FUNCTIONS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the address in hex, the size the symbol states (or `-`), the section, the raw name and the
+/// demangled spelling where there is a two-witness one. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn function_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    FUNCTIONS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
 }
 
 /// -2 for a file this reader cannot open at all; 0 once the report is standing by.

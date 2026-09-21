@@ -72,7 +72,8 @@ test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
     'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
-    'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at', 'abi_version', 'self_test']) {
+    'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at',
+    'function_count', 'function_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -153,7 +154,7 @@ test('the base module the page always downloads carries none of this', async () 
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
     'export_count', 'export_at', 'import_count', 'import_at', 'demangle_count', 'demangle_at',
-    'reloc_count', 'reloc_at', 'self_test']) {
+    'reloc_count', 'reloc_at', 'function_count', 'function_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
