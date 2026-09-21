@@ -1219,7 +1219,7 @@ fn elf_reloc_rows(raw: &[u8]) -> Vec<String> {
     let listed = fixes.len();
     let symbolic = entries - relative;
     let mut out = vec![format!(
-        "relocs\tkind\tdyn\ttables\t{}\tentries\t{entries}\tsymbolic\t{symbolic}\trelative\t{relative}\tbits\t{}",
+        "relocs\tkind\tdyn\ttables\t{}\tentries\t{entries}\tsymbolic\t{symbolic}\trelative\t{relative}\tmachine\t{machine}\tbits\t{}",
         tables.len(),
         if wide { 64 } else { 32 }
     )];

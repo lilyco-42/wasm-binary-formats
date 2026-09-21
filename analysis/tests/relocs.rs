@@ -95,7 +95,7 @@ fn an_image_with_no_directory_says_so_rather_than_being_reported_as_broken() {
     assert_eq!(loaded.len(), 1, "a static image is one row: {loaded:#?}");
     assert_eq!(
         loaded[0],
-        "relocs	kind	dyn	tables	0	entries	0	symbolic	0	relative	0	bits	64",
+        "relocs	kind	dyn	tables	0	entries	0	symbolic	0	relative	0	machine	x86_64	bits	64",
         "the totals row for a file with no dynamic records"
     );
 }

@@ -455,6 +455,11 @@ test('the fixups a loader would apply come through as two readers listed them', 
   report(new Uint8Array(await readFile('test/fixtures/lab.elf')));
   assert.equal(ex.reloc_count(), 1, 'an ELF answers with its own record tables');
   assert.match(text('reloc_at', 0), /^relocs	kind	dyn	tables	0	entries	0	/);
+  // A third object file, and the case where only one reader names a type: binutils prints UNKNOWN
+  // for every aarch64 relocation, so the numbers are listed and the names are withheld.
+  report(new Uint8Array(await readFile('test/fixtures/labarm.so')));
+  assert.equal(ex.reloc_count(), 12, 'an aarch64 object answered a different number of rows');
+  assert.match(text('reloc_at', 4), /	type	1025	name	-	sym	data_at	/);
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.reloc_count(), 0, 'and a COFF object has neither shape');
 });

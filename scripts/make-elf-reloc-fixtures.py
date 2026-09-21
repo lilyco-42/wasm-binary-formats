@@ -57,7 +57,11 @@ int forward(int n) {
 }
 """
 
-CASES = [("lab.so", "x86_64-unknown-linux-gnu", 64), ("lab32.so", "i686-unknown-linux-gnu", 32)]
+CASES = [
+    ("lab.so", "x86_64-unknown-linux-gnu", 64, "x86_64", "X86-64"),
+    ("lab32.so", "i686-unknown-linux-gnu", 32, "i386", "80386"),
+    ("labarm.so", "aarch64-unknown-linux-gnu", 64, "aarch64", "AArch64"),
+]
 
 
 def run(cmd):
@@ -67,7 +71,7 @@ def run(cmd):
     return out.stdout.decode("utf-8", "replace")
 
 
-def build(target, name):
+def build(target, name, want):
     """Compile one shared object; the linker decides which fixups exist, this script only asks."""
     work = os.path.join(ROOT, "temp", "elflab")
     os.makedirs(work, exist_ok=True)
@@ -76,6 +80,9 @@ def build(target, name):
         handle.write(SOURCE)
     out = os.path.join(work, name)
     run(["clang", "--target=" + target, "-shared", "-nostdlib", "-fPIC", "-o", out, src])
+    header = run(["readelf", "-h", out])
+    if want not in header:
+        raise SystemExit("%s: readelf -h does not say %s, so the triple did not build what was asked" % (name, want))
     blob = open(out, "rb").read()
     with open(os.path.join(FIX, name), "wb") as handle:
         handle.write(blob)
@@ -176,86 +183,93 @@ def numbers(records, wide):
     return [(one[5] >> (32 if wide else 8), one[5] & (0xFFFFFFFF if wide else 0xFF)) for one in records]
 
 
-def rows_for(name, bits, table_map, paired):
+def rows_for(name, bits, machine, table_map, paired, single):
     """Rows the Rust reader has to print, assembled from what the two readers said.
 
-    readelf is the source of the printed values and objdump is the check on every one of them: the same
-    offset has to carry the same type name, the same symbol and the same addend in both listings, or the
-    script stops. The `info` word is split at the width this class uses, so a symbol index of zero - the
-    RELATIVE case - is read as "no symbol" rather than as a reference to the first entry.
+    readelf is the source of the printed values and objdump is the check on every one of them. A type
+    number is *named* only where both wrote the same word beside it: binutils' `objdump -R` knows the
+    x86 spellings and prints `UNKNOWN` for every AArch64 one, so an aarch64 file contributes offsets,
+    symbols and addends that both readers agree on and no names at all - which is exactly what the rows
+    below say, and the reason the name table is keyed on machine and number together.
     """
     wide = bits == 64
     records = from_readelf(name)
     other = {one[0]: one for one in from_objdump(name)}
     if len(records) != len(other):
-        raise SystemExit("%s: readelf lists %d records, objdump %d"
-                         % (name, len(records), len(other)))
+        raise SystemExit("%s: readelf lists %d records, objdump %d" % (name, len(records), len(other)))
     tables = []
     fixes = []
     for table, where, kind, sym, addend, info in records:
         one = other.get(where)
         if one is None:
             raise SystemExit("%s: 0x%x is in readelf and not in objdump" % (name, where))
-        if one[1] != kind:
-            raise SystemExit("%s: 0x%x is %s to readelf and %s to objdump"
-                             % (name, where, kind, one[1]))
         spelled = sym or "*ABS*"
         if one[2] not in (spelled, "*ABS*"):
             raise SystemExit("%s: 0x%x names %s for one and %s for the other"
                              % (name, where, spelled, one[2]))
-        # objdump leaves a zero addend unwritten and readelf writes `+ 0` for a RELA record, so the two
-        # are compared as numbers with absence read as zero - and a REL record has no addend to read at
-        # all, which leaves both sides at zero and the branch in the row saying `addend	no`.
         if (addend or 0) != (one[3] or 0):
             raise SystemExit("%s: 0x%x has addend %s for one and %s for the other"
                              % (name, where, addend, one[3]))
         symbol = info >> (32 if wide else 8)
         number = info & (0xFFFFFFFF if wide else 0xFF)
-        key = (name, number)
-        if key not in paired:
+        key = (machine, number)
+        if kind != one[1]:
+            if one[1] != "UNKNOWN":
+                raise SystemExit("%s: 0x%x is %s to readelf and %s to objdump"
+                                 % (name, where, kind, one[1]))
+            single[key] = kind
+        elif key not in paired:
             paired[key] = kind
         elif paired[key] != kind:
             raise SystemExit("%s: type %d is named %s and %s in one file"
                              % (name, number, kind, paired[key]))
         if table not in tables:
             tables.append(table)
-        fixes.append("fixup	0x%x	type	%d	name	%s	sym	%s	addend	%s	section	%s"
-                     % (where, number, kind, "-" if symbol == 0 else spelled,
+        fixes.append((table, where, number, symbol, spelled, addend))
+    lines = []
+    for table, where, number, symbol, spelled, addend in fixes:
+        lines.append("fixup	0x%x	type	%d	name	%s	sym	%s	addend	%s	section	%s"
+                     % (where, number, paired.get((machine, number), "-"),
+                        "-" if symbol == 0 else spelled,
                         "-" if addend is None else addend, owner(table_map, where)))
-    # The record's own size: offset and info, plus the addend word when the table carries one. A RELA
-    # slot is not the same length as a REL slot, and saying `16` for both would describe the half the
-    # two share rather than what the loader steps by.
     step = 8 if wide else 4
     listed = []
     for table in tables:
         addend = table.startswith(".rela")
         listed.append("table	%s	entries	%d	slot_bytes	%d	addend	%s"
-                      % (table, len([one for one in records if one[0] == table]),
+                      % (table, len([one for one in fixes if one[0] == table]),
                          step * (3 if addend else 2), "yes" if addend else "no"))
-    relative = len([one for one in fixes if "	sym	-	" in one])
-    header = ("relocs	kind	dyn	tables	%d	entries	%d	symbolic	%d	relative	%d	bits	%d"
-              % (len(tables), len(records), len(records) - relative, relative, bits))
-    return [header] + listed + fixes, records
+    relative = len([one for one in lines if "	sym	-	" in one])
+    header = ("relocs	kind	dyn	tables	%d	entries	%d	symbolic	%d	relative	%d	machine	%s	bits	%d"
+              % (len(tables), len(fixes), len(fixes) - relative, relative, machine, bits))
+    return [header] + listed + lines, fixes
 
 
 def main():
     files = {}
     paired = {}
-    for name, target, bits in CASES:
-        blob = build(target, name)
+    single = {}
+    for name, target, bits, machine, want in CASES:
+        blob = build(target, name, want)
         table_map = sections(name)
-        rows, records = rows_for(name, bits, table_map, paired)
+        rows, records = rows_for(name, bits, machine, table_map, paired, single)
         files[name] = {"bytes": len(blob), "bits": bits, "records": len(records), "rows": rows}
-        if len(records) < 9:
+        if len(records) < 7:
             raise SystemExit("%s: only %d records, so the table cases are thin" % (name, len(records)))
-    for name, _, _ in CASES:
-        for number in (1, 6, 7, 8):
-            if (name, number) not in paired:
-                raise SystemExit("%s: type %d never appears, so its name is not earned" % (name, number))
-    for (name, number), kind in sorted(paired.items()):
-        print("%-9s %2d %s" % (name, number, kind))
+    for machine, numbers in (("x86_64", (1, 6, 7, 8)), ("i386", (1, 6, 7, 8))):
+        for number in numbers:
+            if (machine, number) not in paired:
+                raise SystemExit("%s: type %d never appears, so its name is not earned"
+                                 % (machine, number))
+    if ("aarch64", 1025) in paired:
+        raise SystemExit("objdump named an aarch64 type after all; the refusal below is stale")
+    for (machine, number), kind in sorted(paired.items()):
+        print("paired   %-9s %4d %s" % (machine, number, kind))
+    for (machine, number), kind in sorted(single.items()):
+        print("unnamed  %-9s %4d %s" % (machine, number, kind))
     with open(os.path.join(FIX, "elfreloc.probe.json"), "w", encoding="utf-8") as handle:
         json.dump({"type_names": {"%s:%d" % key: value for key, value in sorted(paired.items())},
+                   "readelf_only": {"%s:%d" % key: value for key, value in sorted(single.items())},
                    "files": files}, handle, indent=1, sort_keys=True)
         handle.write("\n")
     print(json.dumps({one: len(two["rows"]) for one, two in files.items()}))

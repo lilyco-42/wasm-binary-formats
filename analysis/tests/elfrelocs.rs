@@ -48,7 +48,7 @@ fn a_sixty_four_bit_shared_object_lists_every_slot_the_linker_left() {
     let listed = rows("lab.so");
     assert_eq!(
         listed[0],
-        "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tbits\t64",
+        "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tmachine\tx86_64\tbits\t64",
         "{}",
         listed[0]
     );
@@ -104,7 +104,7 @@ fn the_same_type_number_is_named_for_the_machine_the_file_was_written_for() {
     let listed = rows("lab32.so");
     assert_eq!(
         listed[0],
-        "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tbits\t32",
+        "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tmachine\ti386\tbits\t32",
         "{}",
         listed[0]
     );
@@ -158,5 +158,43 @@ fn a_slot_is_owned_by_the_tightest_section_that_covers_it() {
     assert!(
         !owners.iter().any(|one| one == ".relro_padding" || one == "unmapped"),
         "{owners:?}"
+    );
+}
+
+/// An AArch64 shared object is the case where the two readers do not both name a type: `readelf -rW`
+/// writes `R_AARCH64_GLOB_DAT` where binutils' `objdump -R` prints `UNKNOWN` beside the same offset. The
+/// offsets, symbols and addends still agree, so they are listed - but a number one reader named and the
+/// other did not stays a number, which is every row of this file. The numbers are also why the table is
+/// keyed on the machine: 1025 and 257 are what aarch64 calls the records x86 spells 6 and 1.
+#[test]
+fn a_type_one_reader_named_and_the_other_did_not_stays_a_number() {
+    let listed = rows("labarm.so");
+    assert_eq!(
+        listed[0],
+        "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tmachine\taarch64\tbits\t64",
+        "{}",
+        listed[0]
+    );
+    assert_eq!(listed[1], "table\t.rela.dyn\tentries\t7\tslot_bytes\t24\taddend\tyes");
+    assert_eq!(listed[2], "table\t.rela.plt\tentries\t2\tslot_bytes\t24\taddend\tyes");
+    for row in listed.iter().skip(3) {
+        assert_eq!(column(row, "name"), Some("-".to_owned()), "{row}");
+    }
+    let numbers: Vec<String> = listed
+        .iter()
+        .skip(3)
+        .filter_map(|row| column(row, "type"))
+        .collect();
+    assert!(
+        numbers.contains(&"1025".to_owned()) && numbers.contains(&"257".to_owned()),
+        "the aarch64 numbers are 1025 and 257, not x86's 6 and 1: {numbers:?}"
+    );
+    assert_eq!(
+        listed[4],
+        "fixup\t0x206a0\ttype\t1025\tname\t-\tsym\tdata_at\taddend\t0\tsection\t.got"
+    );
+    assert_eq!(
+        listed[7],
+        "fixup\t0x306d0\ttype\t257\tname\t-\tsym\ttable\taddend\t4\tsection\t.data"
     );
 }
