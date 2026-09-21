@@ -515,7 +515,13 @@ test('the version block the API agrees with is read out of the file, not asked f
   report(new Uint8Array(await readFile('test/fixtures/res.dll')));
   const rows = Array.from({ length: ex.version_count() }, (_, index) => text('version_at', index));
   assert.ok(rows.includes('string	Assembly Version	0.0.0.0'), rows.join(' | '));
-  assert.equal(rows.filter((one) => one.endsWith('	 ')).length, 3, 'blank-but-present values');
+  // Two of the three free-text fields are a single space in this file. The count is taken from the
+  // probe rather than typed in here - a guessed number in an assertion is how this test failed in CI,
+  // where there is no local build of the module to catch it first.
+  const blank = (one) => one.endsWith('\t ');
+  const wanted = probe["res.dll"].rows.filter(blank).length;
+  assert.ok(wanted > 0, 'the probe has no space-only value, so this proves nothing');
+  assert.equal(rows.filter(blank).length, wanted, 'a value was dropped, not printed as spelled');
   for (const name of ['lab.elf', 'answer.obj']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.version_count(), 0, `${name} answered with a version block`);
