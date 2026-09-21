@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, and the base relocations a loader is told to apply |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, and the resource tree an image carries |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -486,6 +486,30 @@ the list with `kind section` because they are names the file attaches to address
 says. C++ names carry both spellings, the table's bytes in `name` and the two-witness reading in `read`,
 so the row that the demanglers disagree on is still listed - with `read -` - rather than dropped from a
 window that is supposed to be complete.
+
+**The resources window** (`resource_count` / `resource_at`) lists the tree a PE carries beside its
+code: three levels - type, name, language - whose entries state whether the child is another directory
+or a body, and whose body states an RVA, a size and a codepage. The RVA is the whole difficulty, and it
+is the difficulty every PE reader has: the address has to be walked through the section table before it
+names a byte, so a body whose address no section covers prints `off -1` rather than the RVA dressed up
+as an offset. Two fixtures and two writers, because one writer cannot show both halves of the name
+table: `res.dll` is `csc` with an icon file, a manifest and its own version block (five bodies under
+four types, every identifier numeric, which is all a managed compiler emits), and `rcres.dll` is
+Microsoft's `rc` writing the tree, GNU `windres` turning the resulting `.res` into an object and `gcc`
+linking it - which brings the half `csc` cannot reach: two string *types*, one string *name*, language
+1033 where `csc` used 0, and a PE32+ header. Three readers had to agree on each file before the probe
+was written: a python walk of the bytes, `llvm-readobj --coff-resources`, and Windows' own loader
+through `LoadLibraryExW(..., LOAD_LIBRARY_AS_DATAFILE)` - a mapping that executes nothing and needs no
+elevation - which enumerates the types, states each body's size and hands back its bytes; those bytes
+are then compared against the file at the offset this walk derived, which is what turns the RVA mapping
+from an assertion into a checked thing. Three findings the fixtures settled rather than being recalled
+correctly: rc stores a string type *with its quote characters inside the text* (`"LABNAME"`) while llvm
+prints the name without them, so the row keeps the file's spelling - which is also what the loader
+returns; GNU's chain leaves the codepage word uninitialised, so `rcres.dll` prints a number that is no
+codepage at all, because the row is what the file carries rather than what the format meant; and the
+type words are llvm's (`ICON`, `GROUP_ICON`, `VERSIONINFO`, `MANIFEST`, `RCDATA`) while Microsoft's own
+header spells the same numbers `RT_ICON`, `RT_GROUP_ICON`, `RT_VERSION`, so the *pair* is witnessed
+twice and the *spelling* once - which is why the number stays in the row and the word rides beside it.
 
 **The segments window** (`segment_count` / `segment_at`) is the loader's list rather than the linker's: an
 ELF's program headers, one row per record, with the type number and the word two readers used for it, the
@@ -687,6 +711,7 @@ temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports
 temp/venv/Scripts/python.exe scripts/make-xsd-fixtures.py        # authors five fixtures, then gates the probe on `xmlschema`'s compiled component maps and the JDK's Xerces agreeing with ElementTree's tree name by name; neither witness is reachable from CI, so the committed probe is the evidence
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
+temp/venv/Scripts/python.exe scripts/make-resource-fixtures.py      # csc writes res.dll (icon, manifest, version block) and rc + windres + gcc write rcres.dll (string types and a string name); the probe is not written unless a python walk, `llvm-readobj --coff-resources` and Windows' own resource loader agree on every type, name, language, size - and on the bytes at the file offset the walk derived from each RVA
 temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
 test/fixtures/labarm.so already exist, and every program header is read three times - the bytes at e_phoff,
 readelf -lW and llvm-readobj --segments - which must agree on all six numbers and on the type word before

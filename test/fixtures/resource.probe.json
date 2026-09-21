@@ -1,0 +1,244 @@
+{
+ "rcres.dll": {
+  "bytes": 4966,
+  "entries": [
+   {
+    "codepage": 1735357008,
+    "language": 1033,
+    "name": 11,
+    "name_string": false,
+    "offset": 2848,
+    "rva": 16672,
+    "size": 15,
+    "type": "\"LABNAME\"",
+    "type_string": true
+   },
+   {
+    "codepage": 909259060,
+    "language": 1033,
+    "name": 260,
+    "name_string": false,
+    "offset": 2864,
+    "rva": 16688,
+    "size": 15,
+    "type": "\"OTHER\"",
+    "type_string": true
+   },
+   {
+    "codepage": 1212350575,
+    "language": 1033,
+    "name": "LABTYPE",
+    "name_string": true,
+    "offset": 2880,
+    "rva": 16704,
+    "size": 20,
+    "type": 10,
+    "type_string": false
+   }
+  ],
+  "llvm": [
+   {
+    "codepage": 1735357008,
+    "language": 1033,
+    "name": 11,
+    "name_id": 11,
+    "name_text": null,
+    "rva": 16672,
+    "size": 15,
+    "type": "LABNAME",
+    "type_id": null,
+    "type_text": "LABNAME"
+   },
+   {
+    "codepage": 909259060,
+    "language": 1033,
+    "name": 260,
+    "name_id": 260,
+    "name_text": null,
+    "rva": 16688,
+    "size": 15,
+    "type": "OTHER",
+    "type_id": null,
+    "type_text": "OTHER"
+   },
+   {
+    "codepage": 1212350575,
+    "language": 1033,
+    "name": "LABTYPE",
+    "name_id": null,
+    "name_text": "LABTYPE",
+    "rva": 16704,
+    "size": 20,
+    "type": 10,
+    "type_id": 10,
+    "type_text": "RCDATA"
+   }
+  ],
+  "rows": [
+   "resources\ttypes\t3\tentries\t3\tstrings\t3\tdir\t2\trva\t0x4000\tmachine\t0x8664\twide\tyes",
+   "type\t0\ttext\t\"LABNAME\"\tword\t-\tbodies\t1",
+   "type\t1\ttext\t\"OTHER\"\tword\t-\tbodies\t1",
+   "type\t2\tid\t10\tword\tRCDATA\tbodies\t1",
+   "entry\t0\t0\tid\t11\tlang\t1033\tbytes\t15\trva\t0x4120\toff\t2848\tcodepage\t1735357008",
+   "entry\t1\t0\tid\t260\tlang\t1033\tbytes\t15\trva\t0x4130\toff\t2864\tcodepage\t909259060",
+   "entry\t2\t0\ttext\tLABTYPE\tlang\t1033\tbytes\t20\trva\t0x4140\toff\t2880\tcodepage\t1212350575"
+  ],
+  "windows_sizes": [
+   15,
+   15,
+   20
+  ],
+  "windows_types": [
+   "\"LABNAME\"",
+   "\"OTHER\"",
+   "10"
+  ]
+ },
+ "res.dll": {
+  "bytes": 3584,
+  "entries": [
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 2,
+    "name_string": false,
+    "offset": 2456,
+    "rva": 17304,
+    "size": 95,
+    "type": 3,
+    "type_string": false
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 3,
+    "name_string": false,
+    "offset": 2552,
+    "rva": 17400,
+    "size": 125,
+    "type": 3,
+    "type_string": false
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 32512,
+    "name_string": false,
+    "offset": 2680,
+    "rva": 17528,
+    "size": 34,
+    "type": 14,
+    "type_string": false
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 1,
+    "name_string": false,
+    "offset": 1888,
+    "rva": 16736,
+    "size": 564,
+    "type": 16,
+    "type_string": false
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 2,
+    "name_string": false,
+    "offset": 2720,
+    "rva": 17568,
+    "size": 297,
+    "type": 24,
+    "type_string": false
+   }
+  ],
+  "llvm": [
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 2,
+    "name_id": 2,
+    "name_text": null,
+    "rva": 17304,
+    "size": 95,
+    "type": 3,
+    "type_id": 3,
+    "type_text": "ICON"
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 3,
+    "name_id": 3,
+    "name_text": null,
+    "rva": 17400,
+    "size": 125,
+    "type": 3,
+    "type_id": 3,
+    "type_text": "ICON"
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 32512,
+    "name_id": 32512,
+    "name_text": null,
+    "rva": 17528,
+    "size": 34,
+    "type": 14,
+    "type_id": 14,
+    "type_text": "GROUP_ICON"
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 1,
+    "name_id": 1,
+    "name_text": null,
+    "rva": 16736,
+    "size": 564,
+    "type": 16,
+    "type_id": 16,
+    "type_text": "VERSIONINFO"
+   },
+   {
+    "codepage": 0,
+    "language": 0,
+    "name": 2,
+    "name_id": 2,
+    "name_text": null,
+    "rva": 17568,
+    "size": 297,
+    "type": 24,
+    "type_id": 24,
+    "type_text": "MANIFEST"
+   }
+  ],
+  "rows": [
+   "resources\ttypes\t4\tentries\t5\tstrings\t0\tdir\t2\trva\t0x4000\tmachine\tx86\twide\tno",
+   "type\t0\tid\t3\tword\tICON\tbodies\t2",
+   "type\t1\tid\t14\tword\tGROUP_ICON\tbodies\t1",
+   "type\t2\tid\t16\tword\tVERSIONINFO\tbodies\t1",
+   "type\t3\tid\t24\tword\tMANIFEST\tbodies\t1",
+   "entry\t0\t0\tid\t2\tlang\t0\tbytes\t95\trva\t0x4398\toff\t2456\tcodepage\t0",
+   "entry\t0\t1\tid\t3\tlang\t0\tbytes\t125\trva\t0x43f8\toff\t2552\tcodepage\t0",
+   "entry\t1\t0\tid\t32512\tlang\t0\tbytes\t34\trva\t0x4478\toff\t2680\tcodepage\t0",
+   "entry\t2\t0\tid\t1\tlang\t0\tbytes\t564\trva\t0x4160\toff\t1888\tcodepage\t0",
+   "entry\t3\t0\tid\t2\tlang\t0\tbytes\t297\trva\t0x44a0\toff\t2720\tcodepage\t0"
+  ],
+  "windows_sizes": [
+   95,
+   125,
+   34,
+   564,
+   297
+  ],
+  "windows_types": [
+   "14",
+   "16",
+   "24",
+   "3"
+  ]
+ }
+}

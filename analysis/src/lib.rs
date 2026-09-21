@@ -211,6 +211,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     FUNCTIONS.with(|slot| slot.borrow_mut().clear());
     NAMED.with(|slot| slot.borrow_mut().clear());
     SEGMENTS.with(|slot| slot.borrow_mut().clear());
+    RESOURCES.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -348,6 +349,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     NAMED.with(|slot| *slot.borrow_mut() = listed);
     let segments = segment_rows(bytes);
     SEGMENTS.with(|slot| *slot.borrow_mut() = segments);
+    let resources = resource_rows(bytes);
+    RESOURCES.with(|slot| *slot.borrow_mut() = resources);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1113,6 +1116,7 @@ fn where_lies(pe: &Pe, rva: u64) -> (i64, String) {
 thread_local! {
     /// The Segments window: the program headers an ELF hands its loader.
     static SEGMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static RESOURCES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -1269,6 +1273,227 @@ pub extern "C" fn segment_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     SEGMENTS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// Which data directory carries the resource tree (`2`, the one the optional header reserves for it),
+/// and how many bodies one report will reach before it stops and says so.
+const RESOURCE_DIRECTORY: usize = 2;
+const RESOURCE_MAX_BODIES: usize = 512;
+
+/// One type of the level-one directory, with the bodies counted under it.
+struct TypeSlot {
+    text: bool,
+    id: u64,
+    label: String,
+    bodies: usize,
+}
+
+/// The identifiers two readers named in the files here. `llvm-readobj` prints the word beside the
+/// number; Microsoft's own header spells the same number `RT_ICON`, so the *pair* is witnessed twice
+/// while the *spelling* is witnessed once - which is why the row keeps the number and carries the word
+/// beside it rather than replacing it. Anything not on this list prints with `word\t-`.
+fn resource_word(id: u64) -> &'static str {
+    match id {
+        3 => "ICON",
+        10 => "RCDATA",
+        14 => "GROUP_ICON",
+        16 => "VERSIONINFO",
+        24 => "MANIFEST",
+        _ => "-",
+    }
+}
+
+/// One directory's entries: whether the child is another directory, the identifier's number, its text
+/// when the identifier is a string, and where the child sits. An identifier with its high bit set is an
+/// offset into the section's own string table, where a UTF-16 count is followed by that many characters
+/// - and the text is kept exactly as the file spells it, quotes included, because rc puts the quote
+/// characters *inside* a string type name and the loader hands them back.
+fn resource_level(raw: &[u8], base: usize, node: usize) -> Vec<(bool, u64, String, usize)> {
+    let header = |offset: usize| node.checked_add(offset).and_then(|at| half_at(raw, at, true));
+    let Some(named) = header(12) else { return Vec::new() };
+    let Some(ids) = header(14) else { return Vec::new() };
+    let mut out = Vec::new();
+    for slot in 0..named.checked_add(ids).unwrap_or(0).min(1024) {
+        let step = match usize::try_from(slot.checked_mul(8).unwrap_or(u64::MAX)) {
+            Ok(one) => one,
+            Err(_) => break,
+        };
+        let Some(at) = node.checked_add(16).and_then(|start| start.checked_add(step)) else {
+            break;
+        };
+        let key = match word_at(raw, at, true) {
+            Some(one) => one,
+            None => break,
+        };
+        let child = match at.checked_add(4).and_then(|place| word_at(raw, place, true)) {
+            Some(one) => one,
+            None => break,
+        };
+        let number = key & 0x7FFF_FFFF;
+        let label = if key & 0x8000_0000 == 0 {
+            String::new()
+        } else {
+            let place = match base.checked_add(usize::try_from(number).unwrap_or(usize::MAX)) {
+                Some(one) => one,
+                None => break,
+            };
+            let units = match half_at(raw, place, true) {
+                Some(one) => one,
+                None => break,
+            };
+            let count = match usize::try_from(units.checked_mul(2).unwrap_or(u64::MAX)) {
+                Ok(one) => one,
+                Err(_) => break,
+            };
+            let span = match place.checked_add(2).and_then(|start| start.checked_add(count).map(|stop| (start, stop))) {
+                Some(one) => one,
+                None => break,
+            };
+            let body = match raw.get(span.0..span.1) {
+                Some(one) => one,
+                None => break,
+            };
+            let wide: Vec<u16> = body.chunks(2).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect();
+            String::from_utf16_lossy(&wide)
+        };
+        let where_ = match usize::try_from(child & 0x7FFF_FFFF)
+            .ok()
+            .and_then(|offset| base.checked_add(offset))
+        {
+            Some(one) => one,
+            None => break,
+        };
+        out.push((child & 0x8000_0000 != 0, number, label, where_));
+    }
+    out
+}
+
+/// IDA's Resources window: every body a PE carries, with where the file says it is.
+///
+/// Three levels - type, name, language - each a directory of entries whose high bit says whether the
+/// child is another directory or the data entry itself. The only interesting arithmetic left is the one
+/// every PE reader has to do: an entry names an RVA, and the RVA has to be walked through the section
+/// table before it names a byte, so `off` is `-1` when the file points somewhere no section covers
+/// rather than being quietly turned into the RVA.
+fn resource_rows(raw: &[u8]) -> Vec<String> {
+    let Some(pe) = Pe::parse(raw) else { return Vec::new() };
+    let Some(lfanew) = word_at(raw, 0x3c, true) else { return Vec::new() };
+    let Some(lfanew) = usize::try_from(lfanew).ok() else { return Vec::new() };
+    let Some(machine) = lfanew.checked_add(4).and_then(|at| half_at(raw, at, true)) else {
+        return Vec::new();
+    };
+    let Some(at) = pe.dirs.checked_add(RESOURCE_DIRECTORY * 8) else { return Vec::new() };
+    let Some(rva) = word_at(raw, at, true) else { return Vec::new() };
+    let Some(size) = at.checked_add(4).and_then(|place| word_at(raw, place, true)) else {
+        return Vec::new();
+    };
+    if size == 0 {
+        return Vec::new();
+    }
+    let Some((base, _)) = pe.at(rva) else { return Vec::new() };
+    // The type list is built in the order the file first names each type, and `bodies` on a type row is
+    // counted from the bodies actually reached, so a directory that lists a type twice cannot make the
+    // report list it twice.
+    let mut order: Vec<TypeSlot> = Vec::new();
+    let mut bodies = 0usize;
+    let mut strings = 0usize;
+    let mut rows: Vec<String> = Vec::new();
+    for (type_dir, type_id, type_label, type_where) in resource_level(raw, base, base) {
+        if !type_dir {
+            continue;
+        }
+        let type_text = !type_label.is_empty();
+        for (name_dir, name_id, name_label, name_where) in resource_level(raw, base, type_where) {
+            if !name_dir {
+                continue;
+            }
+            let name_text = !name_label.is_empty();
+            let index = match order
+                .iter()
+                .position(|one| one.text == type_text && one.id == type_id)
+            {
+                Some(found) => found,
+                None => {
+                    order.push(TypeSlot { text: type_text, id: type_id, label: type_label.clone(), bodies: 0 });
+                    order.len() - 1
+                }
+            };
+            for (lang_dir, language, _lang_label, data_where) in resource_level(raw, base, name_where) {
+                if lang_dir || bodies >= RESOURCE_MAX_BODIES {
+                    continue;
+                }
+                let Some(data_rva) = word_at(raw, data_where, true) else { continue };
+                let Some(at) = data_where.checked_add(4) else { continue };
+                let Some(data_size) = word_at(raw, at, true) else { continue };
+                let codepage = at.checked_add(4).and_then(|place| word_at(raw, place, true)).unwrap_or(0);
+                let where_ = pe.at(data_rva).map(|(found, _name)| found);
+                let number = order[index].bodies;
+                rows.push(format!(
+                    "entry\t{index}\t{number}\t{}\t{}\tlang\t{language}\tbytes\t{data_size}\trva\t0x{data_rva:x}\toff\t{}\tcodepage\t{codepage}",
+                    if name_text { "text" } else { "id" },
+                    if name_text { clean(&name_label) } else { name_id.to_string() },
+                    where_.map_or(-1i64, |found| i64::try_from(found).unwrap_or(i64::MAX)),
+                ));
+                order[index].bodies += 1;
+                strings += usize::from(type_text) + usize::from(name_text);
+                bodies += 1;
+            }
+        }
+    }
+    // Two lists, two caps of their own: running out of type rows says nothing about the bodies, and a
+    // report that stopped listing one must not claim it stopped listing the other.
+    let listed = MAX_LISTED;
+    let head = format!(
+        "resources\ttypes\t{}\tentries\t{bodies}\tstrings\t{strings}\tdir\t{RESOURCE_DIRECTORY}\trva\t0x{rva:x}\tmachine\t{}\twide\t{}",
+        order.len(),
+        if machine == 0x14c { "x86".to_string() } else { format!("0x{machine:x}") },
+        if pe.wide { "yes" } else { "no" },
+    );
+    let mut found = vec![head];
+    for (index, slot) in order.iter().enumerate() {
+        if index >= listed {
+            break;
+        }
+        found.push(format!(
+            "type\t{index}\t{}\t{}\tword\t{}\tbodies\t{}",
+            if slot.text { "text" } else { "id" },
+            if slot.text { clean(&slot.label) } else { slot.id.to_string() },
+            // A string identifier's low bits are an offset into the string table, not a type number,
+            // so there is nothing to name here - and matching the offset against the table of types
+            // would print a word the file never used.
+            if slot.text { "-" } else { resource_word(slot.id) },
+            slot.bodies
+        ));
+    }
+    for row in rows.into_iter().take(listed) {
+        found.push(row);
+    }
+    if order.len() > listed {
+        found.push(format!("cut\ttypes\t{}\tlisted\t{listed}", order.len()));
+    }
+    if bodies > listed {
+        found.push(format!("cut\tentries\t{bodies}\tlisted\t{listed}"));
+    }
+    found
+}
+
+/// The Resources window's two calls, over the rows `resource_rows` built for the last file analysed.
+#[no_mangle]
+pub extern "C" fn resource_count() -> i32 {
+    RESOURCES.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then one line per type and one per body, each with the address the entry names
+/// and the file offset that address resolves to. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn resource_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    RESOURCES.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

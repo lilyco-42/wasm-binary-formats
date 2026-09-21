@@ -74,6 +74,7 @@ test('the analysis module stands on its own exports', () => {
     'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
     'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at',
     'function_count', 'function_at', 'named_count', 'named_at', 'segment_count', 'segment_at',
+    'resource_count', 'resource_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -157,6 +158,7 @@ test('the base module the page always downloads carries none of this', async () 
     'export_count', 'export_at', 'import_count', 'import_at', 'demangle_count', 'demangle_at',
     'reloc_count', 'reloc_at', 'function_count', 'function_at', 'named_count', 'named_at',
     'segment_count', 'segment_at',
+    'resource_count', 'resource_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -465,4 +467,27 @@ test('the fixups a loader would apply come through as two readers listed them', 
   assert.match(text('reloc_at', 4), /	type	1025	name	R_AARCH64_GLOB_DAT	sym	data_at	/);
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.reloc_count(), 0, 'and a COFF object has neither shape');
+});
+
+test('the resource tree the witnesses recorded is what the built module reports', async () => {
+  // scripts/make-resource-fixtures.py builds res.dll with csc and rcres.dll with rc + windres + gcc,
+  // then refuses to write `resource.probe.json` unless a python walk of the bytes, `llvm-readobj
+  // --coff-resources` and Windows' own loader agree on every type, name, language, size and body byte.
+  // This is that probe against the module as CI built it - the deployed build, not a local compile.
+  const probe = JSON.parse(await readFile('test/fixtures/resource.probe.json', 'utf8'));
+  for (const name of ['res.dll', 'rcres.dll']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.resource_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the witnesses said ${want.length}`);
+    for (let index = 0; index < total; index += 1) {
+      assert.equal(text('resource_at', index), want[index], `${name} row ${index}`);
+    }
+  }
+  // A PE-only tree: an ELF has no resource directory, and a COFF object has no data directories at all,
+  // so both come back empty rather than with the rows the image read a moment before left behind.
+  for (const name of ['lab.elf', 'answer.obj']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.resource_count(), 0, `${name} answered with a resource tree`);
+  }
 });
