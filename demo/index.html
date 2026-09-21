@@ -446,9 +446,9 @@ function appendLists(box, state) {
     }
     return rows;
   }
-  const bodies = resourceList(state.mod);
-  if (bodies && bodies.length > 1) {
-    const head = bodies[0].split('\t');
+  const tree = resourceList(state.mod);
+  if (tree && tree.length > 1) {
+    const head = tree[0].split('\t');
     const title = document.createElement('p');
     title.textContent = `资源（PE 的资源目录树：${field(head, 'types')} 类、${field(head, 'entries')} 个正文，`
       + `${field(head, 'strings')} 个标识符写的是字符串而不是编号；目录在第 ${field(head, 'dir')} 项数据目录，`
@@ -457,17 +457,17 @@ function appendLists(box, state) {
       + '写的是 llvm 的说法（微软自己的头文件把同一个号叫 RT_ICON）；字符串类型那对引号是文件里就带着的，'
       + '不是读者加上去的：';
     const table = document.createElement('pre');
-    const words = {};
-    table.textContent = bodies.slice(1).map((row) => {
+    const typeNames = {};
+    table.textContent = tree.slice(1).map((row) => {
       const cell = row.split('\t');
       if (cell[0] === 'cut') {
         return `（${cell[1] === 'types' ? '类型' : '正文'}比列出来的多，共 ${cell[2]} 个，到这里为止）`;
       }
       if (cell[0] === 'type') {
-        words[cell[1]] = (cell[2] === 'text' ? cell[3] : '#' + cell[3]) + (cell[5] === '-' ? '' : ' ' + cell[5]);
-        return `  类型 ${words[cell[1]]}  ——  ${cell[7]} 个正文`;
+        typeNames[cell[1]] = (cell[2] === 'text' ? cell[3] : '#' + cell[3]) + (cell[5] === '-' ? '' : ' ' + cell[5]);
+        return `  类型 ${typeNames[cell[1]]}  ——  ${cell[7]} 个正文`;
       }
-      const owner = words[cell[1]] || ('类型 ' + cell[1]);
+      const owner = typeNames[cell[1]] || ('类型 ' + cell[1]);
       return `    ${owner} / ${cell[3] === 'text' ? cell[4] : '#' + cell[4]} / 语言 ${cell[6]}`
         + `  ${cell[8]} 字节  RVA ${cell[10]}  文件 `
         + `${cell[12] === '-1' ? '（无节覆盖）' : cell[12]}  代码页 ${cell[14]}`;

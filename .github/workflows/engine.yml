@@ -122,6 +122,8 @@ jobs:
         with:
           name: apk-lens-disasm-wasm
           path: artifact-disasm
+      - name: Parse the demo page
+        run: node tools/check-demo.mjs
       - name: Assemble site
         run: |
           mkdir -p site
