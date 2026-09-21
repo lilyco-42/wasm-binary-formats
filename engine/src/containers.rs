@@ -7058,7 +7058,7 @@ fn psd_image_data(
         // Proving the table fits is what keeps the loop below bounded by the file rather than by two
         // numbers a corrupted header can make huge.
         let table = data_at.saturating_add(lines.saturating_mul(2));
-        let (sum, rest) = if table <= length {
+        let counted: Option<(u64, u64)> = if table <= length {
             let mut total = 0u64;
             let mut each = 0u64;
             while each < lines {
@@ -7068,12 +7068,12 @@ fn psd_image_data(
                 }
                 each += 1;
             }
-            (Some(total), length - table)
+            Some((total, length - table))
         } else {
-            (None, payload)
+            None
         };
-        match sum {
-            Some(counts) => {
+        match counted {
+            Some((counts, rest)) => {
                 let ends = counts == rest;
                 *broken += usize::from(!ends);
                 rows.push(format!(
@@ -7082,9 +7082,11 @@ fn psd_image_data(
                 ));
             }
             None => {
+                // No table end, so no payload either: the bytes that happen to follow the compression
+                // field are not the compressed rows, and printing their count would invent a quantity.
                 *broken += 1;
                 rows.push(format!(
-                    "image\tcompression\t1(RLE)\trows\t{lines}\tcounts\t-\tpayload\t{rest}\tends\tno"
+                    "image\tcompression\t1(RLE)\trows\t{lines}\tcounts\t-\tpayload\t-\tends\tno"
                 ));
             }
         }
