@@ -212,6 +212,15 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         rows.push(format!("cut\tdynsym\t{imported}"));
     }
 
+    let (exports, export_names) = export_rows(bytes);
+    let (imports, import_names) = import_rows(bytes);
+    EXPORTS.with(|slot| *slot.borrow_mut() = exports);
+    IMPORTS.with(|slot| *slot.borrow_mut() = imports);
+    // The file's own symbol names come first, then the export table's, then the imports: an address a
+    // linker named is still called that by the symbol table, and what is left to name is the exported
+    // body and the slot the loader fills in.
+    named.extend(export_names);
+    named.extend(import_names);
     // Two names for one address are the file's ambiguity, not the reader's: `sort_by` is stable, so the
     // table's own order decides and the first listing keeps the name.
     named.sort_by(|left, right| left.0.cmp(&right.0));
@@ -221,8 +230,6 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     REGIONS.with(|slot| *slot.borrow_mut() = regions);
     STRINGS.with(|slot| *slot.borrow_mut() = strings);
     TYPES.with(|slot| *slot.borrow_mut() = types);
-    EXPORTS.with(|slot| *slot.borrow_mut() = export_rows(bytes));
-    IMPORTS.with(|slot| *slot.borrow_mut() = import_rows(bytes));
 
     rows.insert(
         0,
@@ -652,44 +659,48 @@ impl Pe {
 /// module's name, and anything else is the address of a body. The row order is the table's own - by
 /// ordinal - which is why a file with two names on one address shows it twice, and why `hint` is printed
 /// where it comes from: the name table's index, not the ordinal.
-fn export_rows(raw: &[u8]) -> Vec<String> {
+/// The names that go with them: an exported body's address keeps the name the table gives
+/// it, and an import slot is named `dll!name` (or `dll#ordinal`, where the file states no
+/// name at all) because that is what a call through the slot reaches.
+fn export_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
+    let mut found_names: Vec<(u64, String)> = Vec::new();
     let pe = match Pe::parse(raw) {
         Some(found) => found,
-        None => return Vec::new(),
+        None => return (Vec::new(), Vec::new()),
     };
     let (dir_rva, dir_size) = match (word_at(raw, pe.dirs, true), word_at(raw, pe.dirs + 4, true)) {
         (Some(one), Some(two)) => (one, two),
-        _ => return Vec::new(),
+        _ => return (Vec::new(), Vec::new()),
     };
     // No directory, or one too short to hold its own fixed header, is not a file with no exports - it
     // is a file that says nothing here, which an ELF also does. Both answer with no rows.
     if dir_rva == 0 || dir_size < 40 {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let (at, section) = match pe.at(dir_rva) {
         Some(found) => found,
-        None => return Vec::new(),
+        None => return (Vec::new(), Vec::new()),
     };
     let at = match usize::try_from(at).ok().filter(|each| raw.get(*each..*each + 40).is_some()) {
         Some(where_) => where_,
-        None => return Vec::new(),
+        None => return (Vec::new(), Vec::new()),
     };
     let (name_rva, base, functions, names) = (
         match word_at(raw, at + 12, true) {
             Some(value) => value,
-            None => return Vec::new(),
+            None => return (Vec::new(), Vec::new()),
         },
         match word_at(raw, at + 16, true) {
             Some(value) => value,
-            None => return Vec::new(),
+            None => return (Vec::new(), Vec::new()),
         },
         match word_at(raw, at + 20, true) {
             Some(value) => value,
-            None => return Vec::new(),
+            None => return (Vec::new(), Vec::new()),
         },
         match word_at(raw, at + 24, true) {
             Some(value) => value,
-            None => return Vec::new(),
+            None => return (Vec::new(), Vec::new()),
         },
     );
     let (eat_at, names_at, ordinals_at): (usize, usize, usize) = match (
@@ -698,7 +709,7 @@ fn export_rows(raw: &[u8]) -> Vec<String> {
         word_at(raw, at + 36, true).and_then(|value| pe.at(value)),
     ) {
         (Some(one), Some(two), Some(three)) => (one.0, two.0, three.0),
-        _ => return Vec::new(),
+        _ => return (Vec::new(), Vec::new()),
     };
     // The name table is read first, because a slot's name is only known through it: entry `i` of that
     // table holds the i-th hint, the index into the name list, which is why the rows print `hint` and
@@ -783,8 +794,11 @@ fn export_rows(raw: &[u8]) -> Vec<String> {
             offset,
             clean(section)
         ));
+        if !name.is_empty() {
+            found_names.push((pe.image_base + rva, name.clone()));
+        }
     }
-    rows
+    (rows, found_names)
 }
 
 /// IDA's Imports window: what a PE asks the loader to hand it, DLL by DLL.
@@ -795,21 +809,22 @@ fn export_rows(raw: &[u8]) -> Vec<String> {
 /// are the number; anything else is the RVA of a two-byte hint and a name. A descriptor with no ILT is
 /// not broken - the names then have to be read out of the IAT, which is the same list before the loader
 /// touched it. Both readers called that out, and the fixtures here hold both shapes.
-fn import_rows(raw: &[u8]) -> Vec<String> {
+fn import_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
+    let mut found_names: Vec<(u64, String)> = Vec::new();
     let pe = match Pe::parse(raw) {
         Some(found) => found,
-        None => return Vec::new(),
+        None => return (Vec::new(), Vec::new()),
     };
     let (dir_rva, dir_size) = match (word_at(raw, pe.dirs + 8, true), word_at(raw, pe.dirs + 12, true)) {
         (Some(one), Some(two)) => (one, two),
-        _ => return Vec::new(),
+        _ => return (Vec::new(), Vec::new()),
     };
     if dir_rva == 0 || dir_size < 20 {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let (at, section) = match pe.at(dir_rva) {
         Some(found) => found,
-        None => return Vec::new(),
+        None => return (Vec::new(), Vec::new()),
     };
     let width = if pe.wide { 8 } else { 4 };
     let flag = 1u64 << if pe.wide { 63 } else { 31 };
@@ -882,11 +897,16 @@ fn import_rows(raw: &[u8]) -> Vec<String> {
                 continue;
             }
             if value & flag != 0 {
+                let number = value & 0xffff;
                 detail.push(format!(
                     "thunk\t{}\t-\tordinal\t{}\tslot\t{:#x}",
                     clean(&dll),
-                    value & 0xffff,
+                    number,
                     iat + slot * width
+                ));
+                found_names.push((
+                    pe.image_base + iat + slot * width,
+                    format!("{}#{}", clean(&dll), number),
                 ));
                 continue;
             }
@@ -902,14 +922,21 @@ fn import_rows(raw: &[u8]) -> Vec<String> {
                 }
             };
             let hint = half_at(raw, entry, true).unwrap_or(0);
+            let symbol = clean(&cstr_at(raw, entry + 2));
             detail.push(format!(
                 "thunk\t{}\t{}\thint\t{}\tslot\t{:#x}\tname\t{:#x}",
                 clean(&dll),
-                clean(&cstr_at(raw, entry + 2)),
+                symbol,
                 hint,
                 iat + slot * width,
                 value
             ));
+            if !symbol.is_empty() {
+                found_names.push((
+                    pe.image_base + iat + slot * width,
+                    format!("{}!{}", clean(&dll), symbol),
+                ));
+            }
         }
     }
     let planned = dlls + thunks;
@@ -921,7 +948,7 @@ fn import_rows(raw: &[u8]) -> Vec<String> {
     if truncated || planned as usize > rows.len() - 1 {
         rows.push(format!("cut\timports\t{planned}"));
     }
-    rows
+    (rows, found_names)
 }
 
 /// The map: every range the file names, in order, with what falls between them called what it is -

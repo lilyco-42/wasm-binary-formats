@@ -354,6 +354,13 @@ test('the imports a loader will fill in come through as the readers spell them',
   assert.match(probe['noilt.dll'].rows[1], /\tilt\t0x0\tiat\t0x2000\tnames\tiat\b/);
   assert.match(probe['ordinal.dll'].rows[2], /^thunk\tmscoree\.dll\t-\tordinal\t12\tslot\t0x2000$/);
   assert.ok(!probe['ordinal.dll'].rows[2].includes('_CorDllMain'), 'an ordinal import has no name');
+  // The same addresses answer the index the disassembler labels functions with, which is the point of
+  // carrying the slot at all: a call through it can be named instead of synthesised.
+  report(new Uint8Array(await readFile('test/fixtures/lab.dll')));
+  assert.equal(text('name_at', 0x1000_2000n), 'mscoree.dll!_CorDllMain');
+  report(new Uint8Array(await readFile('test/fixtures/ordinal.dll')));
+  assert.equal(text('name_at', 0x1000_2000n), 'mscoree.dll#12', 'no name to borrow, so the number');
   report(new Uint8Array(await readFile('test/fixtures/exp.dll')));
+  assert.equal(text('name_at', 0x1_8000_1000n), 'shipped', 'three names, the table’s first one');
   assert.equal(ex.import_count(), 0, 'a DLL that hands out names need not ask for any');
 });

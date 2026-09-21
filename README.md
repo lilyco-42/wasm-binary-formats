@@ -353,6 +353,12 @@ probe unless all three agree, so the eight rows the tests assert are the linkers
 never a transcription of this one's. An ELF, a Mach-O or a COFF object answers with no rows: their names
 are already in the symbol list, and inventing an export directory for them is not this reader's job.
 
+Both tables feed the address index the disassembler labels entries with, which is what turns a
+`call [slot]` into a name: an exported body answers with the first name its table gives it, and an
+import slot answers `dll!name` - or `dll#ordinal`, because a request made by number has no name to
+borrow. Those two spellings are this reader's, not the file's: the table holds the pair, never a string
+that joins them, and the row that carries a slot says which of the two it is.
+
 **The import list** (`import_count` / `import_at`) is the other half of that window, and it needed a
 different producer: `lld-link` cannot write an import table on this host at all, because there is no
 Windows import library, no mingw sysroot and no SDK anywhere on it, so a call into `kernel32` has nothing

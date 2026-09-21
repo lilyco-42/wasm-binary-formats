@@ -741,6 +741,33 @@ fn an_ordinal_import_and_a_table_with_no_lookup_table_read_the_way_the_readers_d
     );
 }
 
+/// The address index is what the disassembler labels a function with, so an exported body and the slot
+/// a call through the import table reaches have to answer too. The spelling of an import is this
+/// reader's - `dll!name`, and `dll#ordinal` where the file states no name - because the file gives the
+/// pair, but no single string that holds it.
+#[test]
+fn an_exported_address_and_an_import_slot_answer_with_their_names() {
+    rows(&fixture("exp.dll"));
+    // Three names sit on one address in that table; the index keeps the first the file lists, and the
+    // empty slot and the nameless one add nothing at all.
+    assert_eq!(name_for(0x1_8000_1000).as_deref(), Some("shipped"));
+    assert_eq!(name_for(0x1_8000_1010).as_deref(), Some("helper"));
+    assert_eq!(names_len(), 2, "four names, two addresses");
+
+    rows(&fixture("lab.dll"));
+    assert_eq!(
+        name_for(0x1000_2000).as_deref(),
+        Some("mscoree.dll!_CorDllMain"),
+        "the slot the loader fills in, named by the DLL it is filled from"
+    );
+    rows(&fixture("ordinal.dll"));
+    assert_eq!(
+        name_for(0x1000_2000).as_deref(),
+        Some("mscoree.dll#12"),
+        "an ordinal import has no name to borrow"
+    );
+}
+
 #[test]
 fn a_file_that_imports_nothing_leaves_both_lists_empty() {
     rows(&sample_elf());
