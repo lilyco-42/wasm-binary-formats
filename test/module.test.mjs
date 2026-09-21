@@ -169,7 +169,7 @@ test('the region map accounts for the whole file, in both image formats', async 
     const total = ex.region_count();
     assert.ok(total > 1, `${name}: the map came back empty`);
     const rows = [];
-    for (let index = 0; index < total; index += 1) rows.push(text('region_at', BigInt(index)));
+    for (let index = 0; index < total; index += 1) rows.push(text('region_at', index));
     assert.equal(rows[0], head, `${name}: the totals row moved`);
     let cursor = 0n;
     const kinds = new Set();
