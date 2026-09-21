@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 51 | 23.3% |
+| own Rust reader, named header fields decoded | 52 | 23.7% |
 | own Rust reader, container framing only | 28 | 12.8% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **99** | 45.2% |
-| **covered, any level** | **120** | 54.8% |
+| **no parser at all - real gap** | **98** | 44.7% |
+| **covered, any level** | **121** | 55.3% |
 
-Top binary gap groups by count: unknown 52, archive 10, image 8, application 9, document 6,
+Top binary gap groups by count: unknown 52, archive 10, image 8, application 8, document 6,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 120 of 219 binary labels have a parser
-that runs here (51 field-level and 28 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 99 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 121 of 219 binary labels have a parser
+that runs here (52 field-level and 28 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 98 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 120 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 121 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -460,7 +460,9 @@ temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c w
 temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
 temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
 temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
+temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
+python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -569,8 +571,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **120 covered** (51 field-level and 28
-container-level from this repo's own readers, 41 generated and mostly load-gated), **99 with no
+Coverage is scored against magika's 219 binary labels: **121 covered** (52 field-level and 28
+container-level from this repo's own readers, 41 generated and mostly load-gated), **98 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -936,6 +938,19 @@ does not re-derive them:
   knowledge-base entry - no mime, no description, no extension - which is a label that cannot be pinned
   to anything, so it stays a gap rather than becoming a guess. `tools/vcard-sim.py` is the usual shadow:
   a second reading of the same rules in Python, diffed against the rows before a CI cycle is spent.
+* .torrent (+1 field-level label, 121 covered, 98 gaps) is bencode, the third format here with no magic
+  to match: every string and every integer states its own length, so either the values tile the file
+  exactly or the file is not what it claims, which is the whole of the acceptance rule - a walk that
+  lands on the last byte and finds an `info` dictionary on the way. `bencode.py` writes both fixtures
+  (`lab.torrent` single-file, `lab-multi.torrent` with a `files` list) and re-encodes each one back to
+  identical bytes, so the key counts, the `pieces` length and the file count in the probe are another
+  implementation's. Two things are reported rather than demanded, because both are cases where a real
+  file can be readable and still wrong: dictionary keys out of BEP-3's byte order come back as
+  `sorted no` with a count of the dictionaries that did it, and `pieces` - a flat string of 20-byte
+  SHA-1 hashes - states `pieces_x20 no` when its length does not divide, which is the one arithmetic
+  check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
+  file's size and not the torrent's, so named values are read at the key they were reached under, and
+  the shape row says `single` or `multi` from which of the two the file actually has.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

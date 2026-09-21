@@ -145,6 +145,7 @@ pub fn name() -> &'static str {
         FORMAT_PSD => "psd",
         FORMAT_OTF => "otf",
         FORMAT_VCARD => "vcard",
+        FORMAT_TORRENT => "torrent",
         _ => "unknown",
     }
 }
@@ -7428,6 +7429,280 @@ fn read_vcard(bytes: &[u8]) -> Option<Vec<String>> {
     card.names.sort_by(|left, right| left.0.cmp(&right.0));
     Some(card.rows())
 }
+// ------------------------------------------------------------------- TORRENT / bencode tree
+pub const FORMAT_TORRENT: i32 = 53;
+
+/// Values walked before the reader stops. A `.torrent` has a few dozen; the cap exists so a 32 MB file
+/// of nested lists cannot make the row vector grow without bound.
+const BENCODE_MAX_NODES: usize = 4096;
+/// Nesting the walk will follow, for the same reason.
+const BENCODE_MAX_DEPTH: usize = 32;
+
+/// One scalar, sized as the byte count the file stated for it. `Opaque` is a well-formed integer too
+/// large for this report to print, which is still not a reason to call the file broken.
+#[derive(Clone, Copy)]
+enum Plain<'a> {
+    Number(u64),
+    Text(&'a [u8]),
+    Opaque,
+}
+
+/// The tree, counted on the way past. Only a handful of named values are *read*, each at the depth its
+/// key says it lives at: a `length` inside a `files` entry is one file's size, not the torrent's own,
+/// and mixing the two up would put the wrong number in the row that claims it.
+struct Bencode<'a> {
+    raw: &'a [u8],
+    nodes: usize,
+    keys: usize,
+    deepest: usize,
+    broken: usize,
+    unsorted: usize,
+    truncated: bool,
+    saw_info: bool,
+    pieces: Option<usize>,
+    length: Option<u64>,
+    piece_length: Option<u64>,
+    files: Option<usize>,
+    announce: Option<String>,
+}
+
+impl<'a> Bencode<'a> {
+    /// The one way out of a walk that is not a completion: count the defect, stop descending, and let
+    /// the caller turn `None` into a refusal.
+    fn refuse<T>(&mut self) -> Option<T> {
+        self.broken += 1;
+        None
+    }
+
+    /// Digits and where they ended. The inner `None` is "more than this report can hold".
+    fn digits(&self, pos: usize) -> Option<(Option<u64>, usize)> {
+        let raw = self.raw;
+        let start = pos;
+        let mut at = pos;
+        while at < raw.len() && raw[at].is_ascii_digit() {
+            at += 1;
+        }
+        if at == start {
+            return None;
+        }
+        let mut value: u64 = 0;
+        for each in &raw[start..at] {
+            let digit = u64::from(each - b'0');
+            match value.checked_mul(10).and_then(|ten| ten.checked_add(digit)) {
+                Some(next) => value = next,
+                None => return Some((None, at)),
+            }
+        }
+        Some((Some(value), at))
+    }
+
+    /// `i…e` or `length:bytes`, and where the next value starts.
+    fn plain(&mut self, pos: usize) -> Option<(Plain<'a>, usize)> {
+        let raw = self.raw;
+        if pos >= raw.len() {
+            return self.refuse();
+        }
+        if raw[pos] == b'i' {
+            let Some((number, at)) = self.digits(pos + 1) else {
+                return self.refuse();
+            };
+            if at >= raw.len() || raw[at] != b'e' {
+                return self.refuse();
+            }
+            return Some((number.map_or(Plain::Opaque, Plain::Number), at + 1));
+        }
+        let Some((Some(length), at)) = self.digits(pos) else {
+            return self.refuse();
+        };
+        let Ok(length) = usize::try_from(length) else {
+            return self.refuse();
+        };
+        if at >= raw.len() || raw[at] != b':' {
+            return self.refuse();
+        }
+        let Some(end) = (at + 1).checked_add(length) else {
+            return self.refuse();
+        };
+        if end > raw.len() {
+            return self.refuse();
+        }
+        Some((Plain::Text(&raw[at + 1..end]), end))
+    }
+
+    fn note(&mut self, key: Option<&[u8]>, inside: Option<&[u8]>, value: Plain<'a>) {
+        let Some(key) = key else { return };
+        if key == b"pieces" && inside == Some(b"info") {
+            if let Plain::Text(body) = value {
+                self.pieces = Some(body.len());
+            }
+        } else if key == b"length" && inside == Some(b"info") {
+            if let Plain::Number(number) = value {
+                self.length = Some(number);
+            }
+        } else if key == b"piece length" && inside == Some(b"info") {
+            if let Plain::Number(number) = value {
+                self.piece_length = Some(number);
+            }
+        } else if key == b"announce" && inside.is_none() {
+            // The one value printed as text, and only when every byte of it is printable: a tracker URL
+            // is worth reading, and a row must not carry the NUL or tab that would forge a column.
+            if let Plain::Text(body) = value {
+                if body.iter().all(|each| (0x20..=0x7e).contains(each)) {
+                    self.announce = String::from_utf8(body.to_vec()).ok();
+                }
+            }
+        }
+    }
+
+    fn value(
+        &mut self,
+        pos: usize,
+        key: Option<&'a [u8]>,
+        inside: Option<&'a [u8]>,
+        depth: usize,
+    ) -> Option<usize> {
+        if self.nodes >= BENCODE_MAX_NODES || depth > BENCODE_MAX_DEPTH {
+            self.truncated = true;
+            return self.refuse();
+        }
+        self.nodes += 1;
+        self.deepest = self.deepest.max(depth);
+        let raw = self.raw;
+        if pos >= raw.len() {
+            return self.refuse();
+        }
+        match raw[pos] {
+            b'd' => self.dictionary(pos + 1, key, depth),
+            b'l' => self.list_at(pos + 1, key, depth),
+            b'i' | b'0'..=b'9' => {
+                let (value, next) = self.plain(pos)?;
+                self.note(key, inside, value);
+                Some(next)
+            }
+            _ => self.refuse(),
+        }
+    }
+
+    fn dictionary(&mut self, pos: usize, key: Option<&'a [u8]>, depth: usize) -> Option<usize> {
+        if key == Some(b"info") {
+            self.saw_info = true;
+        }
+        let raw = self.raw;
+        let mut at = pos;
+        let mut previous: Option<&[u8]> = None;
+        let mut counted = 0usize;
+        while at < raw.len() && raw[at] != b'e' {
+            let (name, next) = self.plain(at)?;
+            // A dictionary's key is a string by definition; an `i5e` in that position is a defect
+            // rather than a key, and the walk cannot know what follows it.
+            let Plain::Text(field) = name else {
+                return self.refuse();
+            };
+            if previous.is_some_and(|seen| seen > field) {
+                self.unsorted += 1;
+            }
+            previous = Some(field);
+            counted += 1;
+            if depth == 1 {
+                self.keys = counted;
+            }
+            at = self.value(next, Some(field), key, depth + 1)?;
+        }
+        if at >= raw.len() {
+            return self.refuse();
+        }
+        Some(at + 1)
+    }
+
+    fn list_at(&mut self, pos: usize, key: Option<&'a [u8]>, depth: usize) -> Option<usize> {
+        let raw = self.raw;
+        let mut at = pos;
+        let mut items = 0usize;
+        while at < raw.len() && raw[at] != b'e' {
+            at = self.value(at, None, None, depth + 1)?;
+            items += 1;
+        }
+        if at >= raw.len() {
+            return self.refuse();
+        }
+        if key == Some(b"files") {
+            self.files = Some(items);
+        }
+        Some(at + 1)
+    }
+
+    fn rows(&self, walked: usize) -> Vec<String> {
+        let mut rows = vec![
+            format!(
+                "bencode\tkeys\t{}\tnodes\t{}\tdepth\t{}\tbytes\t{}\tends\tyes",
+                self.keys,
+                self.nodes,
+                self.deepest,
+                walked
+            ),
+            format!(
+                "sorted\t{}\tunsorted\t{}",
+                if self.unsorted == 0 { "yes" } else { "no" },
+                self.unsorted
+            ),
+            format!(
+                "info\t{}\tpieces\t{}\tpieces_x20\t{}\tpiece_length\t{}",
+                if self.length.is_some() { "single" } else { "multi" },
+                self.pieces.map_or("-".to_string(), |count| count.to_string()),
+                if self.pieces.is_some_and(|count| count > 0 && count % 20 == 0) { "yes" } else { "no" },
+                self.piece_length.map_or("-".to_string(), |number| number.to_string()),
+            ),
+        ];
+        rows.push(match self.length {
+            Some(number) => format!("length\t{number}"),
+            None => format!(
+                "files\t{}",
+                self.files.map_or("-".to_string(), |items| items.to_string())
+            ),
+        });
+        if let Some(url) = &self.announce {
+            rows.push(format!("announce\t{url}"));
+        }
+        rows.push(format!("broken\t{}", self.broken));
+        if self.truncated {
+            rows.push(format!("stopped\tnodes\t{BENCODE_MAX_NODES}"));
+        }
+        rows
+    }
+}
+
+/// A `.torrent`: bencode that carries an `info` dictionary, which is what makes a bencode tree a
+/// torrent rather than some other program's data. There is no magic to match, so the walk is the test -
+/// every string and integer states its own length, so either the values tile the file exactly or the
+/// file is not what it claims - and `pieces`, a flat string of 20-byte hashes, gives the same arithmetic
+/// a second thing to check. Key order is reported rather than demanded: BEP-3 requires it, and a file
+/// that breaks it is still readable, so the row says `sorted no` and counts how many dicts did.
+fn read_torrent(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.first() != Some(&b'd') {
+        return None;
+    }
+    let mut book = Bencode {
+        raw: bytes,
+        nodes: 0,
+        keys: 0,
+        deepest: 0,
+        broken: 0,
+        unsorted: 0,
+        truncated: false,
+        saw_info: false,
+        pieces: None,
+        length: None,
+        piece_length: None,
+        files: None,
+        announce: None,
+    };
+    let end = book.value(0, None, None, 1)?;
+    if end != bytes.len() || !book.saw_info {
+        return None;
+    }
+    Some(book.rows(bytes.len()))
+}
+
 pub fn parse(bytes: &[u8]) -> i32 {
     // Eight bytes is the shortest header any reader below can use (a Netpbm bitmap is seven), and
     // each reader bounds-checks itself, so there is nothing to gain by rejecting earlier.
@@ -7439,6 +7714,12 @@ pub fn parse(bytes: &[u8]) -> i32 {
     // its own count on a card's bytes and answer with a triangle list.
     if let Some(lines) = read_vcard(bytes) {
         return accept(FORMAT_VCARD, lines);
+    }
+    // Bencode has no signature either, but unlike STL it is checked by an exact tiling: the walk has to
+    // land on the last byte and find an `info` dictionary on the way, so a binary that merely starts
+    // with `d` is refused here and reaches the readers below unchanged.
+    if let Some(lines) = read_torrent(bytes) {
+        return accept(FORMAT_TORRENT, lines);
     }
     if let Some(lines) = read_tar(bytes) {
         return accept(FORMAT_TAR, lines);
@@ -7567,7 +7848,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a vCard, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

@@ -309,7 +309,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10], ['wide.mov', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
-    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['lab.vcard', 52], ['tiny.icns', 30],
+    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['lab.vcard', 52], ['lab.torrent', 53], ['tiny.icns', 30],
     ['tiny.bplist', 31], ['keyed.bplist', 31],
     ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
     ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
@@ -816,6 +816,29 @@ test('a vCard counts properties after unfolding them, not physical lines', () =>
   assert.ok(driveBytes('container', calendar).code <= 0, 'a calendar was read as a card');
 });
 
+test('a torrent is accepted only when its stated lengths tile the file', () => {
+  // `bencode.py` wrote both fixtures and re-encoded them to identical bytes, so the counts in these
+  // rows are another implementation's, and `tools/torrent-sim.py` is the shadow they were taken from.
+  const single = assertReadable('container', 'lab.torrent', 53);
+  assert.equal(single.name, 'torrent');
+  assert.equal(single.rows[0], 'bencode\tkeys\t6\tnodes\t15\tdepth\t4\tbytes\t378\tends\tyes');
+  assert.equal(single.rows[1], 'sorted\tyes\tunsorted\t0');
+  assert.equal(single.rows[2], 'info\tsingle\tpieces\t40\tpieces_x20\tyes\tpiece_length\t16384');
+  assert.equal(single.rows[3], 'length\t4096');
+  assert.equal(single.rows[4], 'announce\tudp://tracker.example.invalid:1337/announce');
+
+  const many = assertReadable('container', 'lab-multi.torrent', 53);
+  assert.equal(many.rows[2], 'info\tmulti\tpieces\t20\tpieces_x20\tyes\tpiece_length\t16384');
+  assert.equal(many.rows[3], 'files\t2');
+
+  // Bencode that is not a torrent, and a string length that runs off the end, are both refused - the
+  // walk has nowhere to land, so there is no structure to report.
+  for (const [label, text] of [['no info', 'd8:announce7:trackeree'], ['over-read', 'd4:name99:abce']]) {
+    const seen = driveBytes('container', new TextEncoder().encode(text));
+    assert.ok(seen.code <= 0, `${label} was read as a torrent: ${seen.code}`);
+  }
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -860,7 +883,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'lab.vcard', 'vcard'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'lab.vcard', 'vcard'], ['container', 'lab.torrent', 'torrent'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],

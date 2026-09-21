@@ -1,0 +1,226 @@
+{
+ "lab-multi.torrent": {
+  "bytes": 261,
+  "decoded": {
+   "items": {
+    "announce": {
+     "length": 43,
+     "type": "text"
+    },
+    "creation date": {
+     "type": "int",
+     "value": 1700000001
+    },
+    "info": {
+     "items": {
+      "files": {
+       "count": 2,
+       "items": [
+        {
+         "items": {
+          "length": {
+           "type": "int",
+           "value": 1024
+          },
+          "path": {
+           "count": 2,
+           "items": [
+            {
+             "length": 7,
+             "type": "text"
+            },
+            {
+             "length": 9,
+             "type": "text"
+            }
+           ],
+           "type": "list"
+          }
+         },
+         "keys": [
+          "length",
+          "path"
+         ],
+         "type": "dict"
+        },
+        {
+         "items": {
+          "length": {
+           "type": "int",
+           "value": 2048
+          },
+          "path": {
+           "count": 2,
+           "items": [
+            {
+             "length": 7,
+             "type": "text"
+            },
+            {
+             "length": 10,
+             "type": "text"
+            }
+           ],
+           "type": "list"
+          }
+         },
+         "keys": [
+          "length",
+          "path"
+         ],
+         "type": "dict"
+        }
+       ],
+       "type": "list"
+      },
+      "name": {
+       "length": 7,
+       "type": "text"
+      },
+      "piece length": {
+       "type": "int",
+       "value": 16384
+      },
+      "pieces": {
+       "length": 20,
+       "type": "text"
+      }
+     },
+     "keys": [
+      "files",
+      "name",
+      "piece length",
+      "pieces"
+     ],
+     "type": "dict"
+    }
+   },
+   "keys": [
+    "announce",
+    "creation date",
+    "info"
+   ],
+   "type": "dict"
+  },
+  "files": 2,
+  "info_keys": [
+   "files",
+   "name",
+   "piece length",
+   "pieces"
+  ],
+  "name": "lab-dir",
+  "piece_length": 16384,
+  "pieces": 20,
+  "root_keys": [
+   "announce",
+   "creation date",
+   "info"
+  ],
+  "single": false
+ },
+ "lab.torrent": {
+  "bytes": 378,
+  "decoded": {
+   "items": {
+    "announce": {
+     "length": 43,
+     "type": "text"
+    },
+    "announce-list": {
+     "count": 2,
+     "items": [
+      {
+       "count": 1,
+       "items": [
+        {
+         "length": 43,
+         "type": "text"
+        }
+       ],
+       "type": "list"
+      },
+      {
+       "count": 1,
+       "items": [
+        {
+         "length": 39,
+         "type": "text"
+        }
+       ],
+       "type": "list"
+      }
+     ],
+     "type": "list"
+    },
+    "comment": {
+     "length": 34,
+     "type": "text"
+    },
+    "created by": {
+     "length": 10,
+     "type": "text"
+    },
+    "creation date": {
+     "type": "int",
+     "value": 1700000000
+    },
+    "info": {
+     "items": {
+      "length": {
+       "type": "int",
+       "value": 4096
+      },
+      "name": {
+       "length": 7,
+       "type": "text"
+      },
+      "piece length": {
+       "type": "int",
+       "value": 16384
+      },
+      "pieces": {
+       "length": 40,
+       "type": "text"
+      }
+     },
+     "keys": [
+      "length",
+      "name",
+      "piece length",
+      "pieces"
+     ],
+     "type": "dict"
+    }
+   },
+   "keys": [
+    "announce",
+    "announce-list",
+    "comment",
+    "created by",
+    "creation date",
+    "info"
+   ],
+   "type": "dict"
+  },
+  "files": 0,
+  "info_keys": [
+   "length",
+   "name",
+   "piece length",
+   "pieces"
+  ],
+  "name": "lab.bin",
+  "piece_length": 16384,
+  "pieces": 40,
+  "root_keys": [
+   "announce",
+   "announce-list",
+   "comment",
+   "created by",
+   "creation date",
+   "info"
+  ],
+  "single": true
+ }
+}
