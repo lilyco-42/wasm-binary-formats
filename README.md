@@ -491,6 +491,7 @@ temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools 
 temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
 temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
 temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
+temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it (reader not wired in yet)
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
