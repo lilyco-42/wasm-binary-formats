@@ -213,6 +213,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     SEGMENTS.with(|slot| slot.borrow_mut().clear());
     RESOURCES.with(|slot| slot.borrow_mut().clear());
     VERSION.with(|slot| slot.borrow_mut().clear());
+    DYNAMIC.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -354,6 +355,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     RESOURCES.with(|slot| *slot.borrow_mut() = resources);
     let version = version_rows(bytes);
     VERSION.with(|slot| *slot.borrow_mut() = version);
+    let dynamic = dynamic_rows(bytes);
+    DYNAMIC.with(|slot| *slot.borrow_mut() = dynamic);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1122,6 +1125,8 @@ thread_local! {
     static RESOURCES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// The version block a PE states about itself, from inside the resource tree.
     static VERSION: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The Dynamic window: the list an ELF hands its loader, entries and the names between them.
+    static DYNAMIC: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -1708,6 +1713,208 @@ pub extern "C" fn version_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     VERSION.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// The tag numbers two readers named in the files here. Twenty-two, because those are the ones
+/// `readelf -dW` and `llvm-readobj --dynamic-table` were both asked about, in six files, and agreed on
+/// word for word - and a `DT_*` table copied out of memory is the classic off-by-one (`0x1d` is
+/// `RUNPATH`, `0xf` is `RPATH`, and `0x1c` is neither). A number outside this set prints as a number.
+fn dynamic_name(tag: u64) -> Option<&'static str> {
+    Some(match tag {
+        0 => "NULL",
+        1 => "NEEDED",
+        2 => "PLTRELSZ",
+        3 => "PLTGOT",
+        4 => "HASH",
+        5 => "STRTAB",
+        6 => "SYMTAB",
+        7 => "RELA",
+        8 => "RELASZ",
+        9 => "RELAENT",
+        0xa => "STRSZ",
+        0xb => "SYMENT",
+        0xe => "SONAME",
+        0x11 => "REL",
+        0x12 => "RELSZ",
+        0x13 => "RELENT",
+        0x14 => "PLTREL",
+        0x17 => "JMPREL",
+        0x1d => "RUNPATH",
+        0x6fff_fef5 => "GNU_HASH",
+        0x6fff_fff9 => "RELACOUNT",
+        0x6fff_fffa => "RELCOUNT",
+        _ => return None,
+    })
+}
+
+/// What a value is, as both readers spell it: the size tags state their unit and `DT_PLTREL` holds a
+/// relocation type rather than an address. Everything else in the section holds an address or a bare
+/// count, and neither reader gives it a word, so neither does this one.
+fn dynamic_word(tag: u64, value: u64) -> Option<&'static str> {
+    Some(match tag {
+        0x14 => match value {
+            0x7 => "RELA",
+            0x11 => "REL",
+            _ => return None,
+        },
+        2 | 8 | 9 | 0xa | 0xb | 0x12 | 0x13 => "BYTES",
+        _ => return None,
+    })
+}
+
+/// The string an entry points at inside `DT_STRTAB`, bounded by that table's own length: an entry that
+/// runs past the end of the table is left unresolved rather than answered with whatever bytes follow.
+fn dynamic_text(raw: &[u8], home: Option<usize>, limit: usize, at: u64) -> Option<String> {
+    let start = home?.checked_add(usize::try_from(at).ok()?)?;
+    let window = raw.get(start..limit.min(raw.len()))?;
+    let end = window.iter().position(|byte| *byte == 0)?;
+    Some(clean(&String::from_utf8_lossy(&window[..end])))
+}
+
+/// The dynamic section - the list a loader reads to find out what to bring in before it runs anything.
+///
+/// Two things bound the walk: `PT_DYNAMIC`'s own `p_filesz`, and a `DT_NULL` entry, whichever comes
+/// first. The records are as wide as the file's class (`Elf64_Dyn` is two 8-byte words, the 32-bit
+/// shape two 4-byte ones) and read in the byte order `e_ident` states, so an 8-byte-record file and a
+/// 64-bit one are not walked with the same stride.
+///
+/// Values are addresses in the file's own address space, so the three tags that hold an offset into the
+/// string table are followed twice over: `DT_STRTAB`'s value is itself an address, and turning either
+/// into a position in the file needs the `PT_LOAD` records. That is the same conversion the Resources
+/// window does for an RVA, and a string whose address no segment covers comes back as no string.
+fn dynamic_rows(raw: &[u8]) -> Vec<String> {
+    if raw.len() < 64 || raw.get(..4) != Some(b"\x7fELF") {
+        return Vec::new();
+    }
+    let wide = raw[4] == 2;
+    let little = raw[5] == 1;
+    let (Some(at_ph), Some(stride), Some(count)) = (
+        addr_at(raw, if wide { 32 } else { 28 }, wide, little),
+        usize::try_from(half_at(raw, if wide { 54 } else { 42 }, little).unwrap_or(0)).ok(),
+        half_at(raw, if wide { 56 } else { 44 }, little),
+    ) else {
+        return Vec::new();
+    };
+    if stride < if wide { 56 } else { 32 } {
+        return Vec::new();
+    }
+    let mut loads: Vec<(u64, u64, u64)> = Vec::new();
+    let mut found: Option<(u64, u64, u64)> = None;
+    for index in 0..count.min(64) {
+        let Some(start) = at_ph.checked_add(index * u64::try_from(stride).unwrap_or(0)) else {
+            break;
+        };
+        let Some(at) = usize::try_from(start).ok() else { break };
+        // One record read or the walk stops, the same way the Segments window stops: a header table
+        // that runs off the file's own end still leaves everything before it true.
+        let (Some(kind), Some(offset), Some(vaddr), Some(filesz)) = (
+            word_at(raw, at, little),
+            addr_at(raw, at + if wide { 8 } else { 4 }, wide, little),
+            addr_at(raw, at + if wide { 16 } else { 8 }, wide, little),
+            addr_at(raw, at + if wide { 32 } else { 16 }, wide, little),
+        ) else {
+            break;
+        };
+        if kind == PT_LOAD {
+            loads.push((offset, vaddr, filesz));
+        }
+        if kind == 2 && found.is_none() {
+            found = Some((offset, vaddr, filesz));
+        }
+    }
+    let Some((base, segment, span)) = found else {
+        return Vec::new();
+    };
+    let width = if wide { 16u64 } else { 8 };
+    let stop = base.saturating_add(span);
+    let mut items: Vec<(u64, u64)> = Vec::new();
+    let mut walk = base;
+    while walk.saturating_add(width) <= stop {
+        let Some(at) = usize::try_from(walk).ok() else { break };
+        let (Some(tag), Some(value)) = (
+            addr_at(raw, at, wide, little),
+            addr_at(raw, at + width as usize / 2, wide, little),
+        ) else {
+            break;
+        };
+        items.push((tag, value));
+        walk += width;
+        if tag == 0 {
+            break;
+        }
+    }
+    let strtab = items.iter().find(|one| one.0 == 5).map(|one| one.1);
+    let strsz = items.iter().find(|one| one.0 == 10).map_or(0, |one| one.1);
+    let home = strtab
+        .and_then(|address| {
+            loads.iter().find_map(|&(offset, from, size)| {
+                let over = from.checked_add(size)?;
+                (from <= address && address < over).then_some(offset + (address - from))
+            })
+        })
+        .and_then(|one| usize::try_from(one).ok());
+    let limit = home.unwrap_or(0).saturating_add(usize::try_from(strsz).unwrap_or(0));
+    let mut needed = 0usize;
+    let mut with_text = 0usize;
+    let mut body: Vec<String> = Vec::new();
+    for (index, (tag, value)) in items.iter().enumerate() {
+        if *tag == 1 {
+            needed += 1;
+        }
+        let text = if matches!(*tag, 1 | 0xe | 0x1d) {
+            dynamic_text(raw, home, limit, *value)
+        } else {
+            None
+        };
+        if text.is_some() {
+            with_text += 1;
+        }
+        if index >= MAX_LISTED {
+            continue;
+        }
+        let mut row = format!(
+            "entry\t{index}\ttag\t0x{tag:x}\tname\t{}\tvalue\t0x{value:x}",
+            dynamic_name(*tag).unwrap_or("-"),
+        );
+        if let Some(word) = dynamic_word(*tag, *value) {
+            row.push_str(&format!("\tword\t{word}"));
+        }
+        if let Some(one) = text {
+            row.push_str(&format!("\ttext\t{one}"));
+        }
+        body.push(row);
+    }
+    let total = items.len();
+    let mut rows = vec![format!(
+        "dynamic\tentries\t{total}\twidth\t{width}\tvaddr\t0x{segment:x}\toff\t{base}\tfilesz\t{span}\tstrtab\t0x{:x}\tstrlen\t{strsz}\tneeded\t{needed}\ttext\t{with_text}",
+        strtab.unwrap_or(0),
+    )];
+    rows.append(&mut body);
+    if total > MAX_LISTED {
+        rows.push(format!("cut\tentries\t{total}\tlisted\t{MAX_LISTED}"));
+    }
+    rows
+}
+
+/// How many rows the dynamic section fills. A PE has no such list - it names its imports in a directory
+/// of its own - and a static executable has no `PT_DYNAMIC` at all.
+#[no_mangle]
+pub extern "C" fn dynamic_count() -> i32 {
+    DYNAMIC.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then a line per entry with the tag's number, the word two readers gave that
+/// number in a file here, the value, and - where the value indexes the string table - the string. Row
+/// zero is the totals.
+#[no_mangle]
+pub extern "C" fn dynamic_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    DYNAMIC.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

@@ -1,0 +1,1204 @@
+{
+ "lab.elf": {
+  "entries": 0,
+  "names": {},
+  "rows": [],
+  "width": null
+ },
+ "lab.so": {
+  "bits": 64,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t16\tvaddr\t0x25a0\toff\t1440\tfilesz\t224\tstrtab\t0x34c\tstrlen\t69\tneeded\t0\ttext\t0",
+   "entry\t0\ttag\t0x7\tname\tRELA\tvalue\t0x398",
+   "entry\t1\ttag\t0x8\tname\tRELASZ\tvalue\t0xa8\tword\tBYTES",
+   "entry\t2\ttag\t0x9\tname\tRELAENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t3\ttag\t0x6ffffff9\tname\tRELACOUNT\tvalue\t0x1",
+   "entry\t4\ttag\t0x17\tname\tJMPREL\tvalue\t0x440",
+   "entry\t5\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x30\tword\tBYTES",
+   "entry\t6\ttag\t0x3\tname\tPLTGOT\tvalue\t0x36e0",
+   "entry\t7\ttag\t0x14\tname\tPLTREL\tvalue\t0x7\tword\tRELA",
+   "entry\t8\ttag\t0x6\tname\tSYMTAB\tvalue\t0x238",
+   "entry\t9\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t10\ttag\t0x5\tname\tSTRTAB\tvalue\t0x34c",
+   "entry\t11\ttag\t0xa\tname\tSTRSZ\tvalue\t0x45\tword\tBYTES",
+   "entry\t12\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x310",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "RELA",
+    "tag": "0x7",
+    "text": null,
+    "value": "0x398",
+    "word": null
+   },
+   {
+    "name": "RELASZ",
+    "tag": "0x8",
+    "text": null,
+    "value": "0xa8",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELAENT",
+    "tag": "0x9",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELACOUNT",
+    "tag": "0x6ffffff9",
+    "text": null,
+    "value": "0x1",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x440",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x30",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x36e0",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x34c",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x45",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x310",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
+ "lab32.so": {
+  "bits": 32,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t8\tvaddr\t0x23f0\toff\t1008\tfilesz\t112\tstrtab\t0x220\tstrlen\t69\tneeded\t0\ttext\t0",
+   "entry\t0\ttag\t0x11\tname\tREL\tvalue\t0x268",
+   "entry\t1\ttag\t0x12\tname\tRELSZ\tvalue\t0x38\tword\tBYTES",
+   "entry\t2\ttag\t0x13\tname\tRELENT\tvalue\t0x8\tword\tBYTES",
+   "entry\t3\ttag\t0x6ffffffa\tname\tRELCOUNT\tvalue\t0x1",
+   "entry\t4\ttag\t0x17\tname\tJMPREL\tvalue\t0x2a0",
+   "entry\t5\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x10\tword\tBYTES",
+   "entry\t6\ttag\t0x3\tname\tPLTGOT\tvalue\t0x348c",
+   "entry\t7\ttag\t0x14\tname\tPLTREL\tvalue\t0x11\tword\tREL",
+   "entry\t8\ttag\t0x6\tname\tSYMTAB\tvalue\t0x154",
+   "entry\t9\ttag\t0xb\tname\tSYMENT\tvalue\t0x10\tword\tBYTES",
+   "entry\t10\ttag\t0x5\tname\tSTRTAB\tvalue\t0x220",
+   "entry\t11\ttag\t0xa\tname\tSTRSZ\tvalue\t0x45\tword\tBYTES",
+   "entry\t12\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x1e4",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "REL",
+    "tag": "0x11",
+    "text": null,
+    "value": "0x268",
+    "word": null
+   },
+   {
+    "name": "RELSZ",
+    "tag": "0x12",
+    "text": null,
+    "value": "0x38",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELENT",
+    "tag": "0x13",
+    "text": null,
+    "value": "0x8",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELCOUNT",
+    "tag": "0x6ffffffa",
+    "text": null,
+    "value": "0x1",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x2a0",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x10",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x348c",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x11",
+    "word": "REL"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x154",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x10",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x220",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x45",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x1e4",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 8
+ },
+ "labarm.so": {
+  "bits": 64,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t16\tvaddr\t0x205c0\toff\t1472\tfilesz\t224\tstrtab\t0x34c\tstrlen\t69\tneeded\t0\ttext\t0",
+   "entry\t0\ttag\t0x7\tname\tRELA\tvalue\t0x398",
+   "entry\t1\ttag\t0x8\tname\tRELASZ\tvalue\t0xa8\tword\tBYTES",
+   "entry\t2\ttag\t0x9\tname\tRELAENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t3\ttag\t0x6ffffff9\tname\tRELACOUNT\tvalue\t0x1",
+   "entry\t4\ttag\t0x17\tname\tJMPREL\tvalue\t0x440",
+   "entry\t5\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x30\tword\tBYTES",
+   "entry\t6\ttag\t0x3\tname\tPLTGOT\tvalue\t0x306f0",
+   "entry\t7\ttag\t0x14\tname\tPLTREL\tvalue\t0x7\tword\tRELA",
+   "entry\t8\ttag\t0x6\tname\tSYMTAB\tvalue\t0x238",
+   "entry\t9\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t10\ttag\t0x5\tname\tSTRTAB\tvalue\t0x34c",
+   "entry\t11\ttag\t0xa\tname\tSTRSZ\tvalue\t0x45\tword\tBYTES",
+   "entry\t12\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x310",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "RELA",
+    "tag": "0x7",
+    "text": null,
+    "value": "0x398",
+    "word": null
+   },
+   {
+    "name": "RELASZ",
+    "tag": "0x8",
+    "text": null,
+    "value": "0xa8",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELAENT",
+    "tag": "0x9",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "RELACOUNT",
+    "tag": "0x6ffffff9",
+    "text": null,
+    "value": "0x1",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x440",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x30",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x306f0",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x34c",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x45",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x310",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
+ "liblab.so": {
+  "bits": 64,
+  "entries": 7,
+  "rows": [
+   "dynamic\tentries\t7\twidth\t16\tvaddr\t0x22d8\toff\t728\tfilesz\t112\tstrtab\t0x250\tstrlen\t21\tneeded\t0\ttext\t1",
+   "entry\t0\ttag\t0xe\tname\tSONAME\tvalue\t0xb\ttext\tliblab.so",
+   "entry\t1\ttag\t0x6\tname\tSYMTAB\tvalue\t0x200",
+   "entry\t2\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t3\ttag\t0x5\tname\tSTRTAB\tvalue\t0x250",
+   "entry\t4\ttag\t0xa\tname\tSTRSZ\tvalue\t0x15\tword\tBYTES",
+   "entry\t5\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x230",
+   "entry\t6\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "liblab.so",
+    "value": "0xb",
+    "word": null
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x200",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x250",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x15",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x230",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
+ "libuser.so": {
+  "bits": 64,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t16\tvaddr\t0x23b0\toff\t944\tfilesz\t224\tstrtab\t0x2c0\tstrlen\t52\tneeded\t1\ttext\t3",
+   "entry\t0\ttag\t0x1d\tname\tRUNPATH\tvalue\t0x12\ttext\t/opt/lab/lib",
+   "entry\t1\ttag\t0x1\tname\tNEEDED\tvalue\t0x1f\ttext\tliblab.so",
+   "entry\t2\ttag\t0xe\tname\tSONAME\tvalue\t0x29\ttext\tlibuser.so",
+   "entry\t3\ttag\t0x17\tname\tJMPREL\tvalue\t0x2f8",
+   "entry\t4\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x18\tword\tBYTES",
+   "entry\t5\ttag\t0x3\tname\tPLTGOT\tvalue\t0x3490",
+   "entry\t6\ttag\t0x14\tname\tPLTREL\tvalue\t0x7\tword\tRELA",
+   "entry\t7\ttag\t0x6\tname\tSYMTAB\tvalue\t0x238",
+   "entry\t8\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t9\ttag\t0x5\tname\tSTRTAB\tvalue\t0x2c0",
+   "entry\t10\ttag\t0xa\tname\tSTRSZ\tvalue\t0x34\tword\tBYTES",
+   "entry\t11\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x280",
+   "entry\t12\ttag\t0x4\tname\tHASH\tvalue\t0x2a0",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "RUNPATH",
+    "tag": "0x1d",
+    "text": "/opt/lab/lib",
+    "value": "0x12",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "liblab.so",
+    "value": "0x1f",
+    "word": null
+   },
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "libuser.so",
+    "value": "0x29",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x2f8",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x3490",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x2c0",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x34",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x280",
+    "word": null
+   },
+   {
+    "name": "HASH",
+    "tag": "0x4",
+    "text": null,
+    "value": "0x2a0",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
+ "many.so": {
+  "bits": 64,
+  "entries": 81,
+  "rows": [
+   "dynamic\tentries\t81\twidth\t16\tvaddr\t0x2670\toff\t1648\tfilesz\t1296\tstrtab\t0x2a0\tstrlen\t786\tneeded\t70\ttext\t71",
+   "entry\t0\ttag\t0x1\tname\tNEEDED\tvalue\t0x12\ttext\tlibst0.so",
+   "entry\t1\ttag\t0x1\tname\tNEEDED\tvalue\t0x1c\ttext\tlibst1.so",
+   "entry\t2\ttag\t0x1\tname\tNEEDED\tvalue\t0x26\ttext\tlibst2.so",
+   "entry\t3\ttag\t0x1\tname\tNEEDED\tvalue\t0x30\ttext\tlibst3.so",
+   "entry\t4\ttag\t0x1\tname\tNEEDED\tvalue\t0x3a\ttext\tlibst4.so",
+   "entry\t5\ttag\t0x1\tname\tNEEDED\tvalue\t0x44\ttext\tlibst5.so",
+   "entry\t6\ttag\t0x1\tname\tNEEDED\tvalue\t0x4e\ttext\tlibst6.so",
+   "entry\t7\ttag\t0x1\tname\tNEEDED\tvalue\t0x58\ttext\tlibst7.so",
+   "entry\t8\ttag\t0x1\tname\tNEEDED\tvalue\t0x62\ttext\tlibst8.so",
+   "entry\t9\ttag\t0x1\tname\tNEEDED\tvalue\t0x6c\ttext\tlibst9.so",
+   "entry\t10\ttag\t0x1\tname\tNEEDED\tvalue\t0x76\ttext\tlibst10.so",
+   "entry\t11\ttag\t0x1\tname\tNEEDED\tvalue\t0x81\ttext\tlibst11.so",
+   "entry\t12\ttag\t0x1\tname\tNEEDED\tvalue\t0x8c\ttext\tlibst12.so",
+   "entry\t13\ttag\t0x1\tname\tNEEDED\tvalue\t0x97\ttext\tlibst13.so",
+   "entry\t14\ttag\t0x1\tname\tNEEDED\tvalue\t0xa2\ttext\tlibst14.so",
+   "entry\t15\ttag\t0x1\tname\tNEEDED\tvalue\t0xad\ttext\tlibst15.so",
+   "entry\t16\ttag\t0x1\tname\tNEEDED\tvalue\t0xb8\ttext\tlibst16.so",
+   "entry\t17\ttag\t0x1\tname\tNEEDED\tvalue\t0xc3\ttext\tlibst17.so",
+   "entry\t18\ttag\t0x1\tname\tNEEDED\tvalue\t0xce\ttext\tlibst18.so",
+   "entry\t19\ttag\t0x1\tname\tNEEDED\tvalue\t0xd9\ttext\tlibst19.so",
+   "entry\t20\ttag\t0x1\tname\tNEEDED\tvalue\t0xe4\ttext\tlibst20.so",
+   "entry\t21\ttag\t0x1\tname\tNEEDED\tvalue\t0xef\ttext\tlibst21.so",
+   "entry\t22\ttag\t0x1\tname\tNEEDED\tvalue\t0xfa\ttext\tlibst22.so",
+   "entry\t23\ttag\t0x1\tname\tNEEDED\tvalue\t0x105\ttext\tlibst23.so",
+   "entry\t24\ttag\t0x1\tname\tNEEDED\tvalue\t0x110\ttext\tlibst24.so",
+   "entry\t25\ttag\t0x1\tname\tNEEDED\tvalue\t0x11b\ttext\tlibst25.so",
+   "entry\t26\ttag\t0x1\tname\tNEEDED\tvalue\t0x126\ttext\tlibst26.so",
+   "entry\t27\ttag\t0x1\tname\tNEEDED\tvalue\t0x131\ttext\tlibst27.so",
+   "entry\t28\ttag\t0x1\tname\tNEEDED\tvalue\t0x13c\ttext\tlibst28.so",
+   "entry\t29\ttag\t0x1\tname\tNEEDED\tvalue\t0x147\ttext\tlibst29.so",
+   "entry\t30\ttag\t0x1\tname\tNEEDED\tvalue\t0x152\ttext\tlibst30.so",
+   "entry\t31\ttag\t0x1\tname\tNEEDED\tvalue\t0x15d\ttext\tlibst31.so",
+   "entry\t32\ttag\t0x1\tname\tNEEDED\tvalue\t0x168\ttext\tlibst32.so",
+   "entry\t33\ttag\t0x1\tname\tNEEDED\tvalue\t0x173\ttext\tlibst33.so",
+   "entry\t34\ttag\t0x1\tname\tNEEDED\tvalue\t0x17e\ttext\tlibst34.so",
+   "entry\t35\ttag\t0x1\tname\tNEEDED\tvalue\t0x189\ttext\tlibst35.so",
+   "entry\t36\ttag\t0x1\tname\tNEEDED\tvalue\t0x194\ttext\tlibst36.so",
+   "entry\t37\ttag\t0x1\tname\tNEEDED\tvalue\t0x19f\ttext\tlibst37.so",
+   "entry\t38\ttag\t0x1\tname\tNEEDED\tvalue\t0x1aa\ttext\tlibst38.so",
+   "entry\t39\ttag\t0x1\tname\tNEEDED\tvalue\t0x1b5\ttext\tlibst39.so",
+   "entry\t40\ttag\t0x1\tname\tNEEDED\tvalue\t0x1c0\ttext\tlibst40.so",
+   "entry\t41\ttag\t0x1\tname\tNEEDED\tvalue\t0x1cb\ttext\tlibst41.so",
+   "entry\t42\ttag\t0x1\tname\tNEEDED\tvalue\t0x1d6\ttext\tlibst42.so",
+   "entry\t43\ttag\t0x1\tname\tNEEDED\tvalue\t0x1e1\ttext\tlibst43.so",
+   "entry\t44\ttag\t0x1\tname\tNEEDED\tvalue\t0x1ec\ttext\tlibst44.so",
+   "entry\t45\ttag\t0x1\tname\tNEEDED\tvalue\t0x1f7\ttext\tlibst45.so",
+   "entry\t46\ttag\t0x1\tname\tNEEDED\tvalue\t0x202\ttext\tlibst46.so",
+   "entry\t47\ttag\t0x1\tname\tNEEDED\tvalue\t0x20d\ttext\tlibst47.so",
+   "entry\t48\ttag\t0x1\tname\tNEEDED\tvalue\t0x218\ttext\tlibst48.so",
+   "entry\t49\ttag\t0x1\tname\tNEEDED\tvalue\t0x223\ttext\tlibst49.so",
+   "entry\t50\ttag\t0x1\tname\tNEEDED\tvalue\t0x22e\ttext\tlibst50.so",
+   "entry\t51\ttag\t0x1\tname\tNEEDED\tvalue\t0x239\ttext\tlibst51.so",
+   "entry\t52\ttag\t0x1\tname\tNEEDED\tvalue\t0x244\ttext\tlibst52.so",
+   "entry\t53\ttag\t0x1\tname\tNEEDED\tvalue\t0x24f\ttext\tlibst53.so",
+   "entry\t54\ttag\t0x1\tname\tNEEDED\tvalue\t0x25a\ttext\tlibst54.so",
+   "entry\t55\ttag\t0x1\tname\tNEEDED\tvalue\t0x265\ttext\tlibst55.so",
+   "entry\t56\ttag\t0x1\tname\tNEEDED\tvalue\t0x270\ttext\tlibst56.so",
+   "entry\t57\ttag\t0x1\tname\tNEEDED\tvalue\t0x27b\ttext\tlibst57.so",
+   "entry\t58\ttag\t0x1\tname\tNEEDED\tvalue\t0x286\ttext\tlibst58.so",
+   "entry\t59\ttag\t0x1\tname\tNEEDED\tvalue\t0x291\ttext\tlibst59.so",
+   "entry\t60\ttag\t0x1\tname\tNEEDED\tvalue\t0x29c\ttext\tlibst60.so",
+   "entry\t61\ttag\t0x1\tname\tNEEDED\tvalue\t0x2a7\ttext\tlibst61.so",
+   "entry\t62\ttag\t0x1\tname\tNEEDED\tvalue\t0x2b2\ttext\tlibst62.so",
+   "entry\t63\ttag\t0x1\tname\tNEEDED\tvalue\t0x2bd\ttext\tlibst63.so",
+   "cut\tentries\t81\tlisted\t64"
+  ],
+  "tags": [
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst0.so",
+    "value": "0x12",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst1.so",
+    "value": "0x1c",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst2.so",
+    "value": "0x26",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst3.so",
+    "value": "0x30",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst4.so",
+    "value": "0x3a",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst5.so",
+    "value": "0x44",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst6.so",
+    "value": "0x4e",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst7.so",
+    "value": "0x58",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst8.so",
+    "value": "0x62",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst9.so",
+    "value": "0x6c",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst10.so",
+    "value": "0x76",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst11.so",
+    "value": "0x81",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst12.so",
+    "value": "0x8c",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst13.so",
+    "value": "0x97",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst14.so",
+    "value": "0xa2",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst15.so",
+    "value": "0xad",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst16.so",
+    "value": "0xb8",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst17.so",
+    "value": "0xc3",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst18.so",
+    "value": "0xce",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst19.so",
+    "value": "0xd9",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst20.so",
+    "value": "0xe4",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst21.so",
+    "value": "0xef",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst22.so",
+    "value": "0xfa",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst23.so",
+    "value": "0x105",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst24.so",
+    "value": "0x110",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst25.so",
+    "value": "0x11b",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst26.so",
+    "value": "0x126",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst27.so",
+    "value": "0x131",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst28.so",
+    "value": "0x13c",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst29.so",
+    "value": "0x147",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst30.so",
+    "value": "0x152",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst31.so",
+    "value": "0x15d",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst32.so",
+    "value": "0x168",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst33.so",
+    "value": "0x173",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst34.so",
+    "value": "0x17e",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst35.so",
+    "value": "0x189",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst36.so",
+    "value": "0x194",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst37.so",
+    "value": "0x19f",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst38.so",
+    "value": "0x1aa",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst39.so",
+    "value": "0x1b5",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst40.so",
+    "value": "0x1c0",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst41.so",
+    "value": "0x1cb",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst42.so",
+    "value": "0x1d6",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst43.so",
+    "value": "0x1e1",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst44.so",
+    "value": "0x1ec",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst45.so",
+    "value": "0x1f7",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst46.so",
+    "value": "0x202",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst47.so",
+    "value": "0x20d",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst48.so",
+    "value": "0x218",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst49.so",
+    "value": "0x223",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst50.so",
+    "value": "0x22e",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst51.so",
+    "value": "0x239",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst52.so",
+    "value": "0x244",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst53.so",
+    "value": "0x24f",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst54.so",
+    "value": "0x25a",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst55.so",
+    "value": "0x265",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst56.so",
+    "value": "0x270",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst57.so",
+    "value": "0x27b",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst58.so",
+    "value": "0x286",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst59.so",
+    "value": "0x291",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst60.so",
+    "value": "0x29c",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst61.so",
+    "value": "0x2a7",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst62.so",
+    "value": "0x2b2",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst63.so",
+    "value": "0x2bd",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst64.so",
+    "value": "0x2c8",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst65.so",
+    "value": "0x2d3",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst66.so",
+    "value": "0x2de",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst67.so",
+    "value": "0x2e9",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst68.so",
+    "value": "0x2f4",
+    "word": null
+   },
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libst69.so",
+    "value": "0x2ff",
+    "word": null
+   },
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "many.so",
+    "value": "0x30a",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x5b8",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x3b80",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x2a0",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x312",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x280",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ }
+}

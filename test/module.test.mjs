@@ -76,6 +76,7 @@ test('the analysis module stands on its own exports', () => {
     'function_count', 'function_at', 'named_count', 'named_at', 'segment_count', 'segment_at',
     'resource_count', 'resource_at',
     'version_count', 'version_at',
+    'dynamic_count', 'dynamic_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -161,6 +162,7 @@ test('the base module the page always downloads carries none of this', async () 
     'segment_count', 'segment_at',
     'resource_count', 'resource_at',
     'version_count', 'version_at',
+    'dynamic_count', 'dynamic_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -525,5 +527,47 @@ test('the version block the API agrees with is read out of the file, not asked f
   for (const name of ['lab.elf', 'answer.obj']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.version_count(), 0, `${name} answered with a version block`);
+  }
+});
+
+test('the entries an ELF hands its loader are what readelf and llvm-readobj listed', async () => {
+  // scripts/make-dynamic-fixtures.py walks PT_DYNAMIC in Python and then asks binutils' `readelf -dW`
+  // and LLVM's `--dynamic-table` about the same bytes. An entry is not written to the probe unless all
+  // three agree on its order, tag number and value, and unless the two readers spell that tag the same
+  // word and spell a value's word the same way - so what is asserted below is those programs' listing
+  // of these files, including which one stores each entry in 8 bytes rather than 16.
+  const probe = JSON.parse(await readFile('test/fixtures/dynamic.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('\t');
+    return parts[parts.indexOf(key) + 1];
+  };
+  const widths = new Set();
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.dynamic_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the two readers said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('dynamic_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+    if (want.length > 0) widths.add(cell(want[0], 'width'));
+  }
+  // Both record widths have to turn up among the files, or the narrow one proves nothing about the stride.
+  assert.ok(widths.has('8') && widths.has('16'), `widths seen: ${Array.from(widths).join(', ')}`);
+  // One file is long enough to be cut, and a cut list still has to be counted whole: the totals row is
+  // the file's own number, not the number of rows the panel was allowed to show.
+  const long = Object.keys(probe).filter((one) => probe[one].rows.some((row) => row.startsWith('cut\t')));
+  assert.equal(long.length, 1, `expected exactly one capped fixture, saw ${long.join(', ')}`);
+  report(new Uint8Array(await readFile(`test/fixtures/${long[0]}`)));
+  const rows = Array.from({ length: ex.dynamic_count() }, (_, index) => text('dynamic_at', index));
+  const stated = Number(cell(rows[0], 'entries'));
+  assert.ok(stated > rows.filter((one) => one.startsWith('entry\t')).length,
+    `${long[0]}: ${stated} entries stated, ${rows.length} rows listed`);
+  // A PE names what it needs through a data directory of its own and a static executable has no
+  // PT_DYNAMIC at all, so neither grows a list here - `lab.elf` already answered zero above.
+  for (const name of ['res.dll', 'answer.obj']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.dynamic_count(), 0, `${name} answered with a dynamic section`);
   }
 });

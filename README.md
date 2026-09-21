@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -550,6 +550,31 @@ address with a `LOAD` is the file's own overlap and is left in both rows, and `m
 object answer with no rows, because translating their sections into headers they do not have would be this
 reader's invention.
 
+**The dynamic window** (`dynamic_count` / `dynamic_at`) is the other half of what an ELF tells its loader:
+not where to map, but what to bring in first. Each record is a tag and a value, as wide as the file's own
+class, and the walk is bounded twice over - by a `DT_NULL` entry and by `PT_DYNAMIC`'s `p_filesz`, whichever
+comes first. Row zero states the section's address, its offset and length, where its string table is and how
+long that is, how many `DT_NEEDED` entries the file holds and how many records name a string; then one row
+per entry, in the file's order. Resolving a name is two conversions, because `DT_STRTAB`'s value is itself
+an address: the string table is found through the `PT_LOAD` records and only then indexed by the entry's
+offset, so an entry whose address no segment covers prints its offset and no name. The three new fixtures are
+all `clang --target=x86_64-unknown-linux-gnu -shared`: `liblab.so` and `libuser.so` carry the entries a real
+load acts on (`DT_NEEDED`, `DT_SONAME`, and a `DT_RUNPATH` read back out of the file rather than from the
+command line that asked for it), and `many.so` is told to need seventy stub libraries with `--no-as-needed`,
+which is what pushes the list past the cap every window shares - a linker allowed to drop what nothing
+references writes a file with no `DT_NEEDED` in it at all, and the fixture would then prove nothing.
+Three readers had to agree on all six files before `dynamic.probe.json` was written: a python walk of the
+bytes, `readelf -dW` and `llvm-readobj --dynamic-table`. A tag gets a word only where both external readers
+used the same one in the same file, which is the whole of the `DT_*` table here - none of it copied out of
+memory, because `0x1c` is `FINI_ARRAYSZ` while `0x1d` is `RUNPATH` and `0xf` is `RPATH`. A value gets a word
+the same way: `DT_PLTREL` holds a relocation type and both readers say `RELA` or `REL` rather than `7`, and
+the size tags both say `BYTES`, so those rows carry the word and the rest carry only their number. That
+rule caught one mistake before it could be written down: the first draft of the string list held `DT_INIT`
+and `DT_FINI` beside `DT_SONAME`, and those two values are addresses of functions, not offsets into the
+string table - which is exactly the kind of thing a witness settles and a summary of a format does not. A
+static executable, a PE (which names its imports through a data directory instead) and a COFF object all
+answer with no rows.
+
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -738,6 +763,10 @@ interpreter, a thread-local block and a note appear only in an executable
 temp/venv/Scripts/python.exe scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
 test/fixtures/lab.so and lab32.so; readelf -rW and objdump -R must agree on every offset, type name, symbol
 and addend before elfreloc.probe.json is written, and the eight type numbers they name are paired per machine
+temp/venv/Scripts/python.exe scripts/make-dynamic-fixtures.py    # clang -shared writes liblab.so,
+libuser.so and many.so (seventy stub libraries, needed with --no-as-needed so the list is long enough to be
+cut); readelf -dW and llvm-readobj --dynamic-table must agree with the byte walk on every tag, value and
+bracketed string, and on the word each puts beside it, before dynamic.probe.json is written
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
