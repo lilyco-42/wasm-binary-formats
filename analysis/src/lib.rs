@@ -53,6 +53,10 @@ thread_local! {
     /// of totals, then a line per mangled name in table order. Only names that begin `_Z` are listed,
     /// because that prefix is the whole of how an Itanium mangled name announces itself.
     static DEMANGLED: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// The base-relocation directory of the same file, block by block and fixup by fixup. A PE's only
+    /// answer to "which addresses does the loader intend to rewrite", and empty for an ELF or a
+    /// Mach-O, which carry their fixups as relocation records instead.
+    static RELOCS: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -203,6 +207,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     EXPORTS.with(|slot| slot.borrow_mut().clear());
     IMPORTS.with(|slot| slot.borrow_mut().clear());
     DEMANGLED.with(|slot| slot.borrow_mut().clear());
+    RELOCS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -284,6 +289,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     IMPORTS.with(|slot| *slot.borrow_mut() = imports);
     let names = demangle_rows(&mangled);
     DEMANGLED.with(|slot| *slot.borrow_mut() = names);
+    let fixups = reloc_rows(bytes);
+    RELOCS.with(|slot| *slot.borrow_mut() = fixups);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1019,9 +1026,177 @@ fn import_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
     (rows, found_names)
 }
 
-/// The map: every range the file names, in order, with what falls between them called what it is -
-/// padding inside a segment the loader maps, or bytes no table and no segment reaches at all.
-/// The map and the string list, from the same walk of the same bytes.
+/// The type numbers a fixture put beside a name, and so the only ones this reader writes as names.
+/// `llvm-readobj --coff-basereloc` prints `DIR64` where `pefile` prints `10`, and the pairing came out
+/// of reading the same entries in the same order in three images: `ABSOLUTE` and `HIGHLOW` from the
+/// PE32, `DIR64` from the PE32+. Anything else stays a number, because the loader knows what it means
+/// and this reader was not shown.
+fn reloc_type(kind: u16) -> Option<&'static str> {
+    Some(match kind {
+        0 => "ABSOLUTE",
+        3 => "HIGHLOW",
+        10 => "DIR64",
+        _ => return None,
+    })
+}
+
+/// Where an address of the file's own lies: the position and the section, or `-1` with the reason the
+/// walk gives when no section covers it. Zero is the absent value the directory uses, so it is named
+/// rather than looked for.
+fn where_lies(pe: &Pe, rva: u64) -> (i64, String) {
+    if rva == 0 {
+        return (-1, "none".to_owned());
+    }
+    match pe.at(rva) {
+        Some((where_, name)) => (i64::try_from(where_).unwrap_or(-1), clean(name)),
+        None => (-1, "unmapped".to_owned()),
+    }
+}
+
+/// The base-relocation directory: the fixups a loader applies to the image when it does not land at the
+/// address it was linked for, which is what an analyser needs in order to know that a word in `.data`
+/// is a pointer rather than a number.
+///
+/// Directory five is a run of blocks, and a block is a page RVA, its own length, and that many
+/// two-byte entries whose high nibble is the type and whose low twelve bits are the offset inside the
+/// page. The length is what carries the walk from one block to the next, so a block that claims less
+/// than its own header, or more than the directory has left, ends the list with the claim said out loud
+/// rather than with an entry invented past it.
+fn reloc_rows(raw: &[u8]) -> Vec<String> {
+    let Some(pe) = Pe::parse(raw) else {
+        return Vec::new();
+    };
+    // Directory five: the base-relocation table, eight bytes of RVA and size at a fixed distance into
+    // the directory array.
+    let Some(at_rva) = pe.dirs.checked_add(40) else {
+        return Vec::new();
+    };
+    let Some(at_size) = pe.dirs.checked_add(44) else {
+        return Vec::new();
+    };
+    let Some(dir_rva) = word_at(raw, at_rva, true) else {
+        return Vec::new();
+    };
+    let Some(dir_size) = word_at(raw, at_size, true) else {
+        return Vec::new();
+    };
+    let (dir_off, dir_section) = where_lies(&pe, dir_rva);
+    let mut rows: Vec<String> = Vec::new();
+    let mut blocks = 0usize;
+    let mut entries = 0usize;
+    let mut listed = 0usize;
+    let mut named = 0usize;
+    let mut stopped = "";
+    // An absent directory is an answer, not a failure: a PE linked `/FIXED` has nothing to apply, and
+    // so does a freestanding image whose data needs no fixup. `exp.dll` is the second case, and its
+    // rows are this line and nothing else.
+    if dir_rva != 0 && dir_size != 0 {
+        let Some((start, _)) = pe.at(dir_rva) else {
+            return vec![format!(
+                "relocs\tdir\t{:#x}\tbytes\t{}\toff\t{}\tsection\t{}\tblocks\t0\tentries\t0\tnamed\t0\tstopped\tunmapped",
+                dir_rva, dir_size, dir_off, dir_section
+            )];
+        };
+        // The bytes the walk may read: what the directory claims, cut to what the file has. A directory
+        // that claims more than the image holds is said, not followed.
+        let room = raw.len().saturating_sub(start);
+        let want = usize::try_from(dir_size).unwrap_or(room);
+        let mut left = want.min(room);
+        let mut at = start;
+        if want > room {
+            stopped = "past the file";
+        }
+        while left >= 8 {
+            let Some(page) = word_at(raw, at, true) else {
+                break;
+            };
+            let Some(where_) = at.checked_add(4) else {
+                break;
+            };
+            let Some(size) = word_at(raw, where_, true) else {
+                break;
+            };
+            let Ok(body) = usize::try_from(size) else {
+                stopped = "block size";
+                break;
+            };
+            // Eight bytes is the block's own header, and the entries that follow are two bytes each, so
+            // a length that is neither of those is a file that contradicts itself.
+            if body < 8 || body % 4 != 0 || body > left {
+                stopped = "block size";
+                break;
+            }
+            let count = (body - 8) / 2;
+            blocks += 1;
+            entries += count;
+            rows.push(format!("block\tpage\t{:#x}\tsize\t{}\tentries\t{}", page, size, count));
+            for each in 0..count {
+                let Some(first) = at.checked_add(8) else {
+                    stopped = "entry past the file";
+                    break;
+                };
+                let Some(step) = each.checked_mul(2) else {
+                    stopped = "entry past the file";
+                    break;
+                };
+                let Some(where_) = first.checked_add(step) else {
+                    stopped = "entry past the file";
+                    break;
+                };
+                let Some(word) = half_at(raw, where_, true) else {
+                    stopped = "entry past the file";
+                    break;
+                };
+                if listed >= MAX_LISTED {
+                    continue;
+                }
+                listed += 1;
+                // The high nibble is the type and the low twelve bits the offset inside the page, which
+                // is why a block covers 4 KiB and no more.
+                let kind = ((word >> 12) & 0xf) as u16;
+                let rva = page.checked_add(word & 0x0fff).unwrap_or(page);
+                let (off, section) = where_lies(&pe, rva);
+                let head = match reloc_type(kind) {
+                    Some(name) => {
+                        named += 1;
+                        format!("fixup\t{:#x}\ttype\t{kind}\tname\t{name}", rva)
+                    }
+                    None => format!("fixup\t{:#x}\ttype\t{kind}", rva),
+                };
+                rows.push(format!("{head}\toff\t{off}\tsection\t{section}"));
+            }
+            let Some(next) = at.checked_add(body) else {
+                break;
+            };
+            let Some(rest) = left.checked_sub(body) else {
+                break;
+            };
+            at = next;
+            left = rest;
+        }
+        if left != 0 && stopped.is_empty() {
+            stopped = "trailing";
+        }
+    }
+    let mut head = format!(
+        "relocs\tdir\t{:#x}\tbytes\t{}\toff\t{}\tsection\t{}\tblocks\t{}\tentries\t{}\tnamed\t{}",
+        dir_rva, dir_size, dir_off, dir_section, blocks, entries, named
+    );
+    if !stopped.is_empty() {
+        head.push_str("\tstopped\t");
+        head.push_str(stopped);
+    }
+    let mut out = vec![head];
+    out.append(&mut rows);
+    if entries > listed {
+        out.push(format!("cut\tfixups\t{entries}\tlisted\t{listed}"));
+    }
+    out
+}
+
+/// The map and the string list, from the same walk of the same bytes: every range the file names, in
+/// order, with what falls between them called what it is - padding inside a segment the loader maps, or
+/// bytes no table and no segment reaches at all.
 fn map_rows(raw: &[u8]) -> (Vec<String>, Vec<String>) {
     let (mut spans, loaded) = match elf_spans(raw) {
         Some(found) => (found.0, found.1),
@@ -1817,6 +1992,27 @@ pub extern "C" fn demangle_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     DEMANGLED.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many base-relocation rows the last file produced, including its totals row. One row means the
+/// image has a directory and nothing in it, or no directory at all - both of which are answers.
+#[no_mangle]
+pub extern "C" fn reloc_count() -> i32 {
+    RELOCS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: `block` with the page and its own length, or `fixup` with the address, the type number and
+/// - where a fixture paired one - the name, the position in the file and the section that owns it. Row
+/// zero is the totals.
+#[no_mangle]
+pub extern "C" fn reloc_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    RELOCS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

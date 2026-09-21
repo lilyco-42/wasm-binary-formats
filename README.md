@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 125 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, and the demangled reading of the C++ names in those tables |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, and the base relocations a loader is told to apply |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -396,6 +396,39 @@ operator table is read off a probe; and a substitution names the type that *comp
 `operator<=` and `operator<<` are the reason the walk tracks whether a name carried `I <args> E` instead
 of looking for a `<` in the answer: those three are ordinary functions whose spelling is full of angle
 brackets, and a reader that sniffed would invent a return type in front of each.
+The grammar is the Itanium one - what `clang++` and `g++` write - and MSVC's is not attempted, which is a
+witness gap rather than a shortcut: `c++filt` and `llvm-cxxfilt` were both handed `??0Widget@@QEAA@XZ`
+and `?draw@Widget@@QEAAXXZ` and both returned the name untouched, so there is no second spelling to check
+a reading against and the rule that let this list exist at all is the rule that keeps it out.
+
+**The base relocations** (`reloc_count` / `reloc_at`) are directory number five, and they are the reason
+`0x3000` in `.data` is a pointer rather than the number zero: the list of addresses a Windows image hands
+a loader and says "rewrite these with the real address before you run". IDA applies the same list before
+it draws data cross-references. The directory is a run of blocks, and a block is a page RVA, its own
+length in bytes, and that many two-byte entries whose high nibble is the type and whose low twelve bits
+are the offset inside the page - which is why one block covers 4 KiB and no more, and why the length is
+the only thing carrying the walk to the next block. So the length is what the reader refuses to argue
+with: a block that claims less than its own eight-byte header, or a length that is not a whole number of
+entries, or one that reaches past the directory, stops the list there and names the reason in a `stopped`
+column instead of inventing entries past the claim. Two readers that are not this repo's had to agree
+before any of this was written - `llvm-readobj --coff-basereloc` spells `Type: DIR64` beside
+`Address: 0x3000` and `pefile` gives `rva=0x3000, type=10` - and that pairing is also where the type
+*numbers* got their words: `0 -> ABSOLUTE` and `3 -> HIGHLOW` come from `lab.dll`, a PE32 and so the
+other half of the optional-header branch, and `10 -> DIR64` from `reloc.dll`, which `lld-link` wrote four
+fixups for because four objects in it had their addresses taken. A number no fixture paired stays a
+number in the row, because nothing here established which word belongs to it. binutils was asked too and
+is a negative witness: `objdump -R` prints `(none)` and then `not a dynamic object` over these images, so
+the third reading is a Python library and not the same tool under another flag. `exp.dll` contributes the
+case where the directory is absent entirely - one row, `blocks 0`, because an image whose data holds no
+address of anything has nothing to apply rather than something broken. Only those three numbers carry a
+word: an entry of any other type prints `type 7` with no `name` column at all, which is the shape the host
+test makes by changing one nibble of a real entry, and the totals row counts what came out `named` so a
+silent narrowing of the table is visible. What the rows do not do: nothing is written back, no page is
+rebased, and no fixup's target is resolved to a symbol - the directory says where to write, and the name
+index says what is there, but joining them is the page's business. An ELF and a COFF object answer with
+no rows at all, and that is the format talking rather than a gap in this one - the per-page block list is
+a PE's, and the fixups of a relocatable object are relocation records, which the engine's COFF reader
+already lists record by record against `objdump -r`.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -571,6 +604,7 @@ temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
+temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

@@ -72,7 +72,7 @@ test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
     'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
-    'demangle_count', 'demangle_at', 'abi_version', 'self_test']) {
+    'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -153,7 +153,7 @@ test('the base module the page always downloads carries none of this', async () 
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
     'export_count', 'export_at', 'import_count', 'import_at', 'demangle_count', 'demangle_at',
-    'self_test']) {
+    'reloc_count', 'reloc_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -418,4 +418,41 @@ test('the C++ names in an object answer as two demanglers read them', async () =
   assert.equal(ex.demangle_count(), 1, 'the totals row and nothing else');
   assert.equal(text('demangle_at', 0),
     'demangle\tmangled\t0\tdemangled\t0\trefused\t0\twitnesses\ttwo');
+});
+
+test('the fixups a loader would apply come through as two readers listed them', async () => {
+  // Three PE images, three answers. `reloc.dll` is clang plus `lld-link` with four address-taken
+  // objects in `.data`, which is why its linker had to record anything at all; `lab.dll` is the .NET
+  // compiler's PE32, so it shows the other optional-header base and the padding slot that fixes up
+  // nothing; `exp.dll` has no directory, and says so with one line.
+  // `scripts/make-reloc-fixtures.py` refuses to write the probe unless `llvm-readobj
+  // --coff-basereloc` and `pefile` agree entry by entry, and the type names below are the numbers
+  // those two put beside in these files rather than a table recalled.
+  const probe = JSON.parse(await readFile('test/fixtures/reloc.probe.json', 'utf8'));
+  assert.deepEqual(probe.type_names, { 0: 'ABSOLUTE', 3: 'HIGHLOW', 10: 'DIR64' }, 'a pairing moved');
+  for (const file of ['reloc.dll', 'lab.dll', 'exp.dll']) {
+    const want = probe.files[file].rows;
+    const bytes = new Uint8Array(await readFile(`test/fixtures/${file}`));
+    assert.equal(bytes.length, probe.files[file].bytes, `${file} is not what the probe read`);
+    const seen = report(bytes);
+    assert.equal(seen.rc, 0, `${file} has to be an object`);
+    assert.equal(ex.reloc_count(), want.length, `${file}: a different number of fixup rows`);
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(text('reloc_at', index), want[index], `${file} row ${index} moved`);
+    }
+  }
+  // The `.data` word at `0x3000` is a pointer because the directory says so, and the position the
+  // loader writes at is in the file - which is the whole point of reading it.
+  assert.equal(probe.files['reloc.dll'].rows[2],
+    'fixup\t0x3000\ttype\t10\tname\tDIR64\toff\t2048\tsection\t.data');
+  assert.match(probe.files['lab.dll'].rows[3], /^fixup\t0x2000\ttype\t0\tname\tABSOLUTE\t/);
+  assert.equal(probe.files['exp.dll'].rows.length, 1, 'an absent directory is one line');
+  assert.match(probe.files['exp.dll'].rows[0], /\toff\t-1\tsection\tnone\tblocks\t0\b/);
+  // A PE-only answer: an ELF and a COFF object keep their fixups in relocation records, which are a
+  // different list in a different format, so the panel comes back empty rather than with the rows the
+  // image read a moment before left behind.
+  report(new Uint8Array(await readFile('test/fixtures/lab.elf')));
+  assert.equal(ex.reloc_count(), 0, 'an ELF image has no base relocation directory');
+  report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
+  assert.equal(ex.reloc_count(), 0, 'nor has a COFF object');
 });

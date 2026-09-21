@@ -1,0 +1,64 @@
+{
+ "type_names": {
+  "0": "ABSOLUTE",
+  "3": "HIGHLOW",
+  "10": "DIR64"
+ },
+ "files": {
+  "reloc.dll": {
+   "bytes": 3584,
+   "entries": [
+    [
+     12288,
+     10
+    ],
+    [
+     12296,
+     10
+    ],
+    [
+     12304,
+     10
+    ],
+    [
+     12312,
+     10
+    ]
+   ],
+   "rows": [
+    "relocs\tdir\t0x5000\tbytes\t16\toff\t3072\tsection\t.reloc\tblocks\t1\tentries\t4\tnamed\t4",
+    "block\tpage\t0x3000\tsize\t16\tentries\t4",
+    "fixup\t0x3000\ttype\t10\tname\tDIR64\toff\t2048\tsection\t.data",
+    "fixup\t0x3008\ttype\t10\tname\tDIR64\toff\t2056\tsection\t.data",
+    "fixup\t0x3010\ttype\t10\tname\tDIR64\toff\t2064\tsection\t.data",
+    "fixup\t0x3018\ttype\t10\tname\tDIR64\toff\t2072\tsection\t.data"
+   ]
+  },
+  "lab.dll": {
+   "bytes": 3072,
+   "entries": [
+    [
+     8976,
+     3
+    ],
+    [
+     8192,
+     0
+    ]
+   ],
+   "rows": [
+    "relocs\tdir\t0x6000\tbytes\t12\toff\t2560\tsection\t.reloc\tblocks\t1\tentries\t2\tnamed\t2",
+    "block\tpage\t0x2000\tsize\t12\tentries\t2",
+    "fixup\t0x2310\ttype\t3\tname\tHIGHLOW\toff\t1296\tsection\t.text",
+    "fixup\t0x2000\ttype\t0\tname\tABSOLUTE\toff\t512\tsection\t.text"
+   ]
+  },
+  "exp.dll": {
+   "bytes": 2560,
+   "entries": [],
+   "rows": [
+    "relocs\tdir\t0x0\tbytes\t0\toff\t-1\tsection\tnone\tblocks\t0\tentries\t0\tnamed\t0"
+   ]
+  }
+ }
+}
