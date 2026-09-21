@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point, and the notes an ELF leaves for itself in its PT_NOTE segments |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -645,6 +645,23 @@ callbacks that come back in the file's own order and not sorted by address. Noth
 there is no 32-bit Windows toolchain on this host, so `bits` is 64 in every row here, and the PE32 fixtures in
 the directory answer with no rows at all.
 
+**The note window** (`note_count` / `note_at`) reads what an ELF tells itself: three words - a name length,
+a descriptor length, a type - then the owner's name and the descriptor, each padded to a multiple of four.
+That padding is the whole difficulty, because it is the only thing separating one note from the next: a
+five-byte descriptor is followed by a note that begins eight bytes later, not five, and a reader that says
+otherwise moves every note after it. The route follows the loader - the `PT_NOTE` segments, in the order the
+program headers give them, and `note.elf` happens to have two of them - and falls back to the `.note*`
+sections for a relocatable object, which has no program headers at all to consult. `note.o` is that case,
+and it is why the rows say which route answered.
+
+Only payloads two listings decode are decoded here. Both spell a build ID's twenty bytes as forty hex digits
+and both write `x86 feature: IBT, SHSTK` for the same four-byte record, so both words appear; and where
+neither knows the type, both print the word `Unknown` and the bytes, so that is what the row carries -
+`notelab.elf`'s hand-written notes, owner `LAB` and owner `Q`, are the case. Their descriptors are quoted as
+bytes and never interpreted, because the interpretation is what no reader offers. The property note's records
+are listed beneath it (`type`, `bytes`, `value`), since the aggregated feature word above them is a reading
+rather than a field.
+
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -854,6 +871,12 @@ never mentions _Thread_local); the walk, llvm-readobj --coff-tls-directory, pefi
 must agree on all six fields and on how long the array is, and Windows itself must run the callbacks in the
 order the array lists them, before tls.probe.json is written. Two runs give back the same rows and not the same
 bytes, so nothing hashes these two files
+python scripts/make-note-fixtures.py                     # clang for x86_64-unknown-linux-gnu writes note.o
+(note), note1.elf (IBT only), note.elf (-fcf-protection=full plus -Wl,--build-id=sha1, which lands in two
+PT_NOTE segments) and notelab.elf (a .note written by hand in assembly: a four-byte name, a five-byte
+descriptor, then a two-byte name, so the boundaries are the rounding rule and nothing else); the walk,
+readelf -nW and llvm-readobj --notes must agree on owner, descriptor length, type word and payload before
+note.probe.json is written
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

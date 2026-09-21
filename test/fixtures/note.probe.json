@@ -1,0 +1,56 @@
+{
+ "answer.obj": {
+  "entries": 0,
+  "notes": false,
+  "rows": []
+ },
+ "lab.elf": {
+  "entries": 0,
+  "notes": false,
+  "rows": []
+ },
+ "note.elf": {
+  "entries": 2,
+  "notes": true,
+  "rows": [
+   "notes\tentries\t2\tbits\t64\twalked\tsegment",
+   "note\t0\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t4\tdescsz\t20\ttype\t0x3\towner\tGNU\tword\tNT_GNU_BUILD_ID\ttext\t3b360ec6488de7e3c0a0c36b78b67d83f9f78962",
+   "note\t1\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t4\tdescsz\t16\ttype\t0x5\towner\tGNU\tword\tNT_GNU_PROPERTY_TYPE_0\ttext\tx86 feature: IBT, SHSTK",
+   "prop\t1\t0\ttype\t0xc0000002\tbytes\t4\tvalue\t0x3"
+  ]
+ },
+ "note.o": {
+  "entries": 1,
+  "notes": true,
+  "rows": [
+   "notes\tentries\t1\tbits\t64\twalked\tsection",
+   "note\t0\tkind\tsection\tplace\t.note.gnu.property\tnamesz\t4\tdescsz\t16\ttype\t0x5\towner\tGNU\tword\tNT_GNU_PROPERTY_TYPE_0\ttext\tx86 feature: IBT",
+   "prop\t0\t0\ttype\t0xc0000002\tbytes\t4\tvalue\t0x1"
+  ]
+ },
+ "note1.elf": {
+  "entries": 1,
+  "notes": true,
+  "rows": [
+   "notes\tentries\t1\tbits\t64\twalked\tsegment",
+   "note\t0\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t4\tdescsz\t16\ttype\t0x5\towner\tGNU\tword\tNT_GNU_PROPERTY_TYPE_0\ttext\tx86 feature: IBT",
+   "prop\t0\t0\ttype\t0xc0000002\tbytes\t4\tvalue\t0x1"
+  ]
+ },
+ "notelab.elf": {
+  "entries": 3,
+  "notes": true,
+  "rows": [
+   "notes\tentries\t3\tbits\t64\twalked\tsegment",
+   "note\t0\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t4\tdescsz\t5\ttype\t0x1234\towner\tLAB\tword\tUnknown\ttext\t4142434445",
+   "note\t1\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t2\tdescsz\t4\ttype\t0x7\towner\tQ\tword\tUnknown\ttext\t78797a00",
+   "note\t2\tkind\tsegment\tplace\tPT_NOTE\tnamesz\t4\tdescsz\t16\ttype\t0x5\towner\tGNU\tword\tNT_GNU_PROPERTY_TYPE_0\ttext\tx86 feature: IBT",
+   "prop\t2\t0\ttype\t0xc0000002\tbytes\t4\tvalue\t0x1"
+  ]
+ },
+ "res.dll": {
+  "entries": 0,
+  "notes": false,
+  "rows": []
+ }
+}

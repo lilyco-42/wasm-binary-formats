@@ -217,6 +217,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     SYMVER.with(|slot| slot.borrow_mut().clear());
     DEBUG.with(|slot| slot.borrow_mut().clear());
     TLS.with(|slot| slot.borrow_mut().clear());
+    NOTES.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -366,6 +367,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     SYMVER.with(|slot| *slot.borrow_mut() = versions);
     let storage = tls_rows(bytes, &export_names);
     TLS.with(|slot| *slot.borrow_mut() = storage);
+    let noted = note_rows(bytes);
+    NOTES.with(|slot| *slot.borrow_mut() = noted);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1190,6 +1193,8 @@ thread_local! {
     static DEBUG: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// The thread-local storage window: a PE's directory 9, and the callbacks the loader runs from it.
     static TLS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// What an ELF's note segments and note sections say.
+    static NOTES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -2514,6 +2519,313 @@ pub extern "C" fn tls_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     TLS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// A note's name and descriptor are each followed by enough padding to reach a multiple of four, which
+/// is the rule that decides where the next note begins.
+fn note_rounded(length: u64) -> u64 {
+    length + (4 - length % 4) % 4
+}
+
+/// IDA's note window: what an ELF's `PT_NOTE` segments - or, in a relocatable object, its `.note*`
+/// sections - actually hold.
+///
+/// A note is three words and two payloads, and the payloads are the answer to questions the section
+/// table cannot ask: which build ID a debugger matches a file against, whether the file says it was
+/// built for IBT and SHSTK. The route is the loader's - segments when a file has program headers - and
+/// falls back to sections for an object, which has none. Nothing is decoded that the fixtures do not
+/// settle: the descriptor is spelled out only for the two note kinds two listings also decode, and for
+/// an unknown kind the bytes themselves are given, which is all both readers agree to print.
+fn note_rows(raw: &[u8]) -> Vec<String> {
+    if raw.len() < 64 || raw.get(..4) != Some(b"\x7fELF") {
+        return Vec::new();
+    }
+    let is64 = raw.get(4) == Some(&2);
+    let little = raw.get(5) == Some(&1);
+    let word = |at: usize, wide: bool| -> Option<u64> {
+        if wide {
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(raw.get(at..at.checked_add(8)?)?);
+            Some(if little { u64::from_le_bytes(buf) } else { u64::from_be_bytes(buf) })
+        } else {
+            let mut buf = [0u8; 4];
+            buf.copy_from_slice(raw.get(at..at.checked_add(4)?)?);
+            Some(u64::from(if little { u32::from_le_bytes(buf) } else { u32::from_be_bytes(buf) }))
+        }
+    };
+    let half = |at: usize| -> Option<u64> {
+        let mut buf = [0u8; 2];
+        buf.copy_from_slice(raw.get(at..at.checked_add(2)?)?);
+        Some(u64::from(if little { u16::from_le_bytes(buf) } else { u16::from_be_bytes(buf) }))
+    };
+    // Every stretch of bytes the file says is a note, in the order it says so, with the name of the
+    // place it came from - `PT_NOTE` for a segment, the section's own name otherwise. A relocatable
+    // object's `e_phnum` is zero and its `e_phentsize` with it, which is no table rather than a broken
+    // one, so the segment scan hands over to the section scan instead of ending the read.
+    let is64_bits = if is64 { 64 } else { 32 };
+    let mut places: Vec<(String, u64, u64)> = (|| {
+        let mut found: Vec<(String, u64, u64)> = Vec::new();
+        let (Some(at_ph), Some(entry), Some(count)) = (
+            word(if is64 { 0x20 } else { 0x1c }, is64),
+            half(if is64 { 0x36 } else { 0x2a }),
+            half(if is64 { 0x38 } else { 0x2c }),
+        ) else {
+            return found;
+        };
+        let smallest = if is64 { 56 } else { 32 };
+        let Some(stride) = usize::try_from(entry).ok().filter(|each| *each >= smallest) else {
+            return found;
+        };
+        let Some(walk) = u64::try_from(stride).ok() else {
+            return found;
+        };
+        for index in 0..usize::try_from(count).unwrap_or(0) {
+            let Some(at) = u64::try_from(index).ok()
+                .and_then(|steps| steps.checked_mul(walk))
+                .and_then(|where_| where_.checked_add(at_ph))
+                .and_then(|where_| usize::try_from(where_).ok()) else {
+                break;
+            };
+            if word(at, false) != Some(4) {
+                continue;
+            }
+            // p_offset is the first of the two fields and p_filesz the fourth: an ELF64 program header
+            // puts its sizes after the addresses, an ELF32 one before the flags.
+            let (Some(off), Some(size)) = (word(at + if is64 { 8 } else { 4 }, is64),
+                                           word(at + if is64 { 32 } else { 16 }, is64)) else {
+                break;
+            };
+            found.push(("PT_NOTE".to_owned(), off, size));
+        }
+        found
+    })();
+    let walked = if places.is_empty() { "section" } else { "segment" };
+    if places.is_empty() {
+        let (Some(at_sh), Some(entry), Some(count), Some(link)) = (
+            word(if is64 { 0x28 } else { 0x20 }, is64),
+            half(if is64 { 0x3a } else { 0x2e }),
+            half(if is64 { 0x3c } else { 0x30 }),
+            half(if is64 { 0x3e } else { 0x32 }),
+        ) else {
+            return Vec::new();
+        };
+        let Some(step) = usize::try_from(entry).ok().filter(|each| *each >= if is64 { 64 } else { 40 }) else {
+            return Vec::new();
+        };
+        let (off_in, size_in) = (if is64 { 0x18usize } else { 0x10 }, if is64 { 0x20 } else { 0x14 });
+        let Some(walk) = u64::try_from(step).ok() else { return Vec::new() };
+        // The names live in the table the header points at, so a note section is only worth listing once
+        // that string table can be reached - a name nobody can read is not a name.
+        let Some(strings_at) = u64::try_from(link).ok()
+            .and_then(|which| which.checked_mul(walk))
+            .and_then(|each| each.checked_add(at_sh))
+            .and_then(|where_| usize::try_from(where_).ok())
+            .and_then(|at| word(at + off_in, is64))
+            .and_then(|where_| usize::try_from(where_).ok()) else {
+            return Vec::new();
+        };
+        for index in 0..usize::try_from(count).unwrap_or(0) {
+            let Some(at) = u64::try_from(index).ok()
+                .and_then(|steps| steps.checked_mul(walk))
+                .and_then(|where_| where_.checked_add(at_sh))
+                .and_then(|where_| usize::try_from(where_).ok()) else {
+                break;
+            };
+            let (Some(name_at), Some(off), Some(size)) = (word(at, false),
+                                                           word(at + off_in, is64),
+                                                           word(at + size_in, is64)) else {
+                break;
+            };
+            let Some(section) = usize::try_from(name_at).ok()
+                .and_then(|steps| strings_at.checked_add(steps))
+                .and_then(|where_| raw.get(where_..))
+                .map(|tail| String::from_utf8_lossy(tail.split(|byte| *byte == 0).next().unwrap_or(tail)).into_owned()) else {
+                break;
+            };
+            if section.starts_with(".note") {
+                places.push((section, off, size));
+            }
+        }
+    }
+    let mut listed: Vec<(String, u64, u64, u64, String, Vec<u8>)> = Vec::new();
+    let mut problems: Vec<String> = Vec::new();
+    for (name, off, size) in places {
+        let (Some(start), Some(end)) = (usize::try_from(off).ok(), usize::try_from(size).ok()) else {
+            problems.push(format!("{name} names bytes outside the file"));
+            continue;
+        };
+        let Some(body) = start.checked_add(end).and_then(|stop| raw.get(start..stop)) else {
+            problems.push(format!("{name} runs past the end of the file"));
+            continue;
+        };
+        let mut where_ = 0usize;
+        while where_ + 12 <= end {
+            let (Some(namesz), Some(descsz), Some(kind)) = (word(start + where_, false),
+                                                             word(start + where_ + 4, false),
+                                                             word(start + where_ + 8, false)) else {
+                break;
+            };
+            let Some(head) = where_.checked_add(12) else { break };
+            let Some(after_name) = head.checked_add(usize::try_from(note_rounded(namesz)).unwrap_or(usize::MAX)) else {
+                break;
+            };
+            let Some(stop) = after_name.checked_add(usize::try_from(note_rounded(descsz)).unwrap_or(usize::MAX)) else {
+                break;
+            };
+            if stop > end {
+                problems.push(format!("runs past the {end} bytes it is given"));
+                break;
+            }
+            let (name_len, desc_len) = (usize::try_from(namesz).unwrap_or(usize::MAX),
+                                        usize::try_from(descsz).unwrap_or(usize::MAX));
+            // The owner is the bytes up to a NUL, and the descriptor is exactly `descsz` of them - the
+            // padding after each is what the next round of four skipped.
+            let Some(owner) = head.checked_add(name_len).and_then(|where_| body.get(head..where_)).map(|bytes| {
+                String::from_utf8_lossy(bytes.split(|byte| *byte == 0).next().unwrap_or(bytes)).into_owned()
+            }) else {
+                break;
+            };
+            let Some(desc) = after_name.checked_add(desc_len).and_then(|where_| body.get(after_name..where_)) else {
+                break;
+            };
+            listed.push((name.clone(), namesz, descsz, kind, owner, desc.to_vec()));
+            where_ = stop;
+        }
+        if where_ != end {
+            problems.push(format!("stops at {where_} of {end} bytes"));
+        }
+    }
+    if listed.is_empty() {
+        return Vec::new();
+    }
+    let mut rows = vec![{
+        let mut head = format!("notes\tentries\t{}\tbits\t{is64_bits}\twalked\t{walked}", listed.len());
+        if !problems.is_empty() {
+            head.push_str(&format!("\twhy\t{}", problems.join("; ")));
+        }
+        head
+    }];
+    for (index, (place, namesz, descsz, kind, owner, desc)) in listed.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        // The words are what two listings print for the same bytes; `Unknown` is one of them, because
+        // that is literally what both printers call a type neither of them knows.
+        let (word, body) = match (owner.as_str(), *kind) {
+            ("GNU", 3) => ("NT_GNU_BUILD_ID", note_hex(desc)),
+            ("GNU", 5) => ("NT_GNU_PROPERTY_TYPE_0", note_features(desc)),
+            _ => ("Unknown", note_hex(desc)),
+        };
+        let mut row = vec![
+            "note".to_owned(),
+            index.to_string(),
+            "kind".to_owned(),
+            walked.to_owned(),
+            "place".to_owned(),
+            place.clone(),
+            "namesz".to_owned(),
+            namesz.to_string(),
+            "descsz".to_owned(),
+            descsz.to_string(),
+            "type".to_owned(),
+            format!("0x{kind:x}"),
+            "owner".to_owned(),
+            if owner.is_empty() { "-".to_owned() } else { owner.clone() },
+            "word".to_owned(),
+            word.to_owned(),
+        ];
+        if !body.is_empty() {
+            row.push("text".to_owned());
+            row.push(body);
+        }
+        rows.push(row.join("\t"));
+        if word == "NT_GNU_PROPERTY_TYPE_0" {
+            for (each, entry) in note_properties(desc).into_iter().enumerate() {
+                rows.push(format!(
+                    "prop\t{index}\t{each}\ttype\t0x{:x}\tbytes\t{}\tvalue\t{}",
+                    entry.0, entry.1,
+                    match entry.2 {
+                        Some(value) => format!("0x{value:x}"),
+                        None => "-".to_owned(),
+                    }
+                ));
+            }
+        }
+    }
+    if listed.len() > MAX_LISTED {
+        rows.push(format!("cut\tnotes\t{}\tlisted\t{MAX_LISTED}", listed.len()));
+    }
+    rows
+}
+
+/// A descriptor as both listings print a run of bytes they cannot name: hex, lower case, no separators.
+fn note_hex(desc: &[u8]) -> String {
+    desc.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// The x86 feature bits of a property note, in the one spelling both listings use for them. Only the
+/// record this file set is claimed, and nothing is said about a bit neither reader names.
+fn note_features(desc: &[u8]) -> String {
+    let names = [(1u64, "IBT"), (2u64, "SHSTK")];
+    let mut seen: Vec<&str> = Vec::new();
+    for (kind, size, value) in note_properties(desc) {
+        if kind != 0xC000_0002 || size != 4 {
+            continue;
+        }
+        for (bit, label) in names {
+            if value.is_some_and(|one| one & bit != 0) {
+                seen.push(label);
+            }
+        }
+    }
+    if seen.is_empty() {
+        return String::new();
+    }
+    format!("x86 feature: {}", seen.join(", "))
+}
+
+/// The records inside a property note: a type, a length, that many bytes, and the next record four
+/// bytes in from wherever the padding left it.
+fn note_properties(desc: &[u8]) -> Vec<(u64, u64, Option<u64>)> {
+    let mut out = Vec::new();
+    let mut where_ = 0usize;
+    while where_ + 8 <= desc.len() {
+        let kind = u32::from_le_bytes([desc[where_], desc[where_ + 1], desc[where_ + 2], desc[where_ + 3]]) as u64;
+        let size = u32::from_le_bytes([desc[where_ + 4], desc[where_ + 5], desc[where_ + 6], desc[where_ + 7]]) as u64;
+        let body = desc.get(where_ + 8..where_ + 8 + usize::try_from(size).unwrap_or(usize::MAX));
+        let value = body.filter(|each| each.len() == 4).map(|each| {
+            u32::from_le_bytes([each[0], each[1], each[2], each[3]]) as u64
+        });
+        out.push((kind, size, value));
+        where_ = match where_
+            .checked_add(8)
+            .and_then(|at| at.checked_add(usize::try_from(note_rounded(size)).unwrap_or(usize::MAX)))
+        {
+            Some(next) => next,
+            None => break,
+        };
+    }
+    out
+}
+
+/// How many rows the note window fills. A PE has no such table and a stripped, note-less ELF has none
+/// either, so both answer with nothing.
+#[no_mangle]
+pub extern "C" fn note_count() -> i32 {
+    NOTES.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then one note each, with the records of a property note listed beneath it. Row
+/// zero is the totals.
+#[no_mangle]
+pub extern "C" fn note_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    NOTES.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

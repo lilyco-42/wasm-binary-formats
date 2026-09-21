@@ -80,6 +80,7 @@ test('the analysis module stands on its own exports', () => {
     'debug_count', 'debug_at',
     'symver_count', 'symver_at',
     'tls_count', 'tls_at',
+    'note_count', 'note_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -169,6 +170,7 @@ test('the base module the page always downloads carries none of this', async () 
     'debug_count', 'debug_at',
     'symver_count', 'symver_at',
     'tls_count', 'tls_at',
+    'note_count', 'note_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -731,5 +733,51 @@ test('the thread-local table the loader walks is the one the module reports', as
   for (const name of ['lab.so', 'lab32.so', 'answer.obj', 'res.dll']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.tls_count(), 0, `${name} answered with a PE's TLS directory`);
+  }
+});
+
+test('the notes both listings read are the ones the module reports', async () => {
+  // scripts/make-note-fixtures.py compiles the same four lines of C as an object, as an image linked
+  // with -fcf-protection=full and a build ID, and as one with branch tracking alone, then adds a file
+  // carrying a note written by hand in assembly. A row reaches the probe only where the byte walk,
+  // `readelf -nW` and `llvm-readobj --notes` agree on owner, descriptor length, type word and payload.
+  const probe = JSON.parse(await readFile('test/fixtures/note.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('	');
+    return parts[parts.indexOf(key) + 1];
+  };
+  const routes = new Set();
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.note_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the two listings said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('note_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+    if (want.length > 0) routes.add(cell(want[0], 'walked'));
+    // The rows a file carries are the notes it carries: one row per note, plus one per record inside a
+    // property note, and the totals row counts the notes rather than the rows.
+    const notes = want.filter((one) => one.startsWith('note	')).length;
+    assert.equal(Number(cell(want[0], 'entries')), notes, `${name}: the totals row counts something else`);
+    assert.ok(notes <= want.length - 1, `${name}: fewer notes than rows`);
+  }
+  // Both routes have to turn up: an image is read through its note segments and a relocatable object,
+  // which has no program headers at all, through its note sections.
+  assert.ok(routes.has('segment') && routes.has('section'), `routes seen: ${Array.from(routes).join(', ')}`);
+  // A note whose padding a reader got wrong would move every later note, so the hand-written pair is
+  // checked against the GNU note that follows it: five bytes of descriptor, then a two-byte name.
+  report(new Uint8Array(await readFile('test/fixtures/notelab.elf')));
+  const rows = Array.from({ length: ex.note_count() }, (_, index) => text('note_at', index));
+  const listed = rows.filter((one) => one.startsWith('note	'));
+  assert.equal(listed.length, 3, 'the hand-written notes did not survive the walk');
+  assert.equal(cell(listed[0], 'descsz'), '5', 'a five-byte descriptor lost its padding');
+  assert.equal(cell(listed[1], 'namesz'), '2', 'the second note was not where the rounding puts it');
+  assert.equal(cell(listed[2], 'word'), 'NT_GNU_PROPERTY_TYPE_0', 'the note after them moved');
+  // A PE carries no ELF notes, and an ELF built without any answers with nothing either.
+  for (const name of ['res.dll', 'answer.obj', 'lab.elf', 'tls.dll']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.note_count(), 0, `${name} answered with notes it does not have`);
   }
 });
