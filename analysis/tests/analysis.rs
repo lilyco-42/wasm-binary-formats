@@ -342,6 +342,45 @@ fn an_object_file_gets_no_map_and_a_refused_file_takes_the_last_ones_with_it() {
     assert_eq!(region_count(), 0, "a refused file kept the last file's map");
 }
 
+/// A program database is not an object file, so the analyser answers with one line about the
+/// container and the type list out of its TPI stream. Those twelve rows are the same ones
+/// `scripts/make-pdb-fixtures.py` proved against `llvm-pdbutil dump --types` for the PDB `lld-link`
+/// wrote, which is what makes them facts about the format rather than about this reader.
+#[test]
+fn a_program_database_reports_its_type_stream() {
+    let lines = rows(&fixture("lab.pdb"));
+    assert_eq!(
+        lines,
+        vec![
+            "msf\tpdb\tstreams\t15\ttpi\tversion\t20040203\tindexes\t0x1000..0x100a\tbytes\t212"
+                .to_string()
+        ]
+    );
+    assert_eq!(
+        types(),
+        vec![
+            "types\t10\theader\t56",
+            "type\t0x1000\targlist\t2\tint(0x74)\tint(0x74)",
+            "type\t0x1001\tprocedure\treturns\tint(0x74)\targs\t2\t0x1000",
+            "type\t0x1002\tstructure\tpoint\tcount\t0\tsize\t0\topts\t0x80",
+            "field\t0x1003\tx\tint(0x74)\t0",
+            "field\t0x1003\ty\tdouble(0x41)\t8",
+            "type\t0x1004\tstructure\tpoint\tcount\t2\tsize\t16\topts\t0x0",
+            "field\t0x1005\tRED\t0",
+            "field\t0x1005\tGREEN\t1",
+            "type\t0x1006\tenum\tcolour\tcount\t2\tbase\tint(0x74)\topts\t0x0",
+            "type\t0x1007\targlist\t2\t0x1002\t0x1006",
+            "type\t0x1008\tprocedure\treturns\t0x1002\targs\t2\t0x1007",
+            "type\t0x1009\tpointer\tto\t0x1002\tattr\t0x2002c",
+        ]
+    );
+    // A PDB is not loaded anywhere, so the map and the string list stay empty rather than painting
+    // the file's own sections as if a loader read them.
+    assert_eq!(region_count(), 0, "a program database has no loaded ranges");
+    assert_eq!(string_count(), 0, "and no loaded data to scan for strings");
+    assert_eq!(names_len(), 0, "and no symbol table this reader can name addresses from");
+}
+
 /// The type list, read through the same C ABI the page uses.
 fn types() -> Vec<String> {
     let cap = 4096;

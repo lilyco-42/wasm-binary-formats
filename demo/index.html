@@ -83,7 +83,7 @@ const MODULES = [
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
     title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流（.debug$T，clang -gcodeview 写的目标文件里就有）时列出 —— DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。',
   },
   {
     id: 'disasm',
@@ -326,8 +326,8 @@ function appendLists(box, state) {
   if (typed && typed.length > 1) {
     const head = typed[0].split('\t');
     const title = document.createElement('p');
-    title.textContent = `类型（CodeView 记录，来自 .debug$T；共 ${head[1]} 条记录，`
-      + `流头 ${head[3]}）：`;
+    title.textContent = `类型（CodeView 记录，来自目标文件的 .debug$T 或 .pdb 的 TPI 流；共 ${head[1]} 条记录，`
+      + `流头 ${head[3]} 字节）：`;
     const table = document.createElement('pre');
     table.textContent = typed.slice(1).map((row) => {
       const cell = row.split('\t');

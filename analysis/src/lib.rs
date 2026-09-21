@@ -132,6 +132,14 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     REGIONS.with(|slot| slot.borrow_mut().clear());
     STRINGS.with(|slot| slot.borrow_mut().clear());
     TYPES.with(|slot| slot.borrow_mut().clear());
+    if let Some((summary, listed)) = msf_types(bytes) {
+        // A program database is not an object file - `object` refuses it, and with good reason - but
+        // what a linker leaves beside an executable is the type stream, which is the answer a visitor
+        // opening a `.pdb` came for. The region map and string list stay empty, because a PDB has no
+        // loaded segments to map and no data a program runs.
+        TYPES.with(|slot| *slot.borrow_mut() = listed);
+        return Some(vec![summary]);
+    }
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
@@ -793,13 +801,22 @@ fn cv_name(raw: &[u8], at: usize) -> Option<(String, usize)> {
 /// `llvm-pdbutil dump -types` on the PDB `lld-link` built from that same object, in both directions:
 /// a record the walk names and the witness does not is as much a failure as the other way round.
 fn type_rows(data: &[u8]) -> Vec<String> {
-    let header = match cv_u32(data, 0) {
-        Some(value) => value,
-        None => return Vec::new(),
-    };
+    // A COFF `.debug$T` section opens with a four-byte header and numbers its records from 0x1000.
+    type_records(data, 4, 0x1000, 4)
+}
+
+/// The same walk from any start, base index and header size, because a PDB's TPI stream is the same
+/// records behind a different header: its first index and header length are fields of that stream,
+/// not constants - and the `header` column reports whichever one was skipped, so a reader can see
+/// which of the two it is looking at.
+fn type_records(data: &[u8], first: usize, base: u32, header: u32) -> Vec<String> {
+    if data.len() < first {
+        return Vec::new();
+    }
+    let header_value = header;
     let mut rows = Vec::new();
-    let mut at = 4usize;
-    let mut index: u32 = 0x1000;
+    let mut at = first;
+    let mut index: u32 = base;
     let mut records = 0usize;
     let mut listed = 0usize;
     while at + 4 <= data.len() {
@@ -846,8 +863,116 @@ fn type_rows(data: &[u8]) -> Vec<String> {
         // lied says so in its own row rather than looking like a truncated list.
         rows.push(format!("cut\ttypes\t{records}"));
     }
-    rows.insert(0, format!("types\t{records}\theader\t{header}"));
+    rows.insert(0, format!("types\t{records}\theader\t{header_value}"));
     rows
+}
+
+/// The TPI stream of an MSF 7.00 program database, as the rows of a type list plus one line naming
+/// what was read.
+///
+/// The engine's container reader answers a `.pdb`'s table; this is the part of it that only the
+/// analysis module can do, and it is the same record walk - a TPI stream is the header fields plus
+/// the leaves an object's `.debug$T` holds, with the first index and the header length read from the
+/// stream instead of assumed. A file that is not a PDB, or one whose directory cannot be reached,
+/// answers `None` and the caller says so.
+fn msf_types(bytes: &[u8]) -> Option<(String, Vec<String>)> {
+    const MAGIC: &[u8] = b"Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
+    if !bytes.starts_with(MAGIC) {
+        return None;
+    }
+    let page = usize::try_from(cv_u32(bytes, 32)?).ok()?;
+    if page < 64 || page % 64 != 0 || page > bytes.len() {
+        return None;
+    }
+    let dir_bytes = usize::try_from(cv_u32(bytes, 44)?).ok()?;
+    let want = dir_bytes.checked_add(page - 1)? / page;
+    if dir_bytes < 8 || want == 0 || want > 4096 {
+        return None;
+    }
+    let held = |index: usize| index.checked_mul(page)?.checked_add(page)? <= bytes.len();
+    let mut pages: Vec<usize> = Vec::new();
+    for slot in [48usize, 56] {
+        if let Some(value) = cv_u32(bytes, slot) {
+            let index = usize::try_from(value).ok()?;
+            if index > 0 {
+                pages.push(index);
+            }
+        }
+    }
+    if pages.len() < want {
+        let list = usize::try_from(cv_u32(bytes, 52)?).ok()?;
+        if !held(list) {
+            return None;
+        }
+        for n in pages.len()..want {
+            let index = usize::try_from(cv_u32(bytes, list * page + 4 * n)?).ok()?;
+            if index == 0 {
+                return None;
+            }
+            pages.push(index);
+        }
+    }
+    pages.truncate(want);
+    if !pages.iter().all(|each| held(*each)) {
+        return None;
+    }
+    let mut dir: Vec<u8> = Vec::with_capacity(dir_bytes);
+    for each in &pages {
+        dir.extend_from_slice(bytes.get(each * page..each * page + page)?);
+    }
+    dir.truncate(dir_bytes);
+    let count = usize::try_from(cv_u32(&dir, 0)?).ok()?;
+    if count < 3 || count > 4096 || 4 + 4 * count + 4 > dir_bytes {
+        return None;
+    }
+    // Stream 2 is the type stream by position, which is what llvm-pdbutil's table calls `TPI Stream`.
+    // The block list follows the size list, one entry per page each stream needs, so the offset of
+    // stream 2's blocks is the size list plus every block counted before it.
+    let mut blocks = Vec::with_capacity(count);
+    for index in 0..count {
+        let size = usize::try_from(cv_u32(&dir, 4 + 4 * index)?).ok()?;
+        let used = size.checked_add(page - 1)? / page;
+        let start = 4 + 4 * count + 4 * blocks.iter().map(|each| each.len()).sum::<usize>();
+        if start + 4 * used > dir_bytes {
+            return None;
+        }
+        let found: Vec<usize> = (0..used)
+            .filter_map(|n| Some(usize::try_from(cv_u32(&dir, start + 4 * n)?).ok()?))
+            .collect();
+        if found.len() != used {
+            return None;
+        }
+        blocks.push(found);
+    }
+    let stream = match blocks.get(2) {
+        Some(found) => {
+            let mut out: Vec<u8> = Vec::new();
+            for each in found {
+                if !held(*each) {
+                    return None;
+                }
+                out.extend_from_slice(bytes.get(each * page..each * page + page)?);
+            }
+            out
+        }
+        None => return None,
+    };
+    if stream.len() < 20 {
+        return None;
+    }
+    let version = cv_u32(&stream, 0)?;
+    let header = usize::try_from(cv_u32(&stream, 4)?).ok()?;
+    let first = cv_u32(&stream, 8)?;
+    let last = cv_u32(&stream, 12)?;
+    let total = usize::try_from(cv_u32(&stream, 16)?).ok()?;
+    if header.checked_add(total)? > stream.len() {
+        return None;
+    }
+    let rows = type_records(&stream, header, first, cv_u32(&stream, 4)?);
+    let summary = format!(
+        "msf\tpdb\tstreams\t{count}\ttpi\tversion\t{version}\tindexes\t0x{first:x}..0x{last:x}\tbytes\t{total}"
+    );
+    Some((summary, rows))
 }
 
 /// One record's rows: usually a single row, and a field list one row per member it can read.

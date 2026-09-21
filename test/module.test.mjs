@@ -287,3 +287,23 @@ test('the type list is the record stream, leaf by leaf', async () => {
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.type_count(), 0, 'a plain object invented a type stream');
 });
+
+test('a program database answers with the types its TPI stream holds', async () => {
+  // The engine's container reader says what a .pdb is; this is the part only the analysis module can
+  // do. The rows come from the same probe the generator refused to write unless `llvm-pdbutil
+  // dump --types` agreed with its own walk of the stream, so the module is checked against the
+  // linker's and LLVM reader's answer rather than against this one's.
+  const probe = JSON.parse(await readFile('test/fixtures/pdb.probe.json', 'utf8'));
+  const want = probe['lab.pdb'].types.rows;
+  assert.ok(want.length > 10, `the probe lost its type rows: ${want.length}`);
+  const bytes = new Uint8Array(await readFile('test/fixtures/lab.pdb'));
+  assert.equal(report(bytes).rc, 0, 'a PDB is an accepted input, not a refusal');
+  assert.equal(ex.type_count(), want.length, 'the type list has a different length');
+  for (let index = 0; index < want.length; index += 1) {
+    assert.equal(text('type_at', index), want[index], `TPI row ${index} moved`);
+  }
+  // And no map, because a database image is never loaded: the panels that answer for loaded bytes
+  // have nothing to say here.
+  assert.equal(ex.region_count(), 0, 'a PDB is not loaded anywhere');
+  assert.equal(ex.string_count(), 0, 'so it has no loaded data to scan');
+});

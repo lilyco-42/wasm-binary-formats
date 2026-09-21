@@ -325,18 +325,19 @@ the same basis as the disassembly (`0x140002000`, image base included), the file
 length and its section, so the page can say which strings an instruction actually points at and print that
 as `引用` without guessing.
 
-**The type list** (`type_count` / `type_at`) reads the CodeView records of a `.debug$T` section - the
-same leaves a PDB's TPI stream is made of, which is what IDA calls the type list: structures with their
-field names, types and byte offsets, unions and enums, pointer, modifier, argument-list and procedure
-types. A record's length counts its kind and its data but not the length field itself, so the walk steps
-`length + 2`, and the four-byte header in front of the stream is reported rather than interpreted, because
-what it means has never been checked here - only that the records start after it. A member record inside a
-field list carries no length at all, so when the walk meets a member kind it does not know - `LF_NESTTYPE`,
-which is what clang writes for the anonymous union inside `struct box` - the row says where it stopped
-instead of guessing where the next name begins. Leaves the reader does not decode are listed as
-`aux leaf 0x1605 not decoded`, so the count of what was skipped is on screen too. DWARF is a different
-format and is not read; a file with no `.debug$T` gets no rows rather than names invented from its section
-titles.
+**The type list** (`type_count` / `type_at`) reads the CodeView records of a `.debug$T` section or of a
+PDB's TPI stream - the same leaves either way, which is what IDA calls the type list: structures with
+their field names, types and byte offsets, unions and enums, pointer, modifier, argument-list and
+procedure types. A record's length counts its kind and its data but not the length field itself, so the
+walk steps `length + 2`; in an object the stream opens with a four-byte header that is reported rather
+than interpreted, and in a PDB the header size, the first index and the record bytes are read from the
+TPI header, which is why the same reader answers both and the `header` column says which was skipped.
+A member record inside a field list carries no length at all, so when the walk meets a member kind it
+does not know - `LF_NESTTYPE`, which clang writes for the anonymous union inside `struct box` - the row
+says where it stopped instead of guessing where the next name begins. Leaves the reader does not decode
+are listed as `aux leaf 0x1605 not decoded`, so the count of what was skipped is on screen too. DWARF
+is a different format and is not read; a file with no type stream gets no rows rather than names
+invented from its section titles.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -505,7 +506,7 @@ temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject wr
 temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
 temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
 temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
-temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table and TPI header are checked against llvm-pdbutil --summary --streams --type-stats (engine reader not wired in yet)
+temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
