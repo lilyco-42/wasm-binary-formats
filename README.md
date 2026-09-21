@@ -954,7 +954,10 @@ does not re-derive them:
   the shape row says `single` or `multi` from which of the two the file actually has.
 * OpenPGP (+1 field-level label, 122 covered, 97 gaps) is the fourth format here with no magic: a
   transfer is a run of packets and each one states its own payload length, so the acceptance rule is
-  again "the lengths tile the file". `gpg` 2.4.9 (Git for Windows) writes six fixtures and
+  again "the lengths tile the file". An unstated length is allowed only on the packet that carries a stream
+  to the end of the file - compressed or literal data - and that limit is what a CI run caught: `0x93`, the
+  first octet of a NumPy array, is an old-format header whose two low bits mean "no length follows", so
+  without the rule *any* file of *any* size is a valid one-packet OpenPGP transfer. `gpg` 2.4.9 (Git for Windows) writes six fixtures and
   `gpg --list-packets` is the witness, which is an unusually direct one - it prints `off`, `ctb`, `tag`,
   `hlen` and `plen` for every packet - so the generator refuses to write the probe unless its own walk of
   the bytes agrees with gpg's numbers packet for packet, *and* with the names gpg spells (`public key`,

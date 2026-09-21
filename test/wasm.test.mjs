@@ -881,12 +881,15 @@ test('OpenPGP is accepted by the packet lengths tiling the file and stops at a s
   assert.ok(phrase.rows.includes('skesf\tv4\tcipher\t9\ts2k\t3\thash\t10'), phrase.rows.join(' | '));
 
   // Bencode, a card and a plain string are all refused as packet streams: the first octet of each either
-  // has no high bit or its stated length does not reach the end of the file.
-  for (const [label, text] of [
-    ['bencode', 'd8:announce7:trackeree'],
-    ['plain text', 'just bytes that happen to be long enough to walk over'],
+  // has no high bit or its stated length does not reach the end of the file. And a NumPy header, whose
+  // first octet is an old-format packet header with no length field, is refused because an unstated length
+  // only means something on a packet that carries a stream to the end of the file.
+  for (const [label, bytes] of [
+    ['bencode', new TextEncoder().encode('d8:announce7:trackeree')],
+    ['plain text', new TextEncoder().encode('just bytes that happen to be long enough to walk over')],
+    ['numpy header', new Uint8Array([0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59, 4, 0, 0x45, 0, 0, 0])],
   ]) {
-    const seen = driveBytes('container', new TextEncoder().encode(text));
+    const seen = driveBytes('container', bytes);
     assert.ok(seen.code !== 54, `${label} was read as OpenPGP: ${seen.code}`);
   }
 });

@@ -156,6 +156,28 @@ fn a_compressed_packet_runs_to_the_end_of_the_file_and_is_not_descended_into() {
     assert!(record.contains("\"opaque\": true"));
 }
 
+/// The other side of that limit: a literal packet may leave its length unstated, because its body is the
+/// rest of the file - the way a PGP 2.x-era transfer ends. Hand-built, because gpg states a length for
+/// every packet it writes.
+#[test]
+fn an_open_ended_literal_packet_is_read_from_its_own_fields_to_the_end_of_the_file() {
+    // 0xaf: old format, tag 11, and the two low bits say "no length octets follow".
+    let mut open = vec![0xaf, 0x62, 0x08];
+    open.extend_from_slice(b"note.txt");
+    open.extend_from_slice(&[0x6a, 0xb0, 0x00, 0x01]);
+    open.extend_from_slice(b"a lab fixture body here!!!");
+    assert_eq!(open.len(), 41, "the arithmetic below is stated in bytes");
+    assert_eq!(
+        read(&open),
+        vec![
+            "openpgp\tpackets\t1\tbytes\t41\tends\tyes\tbroken\t0",
+            "kind\tmessage",
+            "packet\t0\told\ttag\t11\tliteral data\thlen\t1\tplen\t-\tindeterminate",
+            "literal\tnote.txt\tbody\t26\tfields\t14",
+        ]
+    );
+}
+
 /// The two encrypted shapes: an opaque SEIPD packet whose header uses the *new* format while the packet in
 /// front of it uses the old one.
 #[test]
@@ -207,6 +229,20 @@ fn a_walk_that_does_not_tile_is_refused_rather_than_half_reported() {
     // Something with no packet header at all.
     assert_eq!(parse(b"not a packet stream at all"), -2);
     assert_eq!(count(), 0, "and rows behind it");
+    // An indeterminate length is only a legal claim for the packet that carries a stream to the end of the
+    // file. That limit is what keeps this reader honest about *other* formats: a NumPy array starts 0x93,
+    // which read as a packet header is "old format, one-pass signature, indeterminate" - and so would
+    // describe any file at all, of any size, as one packet tiling it exactly.
+    let numpy_like = [
+        0x93u8, b'N', b'U', b'M', b'P', b'Y', 4, 0, 0x45, 0x00, 0x00, 0x00,
+    ];
+    assert_eq!(
+        parse(&numpy_like),
+        -2,
+        "an unstated length on a fixed-size packet was believed: {:?}",
+        report()
+    );
+    assert_eq!(count(), 0, "and rows behind that");
 
     // A hand-built subkey packet, long enough to clear the eight-byte floor the whole module shares: the
     // tag is named because gpg names it, and the body's version, algorithm and creation time are read out

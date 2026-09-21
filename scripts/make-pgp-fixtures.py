@@ -242,6 +242,13 @@ def walk(raw):
             broken += 1
             break
         if special == "indeterminate":
+            # Only a packet whose body is a stream may leave its length unstated, because only then is
+            # "the rest of the file" the whole of it: a compressed or a literal packet. Anywhere else the
+            # header is a claim this format never makes - and without this the first octet of a NumPy
+            # array, 0x93, turns any file at all into a one-packet OpenPGP transfer.
+            if tag not in (8, 11):
+                broken += 1
+                break
             packets.append({"off": at, "ctb": "%02x" % ctb, "format": fmt, "tag": tag, "hlen": body - at,
                             "plen": None, "indeterminate": True})
             ends = True
@@ -279,7 +286,11 @@ def rows_for(raw, packets, broken, ends):
         rows.append("stopped\tpackets\t{}".format(MAX_PACKETS))
     details = []
     for index, each in enumerate(shown):
-        body = raw[each["off"] + each["hlen"]:each["off"] + each["hlen"] + (each["plen"] or 0)]
+        # An indeterminate packet's body is the rest of the file by definition, so its leading fields are
+        # as readable as a stated-length one's - the number that differs is only how much is left.
+        start = each["off"] + each["hlen"]
+        stop = start + each["plen"] if each["plen"] is not None else len(raw)
+        body = raw[start:stop]
         tag = each["tag"]
         if tag in OPAQUE:
             details.append((index, "descend\tno\t{}".format(OPAQUE[tag])))

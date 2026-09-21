@@ -37,7 +37,8 @@
 //!         2 -> four, 3 -> indeterminate, and the number is plain big-endian) while a new-format one
 //!         lets the first length octet choose its form. Nothing here has a magic, so the tiling is the
 //!         identification - and every offset, tag, header size and length is checked against the
-//!         `# off=N ctb=XX tag=T hlen=H plen=P` line gpg prints for the same packet.
+//!         `# off=N ctb=XX tag=T hlen=H plen=P` line gpg prints for the same packet. An indeterminate
+//!         length only counts on a stream packet (compressed, literal), else any file would be one packet.
 //!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
 //!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
 //!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
@@ -7832,6 +7833,14 @@ fn pgp_walk(bytes: &[u8]) -> (Vec<Pgp>, usize, bool) {
             break;
         }
         if used == 0 {
+            // Only a packet whose body is a stream may leave its length unstated - a compressed or a
+            // literal packet, where "the rest of the file" really is the whole of it. Without that limit
+            // the first octet of a NumPy array, 0x93, is an old-format header with an indeterminate
+            // length, and every file at all becomes a one-packet OpenPGP transfer.
+            if !matches!(tag, 8 | 11) {
+                broken += 1;
+                break;
+            }
             packets.push(Pgp {
                 offset: at,
                 format: if fresh { "new" } else { "old" },
@@ -7887,12 +7896,13 @@ fn pgp_hex(bytes: &[u8]) -> String {
 }
 
 impl Pgp {
-    /// The packet's own payload, or an empty slice for an indeterminate one.
+    /// The packet's own payload. An indeterminate one has the rest of the file as its body by definition,
+    /// so its leading fields are as readable as a stated-length packet's.
     fn body<'a>(&self, bytes: &'a [u8]) -> &'a [u8] {
         let start = self.offset + self.header;
         match self.payload {
             Some(length) => bytes.get(start..start + length).unwrap_or(&[]),
-            None => &[],
+            None => bytes.get(start..).unwrap_or(&[]),
         }
     }
 
