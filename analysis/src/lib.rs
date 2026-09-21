@@ -74,7 +74,7 @@ fn symbol_row<'data, T: ObjectSymbol<'data>>(prefix: &str, index: usize, symbol:
 /// compilation unit. A symbol with no section is left out too - an import, an absolute value like
 /// clang's `@feat.00`, or a debug entry - because its address column is a zero the reader invented
 /// rather than a place something lives.
-fn name_pair<T: ObjectSymbol>(symbol: &T) -> Option<(u64, String)> {
+fn name_pair<'data, T: ObjectSymbol<'data>>(symbol: &T) -> Option<(u64, String)> {
     if symbol.section_index().is_none() || symbol.is_undefined() {
         return None;
     }
