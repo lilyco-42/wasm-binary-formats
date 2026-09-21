@@ -1,0 +1,60 @@
+{
+ "lab.elf": {
+  "defs": 0,
+  "needs": 0,
+  "rows": [],
+  "symbols": 0
+ },
+ "lab.so": {
+  "defs": 0,
+  "needs": 0,
+  "rows": [],
+  "symbols": 0
+ },
+ "liblab.so": {
+  "defs": 0,
+  "needs": 0,
+  "rows": [],
+  "symbols": 0
+ },
+ "libuse.so": {
+  "defs": 0,
+  "needs": 1,
+  "rows": [
+   "symver\tsymbols\t3\tdefs\t0\tneeds\t1\tversym\t640\tverdef\t-1\tverneed\t648\tbits\t64",
+   "symbol\t0\tvalue\t0x0\tindex\t0\tname\t-\thidden\tno",
+   "symbol\t1\tvalue\t0x2\tindex\t2\tname\tLAB_2\thidden\tno",
+   "symbol\t2\tvalue\t0x1\tindex\t1\tname\t-\thidden\tno",
+   "need\t0\tfile\tlibver.so\tname\tLAB_2\thash\t5265442\tindex\t2\tflags\tnone\tversion\t1"
+  ],
+  "symbols": 3
+ },
+ "libver.so": {
+  "defs": 3,
+  "needs": 0,
+  "rows": [
+   "symver\tsymbols\t3\tdefs\t3\tneeds\t0\tversym\t640\tverdef\t648\tverneed\t-1\tbits\t64",
+   "symbol\t0\tvalue\t0x0\tindex\t0\tname\t-\thidden\tno",
+   "symbol\t1\tvalue\t0x2\tindex\t2\tname\tLAB_1\thidden\tno",
+   "symbol\t2\tvalue\t0x3\tindex\t3\tname\tLAB_2\thidden\tno",
+   "def\t0\tindex\t1\thash\t164382575\tflags\tBASE\tname\tlibver.so\tcnt\t1\tversion\t1",
+   "def\t1\tindex\t2\thash\t5265441\tflags\tnone\tname\tLAB_1\tcnt\t1\tversion\t1",
+   "def\t2\tindex\t3\thash\t5265442\tflags\tnone\tname\tLAB_2\tcnt\t1\tversion\t1"
+  ],
+  "symbols": 3
+ },
+ "libver32.so": {
+  "defs": 3,
+  "needs": 0,
+  "rows": [
+   "symver\tsymbols\t3\tdefs\t3\tneeds\t0\tversym\t388\tverdef\t396\tverneed\t-1\tbits\t32",
+   "symbol\t0\tvalue\t0x0\tindex\t0\tname\t-\thidden\tno",
+   "symbol\t1\tvalue\t0x2\tindex\t2\tname\tLAB_1\thidden\tno",
+   "symbol\t2\tvalue\t0x3\tindex\t3\tname\tLAB_2\thidden\tno",
+   "def\t0\tindex\t1\thash\t164382575\tflags\tBASE\tname\tlibver.so\tcnt\t1\tversion\t1",
+   "def\t1\tindex\t2\thash\t5265441\tflags\tnone\tname\tLAB_1\tcnt\t1\tversion\t1",
+   "def\t2\tindex\t3\thash\t5265442\tflags\tnone\tname\tLAB_2\tcnt\t1\tversion\t1"
+  ],
+  "symbols": 3
+ }
+}
