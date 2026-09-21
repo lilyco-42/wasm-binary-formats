@@ -75,6 +75,7 @@ test('the analysis module stands on its own exports', () => {
     'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at',
     'function_count', 'function_at', 'named_count', 'named_at', 'segment_count', 'segment_at',
     'resource_count', 'resource_at',
+    'version_count', 'version_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -159,6 +160,7 @@ test('the base module the page always downloads carries none of this', async () 
     'reloc_count', 'reloc_at', 'function_count', 'function_at', 'named_count', 'named_at',
     'segment_count', 'segment_at',
     'resource_count', 'resource_at',
+    'version_count', 'version_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -489,5 +491,33 @@ test('the resource tree the witnesses recorded is what the built module reports'
   for (const name of ['lab.elf', 'answer.obj']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.resource_count(), 0, `${name} answered with a resource tree`);
+  }
+});
+
+test('the version block the API agrees with is read out of the file, not asked for by name', async () => {
+  // scripts/make-version-fixtures.py parses res.dll's VS_VERSIONINFO tree and then asks Windows,
+  // through GetFileVersionInfoW and VerQueryValueW, about every key the tree lists - which is how
+  // `Assembly Version`, a key no standard list carries, is in the probe at all. The fixed block's
+  // thirteen words, the language pairs and each string had to match before the file was written.
+  const probe = JSON.parse(await readFile('test/fixtures/version.probe.json', 'utf8'));
+  for (const name of ['res.dll', 'rcres.dll']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.version_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the two readers said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('version_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+  }
+  // One key the loader would never be asked for, and the strings that are a single space in the file
+  // stay a single space rather than being reported as empty.
+  report(new Uint8Array(await readFile('test/fixtures/res.dll')));
+  const rows = Array.from({ length: ex.version_count() }, (_, index) => text('version_at', index));
+  assert.ok(rows.includes('string	Assembly Version	0.0.0.0'), rows.join(' | '));
+  assert.equal(rows.filter((one) => one.endsWith('	 ')).length, 3, 'blank-but-present values');
+  for (const name of ['lab.elf', 'answer.obj']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.version_count(), 0, `${name} answered with a version block`);
   }
 });

@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, and the resource tree an image carries |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -486,6 +486,23 @@ the list with `kind section` because they are names the file attaches to address
 says. C++ names carry both spellings, the table's bytes in `name` and the two-witness reading in `read`,
 so the row that the demanglers disagree on is still listed - with `read -` - rather than dropped from a
 window that is supposed to be complete.
+
+**The version view** (`version_count` / `version_at`) reads what a PE says about itself, out of the
+resource tree the panel above just listed - the body under type 16, whose fixed block opens with
+`0xFEEF04BD` and holds four numbers in two u32s each (`1.2.3.4`, not `66051`), followed by a tree of
+`StringTable` nodes and their `String` children. The keys are counted from the file rather than looked
+up from a list, which is the whole reason the panel exists: `VerQueryValueW` answers one path at a time
+and cannot enumerate, so a caller with a standard list of names never sees `Assembly Version`, and a
+viewer that asked only for the list would report a file as silent about something it states. Three rules
+the fixtures pinned down, none of them obvious from a summary of the format: a text node's
+`wValueLength` counts *characters* while a binary node's counts bytes (double the four-byte
+`Translation` value and the next node's `wLength` - 404 - walks in as a second language the file does
+not have); `GetFileVersionInfoSizeW` answers 1132 for a body that is 564 bytes, so the API's size is not
+a check on the resource's own length; and a `Var` node may carry text type with a zero value length,
+which is how `VarFileInfo` reaches its child at an offset its own value does not explain. No word is
+printed for `os`, `type` or `subtype`: the only names for those numbers come from a Microsoft header,
+and no second reader here named them for a file in this lab - so they stay numbers, unlike the resource
+types, which two readers did name the same way.
 
 **The resources window** (`resource_count` / `resource_at`) lists the tree a PE carries beside its
 code: three levels - type, name, language - whose entries state whether the child is another directory
@@ -711,6 +728,7 @@ temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports
 temp/venv/Scripts/python.exe scripts/make-xsd-fixtures.py        # authors five fixtures, then gates the probe on `xmlschema`'s compiled component maps and the JDK's Xerces agreeing with ElementTree's tree name by name; neither witness is reachable from CI, so the committed probe is the evidence
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
+python scripts/make-version-fixtures.py                                # no new fixture: the version block already in res.dll is parsed as a tree and then re-asked through GetFileVersionInfoW / VerQueryValueW - the probe is not written unless the fixed block's thirteen words, the language pairs and every string match in both directions
 temp/venv/Scripts/python.exe scripts/make-resource-fixtures.py      # csc writes res.dll (icon, manifest, version block) and rc + windres + gcc write rcres.dll (string types and a string name); the probe is not written unless a python walk, `llvm-readobj --coff-resources` and Windows' own resource loader agree on every type, name, language, size - and on the bytes at the file offset the walk derived from each RVA
 temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
 test/fixtures/labarm.so already exist, and every program header is read three times - the bytes at e_phoff,

@@ -1,0 +1,27 @@
+{
+ "rcres.dll": {
+  "api": null,
+  "body": null,
+  "note": "no resource of type 16",
+  "rows": []
+ },
+ "res.dll": {
+  "api": 1132,
+  "body": 564,
+  "rows": [
+   "version\tsignature\t0xfeef04bd\tstruct\t1.0\tfile\t0.0.0.0\tproduct\t0.0.0.0\tflags-mask\t0x3f\tflags\t0x0\tos\t0x4\ttype\t0x2\tsubtype\t0x0\tdate\t0\ttables\t1\tstrings\t7",
+   "translation\t0\tlang\t0x0000\tcodepage\t0x04b0",
+   "string\tFileDescription\t ",
+   "string\tFileVersion\t0.0.0.0",
+   "string\tInternalName\tres.dll",
+   "string\tLegalCopyright\t ",
+   "string\tOriginalFilename\tres.dll",
+   "string\tProductVersion\t0.0.0.0",
+   "string\tAssembly Version\t0.0.0.0"
+  ],
+  "tables": [
+   "000004b0"
+  ],
+  "walk_strings": 8
+ }
+}

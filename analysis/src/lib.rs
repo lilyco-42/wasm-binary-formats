@@ -212,6 +212,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     NAMED.with(|slot| slot.borrow_mut().clear());
     SEGMENTS.with(|slot| slot.borrow_mut().clear());
     RESOURCES.with(|slot| slot.borrow_mut().clear());
+    VERSION.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -351,6 +352,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     SEGMENTS.with(|slot| *slot.borrow_mut() = segments);
     let resources = resource_rows(bytes);
     RESOURCES.with(|slot| *slot.borrow_mut() = resources);
+    let version = version_rows(bytes);
+    VERSION.with(|slot| *slot.borrow_mut() = version);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1117,6 +1120,8 @@ thread_local! {
     /// The Segments window: the program headers an ELF hands its loader.
     static SEGMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static RESOURCES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The version block a PE states about itself, from inside the resource tree.
+    static VERSION: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -1282,6 +1287,9 @@ pub extern "C" fn segment_at(index: i32, out: *mut u8, cap: i32) -> i32 {
 /// and how many bodies one report will reach before it stops and says so.
 const RESOURCE_DIRECTORY: usize = 2;
 const RESOURCE_MAX_BODIES: usize = 512;
+/// The resource type that carries a version block, and the word the fixed block opens with.
+const VERSIONINFO_TYPE: u64 = 16;
+const VERSIONINFO_SIGNATURE: u64 = 0xFEEF_04BD;
 
 /// One type of the level-one directory, with the bodies counted under it.
 struct TypeSlot {
@@ -1494,6 +1502,212 @@ pub extern "C" fn resource_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     RESOURCES.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// The body of the version block, if the file has one: the bytes of the resource directory's type 16,
+/// which is where a PE states what it says about itself. The tree walk is `resource_level`'s, shared
+/// with the Resources window above, so the two panels cannot disagree about where the body is.
+fn version_body(raw: &[u8], base: usize) -> Option<(usize, usize)> {
+    for (type_dir, type_id, type_label, type_where) in resource_level(raw, base, base) {
+        if !type_dir || !type_label.is_empty() || type_id != VERSIONINFO_TYPE {
+            continue;
+        }
+        for (name_dir, _name_id, _name_label, name_where) in resource_level(raw, base, type_where) {
+            if !name_dir {
+                continue;
+            }
+            for (lang_dir, _language, _lang_label, data_where) in resource_level(raw, base, name_where) {
+                if lang_dir {
+                    continue;
+                }
+                let rva = word_at(raw, data_where, true)?;
+                let size = word_at(raw, data_where.checked_add(4)?, true)?;
+                let (place, _name) = Pe::parse(raw)?.at(rva)?;
+                let stop = place.checked_add(usize::try_from(size).ok()?)?;
+                if raw.get(place..stop).is_none() {
+                    return None;
+                }
+                return Some((place, stop));
+            }
+        }
+    }
+    None
+}
+
+/// One node of a `VS_VERSIONINFO` tree: its key, where the value starts, how many bytes of value it
+/// claims, where the children start, and where this node ends.
+///
+/// `wValueLength` is counted in characters when `wType` says text and in bytes otherwise, and every
+/// node starts on a 4-byte boundary - apply either rule to the wrong node and the child lands in the
+/// middle of the parent's text, which is how a four-byte blob (`Translation`) can otherwise appear to
+/// hold two language pairs when the second one is really the next node's length.
+fn version_node(body: &[u8], at: usize) -> Option<(String, usize, usize, usize, usize)> {
+    let header = struct_at(body, at, 6)?;
+    let length = u16::from_le_bytes([header[0], header[1]]) as usize;
+    let value_length = u16::from_le_bytes([header[2], header[3]]) as usize;
+    let kind = u16::from_le_bytes([header[4], header[5]]);
+    if length == 0 {
+        return None;
+    }
+    let stop = at.checked_add(length)?;
+    if stop > body.len() {
+        return None;
+    }
+    let mut end = at.checked_add(6)?;
+    while end.checked_add(2)? <= stop {
+        let pair = struct_at(body, end, 2)?;
+        if pair == [0, 0] {
+            break;
+        }
+        end = end.checked_add(2)?;
+    }
+    if end.checked_add(2)? > stop {
+        return None;
+    }
+    let wide: Vec<u16> = body.get(at.checked_add(6)?..end)?
+        .chunks(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect();
+    let key = String::from_utf16_lossy(&wide);
+    let value = align4(end.checked_add(2)?);
+    let count = value_length.saturating_mul(if kind == 1 { 2 } else { 1 });
+    Some((key, value, count, align4(value.checked_add(count)?), stop))
+}
+
+/// Read `count` bytes, or nothing at all when the range does not fit.
+fn struct_at(body: &[u8], at: usize, count: usize) -> Option<&[u8]> {
+    body.get(at..at.checked_add(count)?)
+}
+
+fn align4(at: usize) -> usize {
+    at.saturating_add(3) & !3usize
+}
+
+/// IDA's version view: the fixed block's own words, the language and codepage pairs the file offers,
+/// and every string key under them - including the keys no standard list carries, which is the point of
+/// reading the file rather than asking an API for a fixed set of names.
+///
+/// The signature is the format's own constant (`0xFEEF04BD`); the numbers are the file's. No word is
+/// printed for `os`, `type` or `subtype`, because the only spellings for them are a Microsoft header's
+/// and no second reader in this lab names them for a file here.
+fn version_rows(raw: &[u8]) -> Vec<String> {
+    version_found(raw).unwrap_or_default()
+}
+
+fn version_found(raw: &[u8]) -> Option<Vec<String>> {
+    let pe = Pe::parse(raw)?;
+    let at = pe.dirs.checked_add(RESOURCE_DIRECTORY * 8)?;
+    let rva = word_at(raw, at, true)?;
+    if word_at(raw, at.checked_add(4)?, true)? == 0 {
+        return None;
+    }
+    let (base, _name) = pe.at(rva)?;
+    let (start, stop) = version_body(raw, base)?;
+    let body = raw.get(start..stop)?;
+    let (key, value_at, count, kids, end) = version_node(body, 0)?;
+    if key != "VS_VERSION_INFO" || count < 52 {
+        return None;
+    }
+    let fixed = struct_at(body, value_at, 52)?;
+    let word = |slot: usize| -> u64 {
+        u32::from_le_bytes([fixed[slot * 4], fixed[slot * 4 + 1], fixed[slot * 4 + 2], fixed[slot * 4 + 3]])
+            as u64
+    };
+    if word(0) != VERSIONINFO_SIGNATURE {
+        return None;
+    }
+    let mut tables: Vec<(u64, u64)> = Vec::new();
+    let mut found: Vec<(String, String)> = Vec::new();
+    let mut visit = Vec::new();
+    visit.push((kids, end, String::new(), false));
+    while let Some((at, stop, parent, strings)) = visit.pop() {
+        let mut at = at;
+        let mut steps = 0usize;
+        while at < stop && steps < RESOURCE_MAX_BODIES {
+            steps += 1;
+            at = align4(at);
+            let Some((key, value_at, count, kids, end)) = version_node(body, at) else {
+                break;
+            };
+            let value = body.get(value_at..value_at.checked_add(count).unwrap_or(value_at)).unwrap_or(&[]);
+            if key == "Translation" {
+                for pair in value.chunks_exact(2).map(|one| one[0] as u64 | ((one[1] as u64) << 8))
+                    .collect::<Vec<u64>>()
+                    .chunks(2)
+                {
+                    tables.push((pair[0], *pair.get(1).unwrap_or(&0)));
+                }
+            } else if count > 0 && !value.is_empty() {
+                let wide: Vec<u16> = value
+                    .chunks(2)
+                    .map(|pair| u16::from_le_bytes([*pair.first().unwrap_or(&0), *pair.get(1).unwrap_or(&0)]))
+                    .collect();
+                let text = String::from_utf16_lossy(&wide);
+                let text = text.trim_end_matches('\0');
+                if strings {
+                    found.push((key.clone(), clean(text)));
+                }
+            }
+            let next = format!("{}{}", if parent.is_empty() { String::new() } else { format!("{}\\", parent) }, key);
+            visit.push((kids, end, next, key == "StringFileInfo" || strings));
+            at = end;
+        }
+    }
+    let mut rows = vec![format!(
+        "version\tsignature\t0x{VERSIONINFO_SIGNATURE:08x}\tstruct\t{}\tfile\t{}\tproduct\t{}\tflags-mask\t0x{:x}\tflags\t0x{:x}\tos\t0x{:x}\ttype\t0x{:x}\tsubtype\t0x{:x}\tdate\t{}\ttables\t{}\tstrings\t{}",
+        hi_lo(word(1)),
+        hi_lo32(word(2), word(3)),
+        hi_lo32(word(4), word(5)),
+        word(6),
+        word(7),
+        word(8),
+        word(9),
+        word(10),
+        (word(11) << 32) | word(12),
+        tables.len(),
+        found.len()
+    )];
+    for (index, (language, codepage)) in tables.iter().take(MAX_LISTED).enumerate() {
+        rows.push(format!("translation\t{index}\tlang\t0x{language:04x}\tcodepage\t0x{codepage:04x}"));
+    }
+    for (key, value) in found.iter().take(MAX_LISTED) {
+        rows.push(format!("string\t{key}\t{value}"));
+    }
+    if tables.len() > MAX_LISTED {
+        rows.push(format!("cut\ttables\t{}\tlisted\t{MAX_LISTED}", tables.len()));
+    }
+    if found.len() > MAX_LISTED {
+        rows.push(format!("cut\tstrings\t{}\tlisted\t{MAX_LISTED}", found.len()));
+    }
+    Some(rows)
+}
+
+/// `VS_FIXEDFILEINFO`'s two halves of one version: the high word then the low, which is how the block
+/// stores a `1.2.3.4` - four numbers in two u32s, and a reader that prints one u32 prints `66051`.
+fn hi_lo(value: u64) -> String {
+    format!("{}.{}", value >> 16, value & 0xFFFF)
+}
+
+fn hi_lo32(high: u64, low: u64) -> String {
+    format!("{}.{}.{}.{}", high >> 16, high & 0xFFFF, low >> 16, low & 0xFFFF)
+}
+
+#[no_mangle]
+pub extern "C" fn version_count() -> i32 {
+    VERSION.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the fixed block's words, then a line per language and codepage pair, then a line per
+/// string. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn version_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    VERSION.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })
