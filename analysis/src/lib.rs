@@ -889,7 +889,12 @@ fn msf_types(bytes: &[u8]) -> Option<(String, Vec<String>)> {
     if dir_bytes < 8 || want == 0 || want > 4096 {
         return None;
     }
-    let held = |index: usize| index.checked_mul(page)?.checked_add(page)? <= bytes.len();
+    let held = |index: usize| -> bool {
+        match index.checked_mul(page) {
+            Some(at) => at.saturating_add(page) <= bytes.len(),
+            None => false,
+        }
+    };
     let mut pages: Vec<usize> = Vec::new();
     for slot in [48usize, 56] {
         if let Some(value) = cv_u32(bytes, slot) {
@@ -968,7 +973,9 @@ fn msf_types(bytes: &[u8]) -> Option<(String, Vec<String>)> {
     if header.checked_add(total)? > stream.len() {
         return None;
     }
-    let rows = type_records(&stream, header, first, cv_u32(&stream, 4)?);
+    // Walk the declared records and nothing past them: the stream is padded to a page boundary, and
+    // reading those pad bytes as a record would invent a type with an index no one refers to.
+    let rows = type_records(&stream[..header + total], header, first, cv_u32(&stream, 4)?);
     let summary = format!(
         "msf\tpdb\tstreams\t{count}\ttpi\tversion\t{version}\tindexes\t0x{first:x}..0x{last:x}\tbytes\t{total}"
     );
