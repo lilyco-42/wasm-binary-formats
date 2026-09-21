@@ -178,6 +178,35 @@ def from_objdump(name):
     return rows
 
 
+def from_llvm(name):
+    """`llvm-readobj --relocs`: `0x306E8 R_AARCH64_RELATIVE - 0x306D8`, grouped by section.
+
+    LLVM's own reader is the second one that knows the AArch64 table, and it is what makes those type
+    names claimable: binutils splits across two programs here, and `readelf` names them while `objdump`
+    prints `UNKNOWN`. Two readers that spell a word the same way is the rule; which two is a fact about
+    the toolchain, not something to widen the rule for.
+    """
+    rows = {}
+    table = None
+    for line in run(["llvm-readobj", "--relocs", os.path.join(FIX, name)]).splitlines():
+        head = re.match(r"^\s+Section \(\d+\) (\S+) \{", line)
+        if head:
+            table = head.group(1)
+            continue
+        # A REL record ends after the symbol - LLVM has no addend to print for it either - so the fourth
+        # column is optional and its absence is zero, not a missing field.
+        one = re.match(r"^\s+(0x[0-9a-fA-F]+)\s+(\S+)\s+(\S+)(?:\s+(0x[0-9a-fA-F]+))?\s*$", line)
+        if not one or table is None:
+            continue
+        symbol = one.group(3)
+        # LLVM writes `-` where a record names no symbol; the other two write nothing or `*ABS*`.
+        if symbol == "-":
+            symbol = "*ABS*"
+        rows[int(one.group(1), 16)] = (table, one.group(2), symbol,
+                                       int(one.group(4), 16) if one.group(4) else 0)
+    return rows
+
+
 def numbers(records, wide):
     """The symbol index and type number inside an `info` word, at the width this class uses."""
     return [(one[5] >> (32 if wide else 8), one[5] & (0xFFFFFFFF if wide else 0xFF)) for one in records]
@@ -195,8 +224,11 @@ def rows_for(name, bits, machine, table_map, paired, single):
     wide = bits == 64
     records = from_readelf(name)
     other = {one[0]: one for one in from_objdump(name)}
-    if len(records) != len(other):
-        raise SystemExit("%s: readelf lists %d records, objdump %d" % (name, len(records), len(other)))
+    llvm = from_llvm(name)
+    for label, found in (("objdump", other), ("llvm-readobj", llvm)):
+        if len(records) != len(found):
+            raise SystemExit("%s: readelf lists %d records, %s %d"
+                             % (name, len(records), label, len(found)))
     tables = []
     fixes = []
     for table, where, kind, sym, addend, info in records:
@@ -213,16 +245,32 @@ def rows_for(name, bits, machine, table_map, paired, single):
         symbol = info >> (32 if wide else 8)
         number = info & (0xFFFFFFFF if wide else 0xFF)
         key = (machine, number)
-        if kind != one[1]:
-            if one[1] != "UNKNOWN":
-                raise SystemExit("%s: 0x%x is %s to readelf and %s to objdump"
-                                 % (name, where, kind, one[1]))
+        # `objdump -R` has no AArch64 table and prints UNKNOWN; readelf and llvm-readobj do. A number is
+        # named only once two readers have spelled it identically, so the abstention is recorded and the
+        # agreement is what earns the word.
+        agree = [one[1], llvm[where][1]]
+        if any(word != kind for word in agree if word != "UNKNOWN"):
+            raise SystemExit("%s: 0x%x is %s to readelf, %s and %s to the others"
+                             % (name, where, kind, agree[0], agree[1]))
+        # Count readers, not distinct spellings: readelf is one, and each other program that wrote the
+        # same word for the same record is another. Three is the same claim as two, and one is none.
+        witnesses = 1 + len([word for word in agree if word == kind])
+        if witnesses < 2:
             single[key] = kind
         elif key not in paired:
             paired[key] = kind
         elif paired[key] != kind:
             raise SystemExit("%s: type %d is named %s and %s in one file"
                              % (name, number, kind, paired[key]))
+        if llvm[where][0] != table:
+            raise SystemExit("%s: 0x%x sits in %s for one reader and %s for another"
+                             % (name, where, table, llvm[where][0]))
+        if llvm[where][3] != (addend or 0):
+            raise SystemExit("%s: 0x%x addend is %s for readelf and %s for llvm-readobj"
+                             % (name, where, addend, llvm[where][3]))
+        if llvm[where][2] not in (spelled, "*ABS*"):
+            raise SystemExit("%s: 0x%x names %s for llvm-readobj and %s for readelf"
+                             % (name, where, llvm[where][2], spelled))
         if table not in tables:
             tables.append(table)
         fixes.append((table, where, number, symbol, spelled, addend))
@@ -261,8 +309,10 @@ def main():
             if (machine, number) not in paired:
                 raise SystemExit("%s: type %d never appears, so its name is not earned"
                                  % (machine, number))
-    if ("aarch64", 1025) in paired:
-        raise SystemExit("objdump named an aarch64 type after all; the refusal below is stale")
+    for number in (257, 1025, 1026, 1027):
+        if ("aarch64", number) not in paired:
+            raise SystemExit("aarch64 type %d was not named by two readers, so it stays a number"
+                             % number)
     for (machine, number), kind in sorted(paired.items()):
         print("paired   %-9s %4d %s" % (machine, number, kind))
     for (machine, number), kind in sorted(single.items()):

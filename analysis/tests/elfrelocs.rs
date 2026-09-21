@@ -161,13 +161,15 @@ fn a_slot_is_owned_by_the_tightest_section_that_covers_it() {
     );
 }
 
-/// An AArch64 shared object is the case where the two readers do not both name a type: `readelf -rW`
-/// writes `R_AARCH64_GLOB_DAT` where binutils' `objdump -R` prints `UNKNOWN` beside the same offset. The
-/// offsets, symbols and addends still agree, so they are listed - but a number one reader named and the
-/// other did not stays a number, which is every row of this file. The numbers are also why the table is
-/// keyed on the machine: 1025 and 257 are what aarch64 calls the records x86 spells 6 and 1.
+/// An AArch64 shared object is where the three readers part company: `objdump -R` prints `UNKNOWN` for
+/// every one of its relocation types, while `readelf -rW` and `llvm-readobj --relocs` both write the real
+/// words. Two of three is still two readers in agreement, so these types are named; a single reader's
+/// word would have gone to the unpaired bucket and printed as a number, which is what the probe's
+/// `readelf_only` map is for and why it is empty for these three files. The numbers are the other half of
+/// the point: 1025 and 257 are what aarch64 calls the records x86 spells 6 and 1, so a name table keyed
+/// on the number alone would have been wrong for every row in this file.
 #[test]
-fn a_type_one_reader_named_and_the_other_did_not_stays_a_number() {
+fn a_type_two_readers_named_and_one_omitted_is_still_a_named_type() {
     let listed = rows("labarm.so");
     assert_eq!(
         listed[0],
@@ -178,7 +180,8 @@ fn a_type_one_reader_named_and_the_other_did_not_stays_a_number() {
     assert_eq!(listed[1], "table\t.rela.dyn\tentries\t7\tslot_bytes\t24\taddend\tyes");
     assert_eq!(listed[2], "table\t.rela.plt\tentries\t2\tslot_bytes\t24\taddend\tyes");
     for row in listed.iter().skip(3) {
-        assert_eq!(column(row, "name"), Some("-".to_owned()), "{row}");
+        assert!(column(row, "name").is_some_and(|one| one.starts_with("R_AARCH64_")),
+                "an aarch64 row without its name: {row}");
     }
     let numbers: Vec<String> = listed
         .iter()
@@ -191,10 +194,10 @@ fn a_type_one_reader_named_and_the_other_did_not_stays_a_number() {
     );
     assert_eq!(
         listed[4],
-        "fixup\t0x206a0\ttype\t1025\tname\t-\tsym\tdata_at\taddend\t0\tsection\t.got"
+        "fixup\t0x206a0\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\tdata_at\taddend\t0\tsection\t.got"
     );
     assert_eq!(
         listed[7],
-        "fixup\t0x306d0\ttype\t257\tname\t-\tsym\ttable\taddend\t4\tsection\t.data"
+        "fixup\t0x306d0\ttype\t257\tname\tR_AARCH64_ABS64\tsym\ttable\taddend\t4\tsection\t.data"
     );
 }

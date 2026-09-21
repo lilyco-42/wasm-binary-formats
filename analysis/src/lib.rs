@@ -1128,10 +1128,13 @@ fn elf_owner(file: &object::File<'_>, where_: u64) -> String {
     best.map_or_else(|| "unmapped".to_owned(), |(_, name)| name)
 }
 
-/// The type names both witnesses wrote beside a number in the files on this host - per machine, because
-/// one number means a different word in the two instruction sets: 6 is `R_X86_64_GLOB_DAT` and
-/// `R_386_GLOB_DAT`, 1 is `R_X86_64_64` and `R_386_32`. Anything else stays a number, so an aarch64 or
-/// RISC-V object prints types without names rather than borrowing x86's words for them.
+/// The type names at least two readers wrote beside a number in the files on this host - `readelf -rW`,
+/// `objdump -R` and `llvm-readobj --relocs`, per machine, because one number means a different word in
+/// each instruction set: 6 is `R_X86_64_GLOB_DAT`, `R_386_GLOB_DAT` and `R_AARCH64_GLOB_DAT`, and the
+/// x86 one is 1 against aarch64's 257. Which two readers agreed is recorded in the probe, not here:
+/// binutils' `objdump` names none of the aarch64 types (it prints `UNKNOWN`), and readelf and
+/// llvm-readobj cover for it. Anything else stays a number, so a RISC-V object prints types without names
+/// rather than borrowing words from a table it was never in.
 fn elf_type_name(machine: &str, kind: u64) -> Option<&'static str> {
     Some(match (machine, kind) {
         ("x86_64", 1) => "R_X86_64_64",
@@ -1142,6 +1145,10 @@ fn elf_type_name(machine: &str, kind: u64) -> Option<&'static str> {
         ("i386", 6) => "R_386_GLOB_DAT",
         ("i386", 7) => "R_386_JUMP_SLOT",
         ("i386", 8) => "R_386_RELATIVE",
+        ("aarch64", 257) => "R_AARCH64_ABS64",
+        ("aarch64", 1025) => "R_AARCH64_GLOB_DAT",
+        ("aarch64", 1026) => "R_AARCH64_JUMP_SLOT",
+        ("aarch64", 1027) => "R_AARCH64_RELATIVE",
         _ => return None,
     })
 }

@@ -46,25 +46,24 @@
     "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tmachine\taarch64\tbits\t64",
     "table\t.rela.dyn\tentries\t7\tslot_bytes\t24\taddend\tyes",
     "table\t.rela.plt\tentries\t2\tslot_bytes\t24\taddend\tyes",
-    "fixup\t0x306e8\ttype\t1027\tname\t-\tsym\t-\taddend\t198360\tsection\t.data",
-    "fixup\t0x206a0\ttype\t1025\tname\t-\tsym\tdata_at\taddend\t0\tsection\t.got",
-    "fixup\t0x206a8\ttype\t1025\tname\t-\tsym\tlocal_static\taddend\t0\tsection\t.got",
-    "fixup\t0x206b0\ttype\t1025\tname\t-\tsym\ttable\taddend\t0\tsection\t.got",
-    "fixup\t0x306d0\ttype\t257\tname\t-\tsym\ttable\taddend\t4\tsection\t.data",
-    "fixup\t0x206b8\ttype\t1025\tname\t-\tsym\tpointer\taddend\t0\tsection\t.got",
-    "fixup\t0x206c0\ttype\t1025\tname\t-\tsym\toffsets\taddend\t0\tsection\t.got",
-    "fixup\t0x30708\ttype\t1026\tname\t-\tsym\tuse_data\taddend\t0\tsection\t.got.plt",
-    "fixup\t0x30710\ttype\t1026\tname\t-\tsym\tcall_me\taddend\t0\tsection\t.got.plt"
+    "fixup\t0x306e8\ttype\t1027\tname\tR_AARCH64_RELATIVE\tsym\t-\taddend\t198360\tsection\t.data",
+    "fixup\t0x206a0\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\tdata_at\taddend\t0\tsection\t.got",
+    "fixup\t0x206a8\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\tlocal_static\taddend\t0\tsection\t.got",
+    "fixup\t0x206b0\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\ttable\taddend\t0\tsection\t.got",
+    "fixup\t0x306d0\ttype\t257\tname\tR_AARCH64_ABS64\tsym\ttable\taddend\t4\tsection\t.data",
+    "fixup\t0x206b8\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\tpointer\taddend\t0\tsection\t.got",
+    "fixup\t0x206c0\ttype\t1025\tname\tR_AARCH64_GLOB_DAT\tsym\toffsets\taddend\t0\tsection\t.got",
+    "fixup\t0x30708\ttype\t1026\tname\tR_AARCH64_JUMP_SLOT\tsym\tuse_data\taddend\t0\tsection\t.got.plt",
+    "fixup\t0x30710\ttype\t1026\tname\tR_AARCH64_JUMP_SLOT\tsym\tcall_me\taddend\t0\tsection\t.got.plt"
    ]
   }
  },
- "readelf_only": {
+ "readelf_only": {},
+ "type_names": {
   "aarch64:1025": "R_AARCH64_GLOB_DAT",
   "aarch64:1026": "R_AARCH64_JUMP_SLOT",
   "aarch64:1027": "R_AARCH64_RELATIVE",
-  "aarch64:257": "R_AARCH64_ABS64"
- },
- "type_names": {
+  "aarch64:257": "R_AARCH64_ABS64",
   "i386:1": "R_386_32",
   "i386:6": "R_386_GLOB_DAT",
   "i386:7": "R_386_JUMP_SLOT",

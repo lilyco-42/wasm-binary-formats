@@ -442,14 +442,16 @@ were of that kind (`symbolic` and `relative`). The type words come from a table 
 *and* number, because the same number is a different word per instruction set: 6 is
 `R_X86_64_GLOB_DAT` in `lab.so` and `R_386_GLOB_DAT` in `lab32.so`, and 1 is `R_X86_64_64` against
 `R_386_32`. Both shared objects were compiled here with `clang --target=… -shared -nostdlib -fPIC`,
-and `scripts/make-elf-reloc-fixtures.py` reads each one twice - `readelf -rW` and `objdump -R` - and
-refuses to write `elfreloc.probe.json` unless the two agree on every offset, type name, symbol and
-addend, so the eight pairings the reader knows are the ones those two wrote down in these files. A
-number no fixture paired prints as a number, and `labarm.so` makes that concrete: `readelf -rW` names
-`R_AARCH64_GLOB_DAT` where binutils' `objdump -R` prints `UNKNOWN` beside the same offset, so that
-file's offsets, symbols and addends are listed and its type numbers are not - one reader's word is
-not two readers' agreement. Nor would x86's words fit: aarch64's 1025 and 257 are what x86 spells 6
-and 1, and the totals row carries the machine for exactly that reason. The section a slot belongs to is the *tightest* range covering it, because
+and `scripts/make-elf-reloc-fixtures.py` reads each one three times - `readelf -rW`, `objdump -R` and
+`llvm-readobj --relocs` - and refuses to write `elfreloc.probe.json` unless they agree on every offset,
+type name, symbol and addend, with which table a record sits in checked too. The twelve pairings the
+reader knows are the ones those programs wrote down in these files. A
+number no fixture paired prints as a number, and `labarm.so` shows where the line sits: binutils'
+`objdump -R` prints `UNKNOWN` for every AArch64 relocation while `readelf -rW` and
+`llvm-readobj --relocs` both write `R_AARCH64_GLOB_DAT`, so two of the three agreeing is enough to name
+it - and the probe keeps a `readelf_only` bucket for the case where it is not, which is empty for these
+three files. Nor would x86's words have fitted: aarch64's 1025 and 257 are what x86 spells 6 and 1, which
+is why the totals row carries the machine the records were read under. The section a slot belongs to is the *tightest* range covering it, because
 `.relro_padding` is NOBITS and spans every address the loader may write - naming it for all nine
 slots would be reading the padding instead of the table's target. What this list does not do: the
 addend is the unsigned word the file holds (a negative one is not folded into a sign), a
