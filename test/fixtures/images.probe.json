@@ -1,0 +1,75 @@
+{
+ "lab.elf": {
+  "bytes": 1064,
+  "header": {
+   "class": 64,
+   "ehsize": 64,
+   "endianness": "little",
+   "entry": 2101584,
+   "load": [
+    [
+     0,
+     332
+    ],
+    [
+     336,
+     342
+    ]
+   ],
+   "machine": 62,
+   "phoff": 64,
+   "shoff": 616,
+   "type": 2
+  },
+  "rows": [
+   "regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0",
+   "region\t0\t64\theader\telf header\t-",
+   "region\t64\t224\ttables\tprogram headers\t-",
+   "region\t288\t44\trodata\t.rodata\tloaded at 0x200120",
+   "region\t332\t4\tgap\tunreferenced\tnot loaded",
+   "region\t336\t6\tcode\t.text\tloaded at 0x201150",
+   "region\t342\t99\tmeta\t.comment\tnot loaded",
+   "region\t441\t7\tgap\tunreferenced\tnot loaded",
+   "region\t448\t96\tmeta\t.symtab\tnot loaded",
+   "region\t544\t50\tmeta\t.shstrtab\tnot loaded",
+   "region\t594\t15\tmeta\t.strtab\tnot loaded",
+   "region\t609\t7\tgap\tunreferenced\tnot loaded",
+   "region\t616\t448\ttables\tsection headers\t-"
+  ]
+ },
+ "lab.exe": {
+  "bytes": 3072,
+  "header": {
+   "characteristics": 34,
+   "checksum": 0,
+   "debug": [
+    12288,
+    28
+   ],
+   "directories": 16,
+   "entry": 4096,
+   "filealignment": 512,
+   "machine": "amd64",
+   "magic": "0x20b",
+   "section_names": [
+    ".text",
+    ".rdata",
+    ".buildid"
+   ],
+   "sections": 3,
+   "sizeofheaders": 1024
+  },
+  "rows": [
+   "regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0",
+   "region\t0\t1024\theader\tms-dos stub and nt headers\t-",
+   "region\t1024\t6\tcode\t.text\tvaddr 0x1000, raw 0x200 in file",
+   "region\t1030\t506\tgap\tunreferenced\tnot loaded",
+   "region\t1536\t80\trodata\t.rdata\tvaddr 0x2000, raw 0x200 in file",
+   "region\t1616\t432\tgap\tunreferenced\tnot loaded",
+   "region\t2048\t53\trodata\t.buildid\tvaddr 0x3000, raw 0x200 in file",
+   "region\t2101\t459\tgap\tunreferenced\tnot loaded",
+   "region\t2560\t36\tmeta\tcoff symbols\tnot loaded",
+   "region\t2596\t476\toverlay\tafter the last table\tnot loaded"
+  ]
+ }
+}

@@ -8,7 +8,10 @@
 //! `test/fixtures/answer.obj`, a real compiler's output that is committed, so the address-to-name
 //! index is checked against a file whose objdump listing is frozen in this repo.
 
-use apk_lens_analysis::{abi_version, analyse, name_for, names_len, sample_elf, self_test};
+use apk_lens_analysis::{
+    abi_version, alloc, analyse, dealloc, name_at, name_for, names_count, names_len, region_at,
+    region_count, sample_elf, self_test,
+};
 use std::fs;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../test/fixtures/");
@@ -200,4 +203,143 @@ fn a_file_with_no_symbol_table_leaves_the_index_empty() {
         0,
         "a rejected file must not keep the last names"
     );
+}
+/// The byte-region map: every range the file points at, plus what lies between them.
+///
+/// Both images are linked by clang + lld (`scripts/make-image-fixtures.py`) and the rows below are the
+/// shadow's, which the script refuses to write unless `readelf -h -l -S` and `objdump -h` agree with its
+/// own reading of the same header fields. So the offsets here are the linker's, not a sketch of the
+/// formats: ELF64 keeps its two-byte header tail at 54/56/58/60 because `e_flags` is four bytes wide at
+/// 48, and the COFF file header has a `TimeDateStamp` before its symbol pointer.
+#[test]
+fn the_map_of_an_elf_names_the_header_tables_and_the_padding_between_them() {
+    let bytes = fixture("lab.elf");
+    assert!(!bytes.is_empty());
+    assert!(analyse(&bytes).is_some(), "the analyser has to read the file first");
+    let lines = regions();
+    assert_eq!(
+        lines[0],
+        "regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0",
+        "{lines:#?}"
+    );
+    assert_eq!(lines[1], "region\t0\t64\theader\telf header\t-");
+    assert_eq!(lines[2], "region\t64\t224\ttables\tprogram headers\t-");
+    assert_eq!(
+        lines[3],
+        "region\t288\t44\trodata\t.rodata\tloaded at 0x200120",
+        "the section name comes out of the file's own string table"
+    );
+    assert_eq!(lines[4], "region\t332\t4\tgap\tunreferenced\tnot loaded");
+    assert_eq!(lines[5], "region\t336\t6\tcode\t.text\tloaded at 0x201150");
+    assert_eq!(
+        lines[lines.len() - 1],
+        "region\t616\t448\ttables\tsection headers\t-",
+        "an ELF ends with its section header table, so there is nothing after it"
+    );
+    assert!(tiles(1064, &lines), "the map must account for every byte: {lines:#?}");
+    // .comment, .symtab and both string tables are structure a tool reads, not data the program runs.
+    for named in [
+        "region\t342\t99\tmeta\t.comment\tnot loaded",
+        "region\t448\t96\tmeta\t.symtab\tnot loaded",
+        "region\t594\t15\tmeta\t.strtab\tnot loaded",
+    ] {
+        assert!(lines.contains(&named.to_string()), "missing {named}");
+    }
+}
+
+#[test]
+fn a_pe_section_claims_only_the_bytes_it_says_it_uses_and_the_rest_is_padding() {
+    let bytes = fixture("lab.exe");
+    assert!(analyse(&bytes).is_some());
+    let lines = regions();
+    assert_eq!(
+        lines[0],
+        "regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0",
+        "{lines:#?}"
+    );
+    assert_eq!(
+        lines[1],
+        "region\t0\t1024\theader\tms-dos stub and nt headers\t-"
+    );
+    // SizeOfRawData is 512 for a section whose virtual size is 6: the 506 bytes after it are file
+    // alignment, and calling them `.text` would colour 500-odd bytes as code that nothing reads.
+    assert_eq!(
+        lines[2],
+        "region\t1024\t6\tcode\t.text\tvaddr 0x1000, raw 0x200 in file"
+    );
+    assert_eq!(lines[3], "region\t1030\t506\tgap\tunreferenced\tnot loaded");
+    assert_eq!(
+        lines[lines.len() - 1],
+        "region\t2596\t476\toverlay\tafter the last table\tnot loaded",
+        "what sits behind the last table is an overlay, and this file's is not a signature"
+    );
+    assert!(tiles(3072, &lines), "the map must account for every byte: {lines:#?}");
+    assert!(
+        !lines.iter().any(|row| row.contains("\tcert\t")),
+        "an unsigned file must not be shown as signed: {lines:#?}"
+    );
+}
+
+#[test]
+fn a_object_file_and_a_lie_about_a_table_both_leave_a_map_the_page_can_still_paint() {
+    // A COFF object is neither of the two image formats whose header tables this map walks, so it gets no
+    // map - which the page shows as "no map" rather than as one big unclaimed range.
+    let bytes = fixture("answer.obj");
+    assert!(analyse(&bytes).is_some());
+    assert_eq!(regions().len(), 0, "an object file has no segment map to draw");
+
+    // A section-header count that cannot be true must be clipped and say so, not run the map off the end.
+    let mut lies = fixture("lab.elf");
+    let shnum_at = 60;
+    lies[shnum_at] = 0xff;
+    lies[shnum_at + 1] = 0xff;
+    assert!(analyse(&lies).is_some());
+    let lines = regions();
+    assert!(tiles(1064, &lines), "a lying count must not break the tiling: {lines:#?}");
+    assert!(
+        !lines.iter().any(|row| row.contains("beyond end of file")),
+        "the clipped claim should have been dropped as an overlap: {lines:#?}"
+    );
+}
+
+/// The map's rows, read through the same C ABI the page uses.
+fn regions() -> Vec<String> {
+    let cap = 4096;
+    let count = region_count();
+    assert!(count <= 1 + 256, "the row list is capped, and said so: {count}");
+    (0..count)
+        .map(|index| {
+            let pointer = alloc(cap);
+            let written = region_at(index, pointer, cap).max(0) as usize;
+            let keep = written.min(cap as usize);
+            let bytes = unsafe { std::slice::from_raw_parts(pointer as *const u8, keep) }.to_vec();
+            dealloc(pointer, cap);
+            String::from_utf8_lossy(&bytes).into_owned()
+        })
+        .collect()
+}
+
+/// Every range starts where the previous one ended, and the last one ends on the file's last byte. That
+/// is the whole promise a colour map makes, and the only one worth asserting without reading the file.
+fn tiles(total: u64, lines: &[String]) -> bool {
+    let mut cursor = 0u64;
+    for line in lines.iter().skip(1) {
+        let field: Vec<&str> = line.split('\t').collect();
+        if field.first().map(|head| *head != "region").unwrap_or(true) {
+            return false;
+        }
+        let start: u64 = match field.get(1).and_then(|each| each.parse().ok()) {
+            Some(value) => value,
+            None => return false,
+        };
+        let length: u64 = match field.get(2).and_then(|each| each.parse().ok()) {
+            Some(value) => value,
+            None => return false,
+        };
+        if start != cursor || length == 0 {
+            return false;
+        }
+        cursor = start + length;
+    }
+    cursor == total
 }

@@ -25,6 +25,10 @@ ul.list li:hover{background:#eef2f7}
 ul.list li.active{background:var(--accent);color:#fff}
 ul.list li span{color:inherit;opacity:.75;font-variant-numeric:tabular-nums;white-space:nowrap}
 iframe{width:100%;height:60vh;border:1px solid var(--line);border-radius:8px;background:#fff}
+.regions{margin:10px 0 0;font-size:12px;color:var(--dim);line-height:1.7}
+.regions p{margin:6px 0 0}
+.regions span{cursor:help}
+.warn{color:var(--warn)}
 #status{color:var(--dim);font-size:13px;margin:12px 0 0;min-height:20px}
 .note{color:var(--warn);font-size:13px;margin-top:16px}
 a{color:var(--accent)}
@@ -78,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样。',
+    title: '对象文件分析（节表 / 符号表 / 分区图）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。',
   },
   {
     id: 'disasm',
@@ -148,7 +152,127 @@ function analysisRows() {
   if (!state) return null;
   const fresh = state.mod ? analyseHere(state.mod) : null;
   if (fresh) state.rows = fresh;
+  paintRegions(state);
   return state.rows || null;
+}
+
+// The colour map: which bytes of the file a table of its own points at, and which none do.
+const REGION_COLORS = {
+  header: '#64748b',
+  tables: '#7c3aed',
+  code: '#ef4444',
+  data: '#f59e0b',
+  rodata: '#3b82f6',
+  meta: '#a855f7',
+  cert: '#db2777',
+  gap: '#22c55e',
+  overlay: '#15803d',
+};
+const REGION_LABELS = {
+  header: '头部',
+  tables: '表（程序头表 / 节头表）',
+  code: '代码区',
+  data: '数据区（可写）',
+  rodata: '只读数据区',
+  meta: '复杂区（符号表 / 重定位 / 调试信息）',
+  cert: '签名（Authenticode）',
+  gap: '安全区 —— 没有任何表或段引用',
+  overlay: '尾部 —— 最后一张表之后',
+};
+// Bytes a segment still maps, but that nothing inside the file addresses: not the same claim as the
+// green above, so not the same colour.
+const LOADED_IDLE = '#0d9488';
+
+function regionRows(mod) {
+  if (!mod || typeof mod.region_count !== 'function' || typeof mod.region_at !== 'function') {
+    return null;
+  }
+  const total = mod.region_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.region_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
+}
+
+function paintRegions(state) {
+  const host = state.host;
+  if (!host || !host.out || !host.out.parentElement) return;
+  const previous = host.out.parentElement.querySelector('.regions');
+  if (previous) previous.remove();
+  if (!picked) return;
+  const rows = regionRows(state.mod);
+  if (rows === null) {
+    // An older cached module has no map to give: say that rather than paint an empty strip.
+    const note = document.createElement('p');
+    note.className = 'regions';
+    note.textContent = '分区图：这个模块没有 region_* 导出（多半是浏览器里缓存的旧版），'
+      + '硬刷新后再看。';
+    host.out.parentElement.insertBefore(note, host.out.nextSibling);
+    return;
+  }
+  if (!rows.length) {
+    const note = document.createElement('p');
+    note.className = 'regions';
+    note.textContent = '分区图：这个文件既不是 ELF 也不是 PE（目标文件只有一张节表，'
+      + '没有加载段可言），所以不画。';
+    host.out.parentElement.insertBefore(note, host.out.nextSibling);
+    return;
+  }
+  const box = document.createElement('div');
+  box.className = 'regions';
+  const strip = document.createElement('div');
+  strip.style.cssText = 'display:flex;height:20px;border-radius:4px;overflow:hidden;'
+    + 'border:1px solid var(--line)';
+  const seen = new Set();
+  let signed = false;
+  for (const row of rows.slice(1)) {
+    const cell = (row || '').split('\t');
+    if (cell[0] !== 'region') continue;
+    const start = Number(cell[1]);
+    const length = Number(cell[2]);
+    const kind = cell[3];
+    const note = cell[5] || '';
+    if (!Number.isFinite(start) || !Number.isFinite(length) || length <= 0) continue;
+    seen.add(kind);
+    if (kind === 'cert') signed = true;
+    const piece = document.createElement('span');
+    piece.style.cssText = `flex:${length} 0 0;min-width:1px;background:`
+      + (note.startsWith('loaded but') ? LOADED_IDLE : (REGION_COLORS[kind] || '#334155'));
+    piece.title = `${start} .. ${start + length}（${length} 字节）· ${REGION_LABELS[kind] || kind}`
+      + ` · ${cell[4]} · ${note}`;
+    strip.appendChild(piece);
+  }
+  const head = rows[0].split('\t');
+  const value = (label) => {
+    const at = head.indexOf(label);
+    return at > 0 ? head[at + 1] : '?';
+  }
+  const legend = document.createElement('p');
+  const order = ['header', 'tables', 'code', 'data', 'rodata', 'meta', 'cert', 'gap', 'overlay'];
+  legend.innerHTML = order.filter((kind) => seen.has(kind))
+    .map((kind) => `<span style="color:${REGION_COLORS[kind]}">■</span> ${REGION_LABELS[kind]}`)
+    .join('　');
+  const total = document.createElement('p');
+  total.textContent = `整份文件 ${value('file')} 字节：被文件自己的表点名的 ${value('claimed')} 字节；`
+    + `没有任何表或加载段引用的 ${value('unloaded')} 字节；已被载入内存但没人引用的 `
+    + `${value('loaded-unaddressed')} 字节。`
+    + (signed ? ' 这个文件带签名，未引用区间可能仍被完整性校验覆盖。' : '');
+  const caveat = document.createElement('p');
+  caveat.className = 'warn';
+  caveat.textContent = '绿只表示「文件自己的结构里没有谁指向这些字节」，不表示「改了一定没事」：'
+    + '校验和、签名，或程序自己按偏移读自己的文件，这三种都不会被这张图发现。'
+    + '改之前先备份，改完自己验一遍。';
+  box.appendChild(strip);
+  box.appendChild(legend);
+  box.appendChild(total);
+  box.appendChild(caveat);
+  host.out.parentElement.insertBefore(box, host.out.nextSibling);
 }
 
 /* The two modules compose the way the tools they stand for do: the analyser says which instruction
@@ -316,6 +440,7 @@ async function loadModule(spec, button, line, out) {
       // listing taken off a different file. The instance is in memory because it was asked for; it is
       // still never fetched before the row is clicked.
       state.mod = mod;
+      state.host = { out };
       state.rows = analysisRows() || [];
       state.report = !picked
         ? '还没有选中文件。先选一个 .exe / .so / 可执行文件，再加载本模块。'
@@ -336,6 +461,7 @@ async function loadModule(spec, button, line, out) {
   button.textContent = '已加载';
   line.textContent = `${spec.title} —— ${toolLine(spec, state)}`;
   out.textContent = state.report;
+  if (spec.id === 'analysis') paintRegions(state);
 }
 
 function renderTools() {

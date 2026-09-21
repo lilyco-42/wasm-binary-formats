@@ -304,8 +304,25 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 122 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, and the byte-region map below |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
+
+**The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
+different question from the section list: not *what is where* but *what names these bytes*. Every range
+comes from a table the file itself points at - ELF's program-header and section-header tables, PE's
+`SizeOfHeaders`, its section table and its certificate directory - and what falls between them is
+classified as what it is: padding inside a segment the loader does map, or bytes no table and no segment
+reaches at all. The colours say the difference, and the page says the limit out loud: green means nothing
+in the file's own structure points there, which is not a promise that editing it is safe: a checksum, a
+signature, or a program that reads its own file by offset are three things this map cannot see.
+
+`scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
+(`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
+is also the answer to "no ELF or PE image can be produced on this host": 1 464 bytes of ELF64 and 3 072 of
+PE32+, each with alignment gaps the map has to find. The script refuses to write its probe unless its own
+reading of the headers agrees with `readelf -h -l -S` and `objdump -h` field for field, which is how two
+wrong offsets in the first draft - ELF64's `e_phentsize`, and the COFF `TimeDateStamp` sitting before the
+symbol pointer - died before the Rust port did.
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
@@ -461,6 +478,7 @@ temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffic
 temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
 temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
 temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
+temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows

@@ -70,7 +70,7 @@ function stubElf() {
 
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
-    'names_count', 'name_at', 'abi_version', 'self_test']) {
+    'names_count', 'name_at', 'region_count', 'region_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -149,8 +149,49 @@ test('the base module the page always downloads carries none of this', async () 
   if (!basePath) return;
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
-    'self_test']) {
+    'region_count', 'region_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
+});
+
+test('the region map accounts for the whole file, in both image formats', async () => {
+  // clang + lld linked both fixtures (`scripts/make-image-fixtures.py`), and that script refuses to write
+  // `images.probe.json` unless its own reading of the headers agrees with `readelf` and `objdump`. The
+  // rows asserted here are those readings, so the byte counts below are the linker's.
+  const expect = {
+    'lab.elf': 'regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0',
+    'lab.exe': 'regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0',
+  };
+  for (const [name, head] of Object.entries(expect)) {
+    const bytes = new Uint8Array(await readFile(`test/fixtures/${name}`));
+    report(bytes);
+    const total = ex.region_count();
+    assert.ok(total > 1, `${name}: the map came back empty`);
+    const rows = [];
+    for (let index = 0; index < total; index += 1) rows.push(text('region_at', BigInt(index)));
+    assert.equal(rows[0], head, `${name}: the totals row moved`);
+    let cursor = 0n;
+    const kinds = new Set();
+    for (const row of rows.slice(1)) {
+      const cell = row.split('\t');
+      assert.equal(cell[0], 'region', `${name}: ${row}`);
+      assert.equal(BigInt(cell[1]), cursor, `${name}: a hole at ${cell[1]}`);
+      cursor += BigInt(cell[2]);
+      kinds.add(cell[3]);
+    }
+    assert.equal(cursor, BigInt(bytes.length), `${name}: the map stops short of the end`);
+    assert.ok(kinds.has('gap'), `${name}: nothing unclaimed in a linked file? ${[...kinds]}`);
+    if (name.endsWith('.elf')) {
+      assert.ok(kinds.has('header') && kinds.has('tables') && kinds.has('code'), [...kinds].join(' '));
+      assert.ok(!kinds.has('overlay'), 'an ELF ends with its section header table');
+    } else {
+      assert.ok(kinds.has('overlay'), 'this PE has bytes behind its last table');
+      assert.ok(!kinds.has('cert'), 'an unsigned file must not be shown as signed');
+    }
+  }
+  // A COFF object has no loaded segments to map, and the honest answer is no map rather than one range
+  // painted over the whole file.
+  report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
+  assert.equal(ex.region_count(), 0, 'an object file should get no map');
 });
