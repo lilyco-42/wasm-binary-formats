@@ -149,46 +149,81 @@ def walk(raw):
 
 
 def objdump_imports(text):
-    """bfd's list, as `{dll: [{slot, ordinal, hint, name}]}`. A column is `<none>` where it does not
-    apply, and the member lines are read from the address table, not the lookup table."""
+    """bfd's list, as `{dll: {ilt, iat, symbols: [{slot, ordinal, hint, name}]}}`. A column is `<none>`
+    where it does not apply, and the members are read out of the address table, not the lookup table."""
     if "There is an import table" not in text:
         return {}
     found = {}
     dll = None
+    # Each descriptor line comes *before* the `DLL Name` it belongs to, so the pair is carried across
+    # the blank line in between instead of being read when it arrives.
+    pending = None
     for line in text.split("There is an import table")[1].splitlines():
         named = re.match(r"\s+DLL Name: (\S+)", line)
-        member = re.match(r"\s*([0-9a-fA-F]{4,8})\s+(<none>|\d+)\s+(<none>|[0-9a-f]{4})\s+(\S+)", line)
-        head = re.match(r"\s*([0-9a-fA-F]{4,8})\s+([0-9a-fA-F]{4,8}) ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})",
-                        line)
+        member = re.match(r"\s*([0-9a-fA-F]{4,8})\s+(<none>|\d+)\s+(<none>|[0-9a-fA-F]{4})\s+(\S+)", line)
+        # bfd prints six columns per descriptor: its own vma, then hint table, time stamp, forwarder
+        # chain, DLL name and first thunk - the last two are the lookup and address tables.
+        head = re.match(r"\s*([0-9a-fA-F]{4,8})	([0-9a-fA-F]{4,8}) ([0-9a-fA-F]{8}) ([0-9a-fA-F]{8}) "
+                        r"([0-9a-fA-F]{4,8}) ([0-9a-fA-F]{4,8})\s*$", line)
         if named:
             dll = named.group(1)
-            found[dll] = []
+            found[dll] = {"ilt": pending[0] if pending else None,
+                          "iat": pending[1] if pending else None, "symbols": []}
+            pending = None
+        elif head:
+            pending = (int(head.group(2), 16), int(head.group(6), 16))
         elif member and dll:
-            found[dll].append({
+            found[dll]["symbols"].append({
                 "slot": int(member.group(1), 16),
                 "ordinal": None if member.group(2) == "<none>" else int(member.group(2)),
                 "hint": None if member.group(3) == "<none>" else int(member.group(3), 16),
                 "name": None if member.group(4) == "<none>" else member.group(4),
             })
-        elif head and dll and not found[dll]:
-            found[dll + "@head"] = {"ilt": int(head.group(2), 16), "iat": int(head.group(5), 16)}
     return found
 
 
 def readobj_imports(text):
-    """llvm's list: one line per symbol, `Name (hint)` for a named import and ` (N)` for an ordinal."""
+    """llvm's list, in the same shape as bfd's.
+
+    Blocks are read line by line rather than by a regex, because a file with delay imports prints
+    `Import {` blocks nested inside a delay descriptor, and a non-greedy brace-to-brace match then
+    stops at the first inner brace and loses the rest of the real list. Only a brace in column zero
+    opens or closes a top-level block; the delay ones carry `ModuleHandle`, and this walk does not read
+    that directory, so those are skipped rather than mixed in."""
     found = {}
-    for block in re.findall(r"Import \{(.*?)\}", text, re.S):
-        dll = re.search(r"Name: (\S+)", block).group(1)
-        ilt = re.search(r"ImportLookupTableRVA: 0x([0-9a-fA-F]+)", block)
-        iat = int(re.search(r"ImportAddressTableRVA: 0x([0-9a-fA-F]+)", block).group(1), 16)
-        symbol = re.search(r"Symbol: +(.*)", block).group(1).strip()
-        # llvm leaves the name out entirely for an ordinal import, so the parenthesis can sit right
-        # against the start of the field: `Symbol: _CorDllMain (0)` and `Symbol:  (12)`.
-        hit = re.match(r"^(.*?) ?\((\d+)\)$", symbol)
-        name, number = (hit.group(1).strip(), int(hit.group(2))) if hit else (symbol, None)
-        found.setdefault(dll, []).append({"name": name or None, "number": number,
-                                          "ilt": int(ilt.group(1), 16) if ilt else 0, "iat": iat})
+    block = None
+    for line in text.splitlines():
+        if line.startswith("Import {"):
+            block = []
+            continue
+        if block is not None and not line.startswith("}"):
+            block.append(line)
+            continue
+        if line.startswith("}") and block is not None:
+            body = chr(10).join(block)
+            block = None
+            # The delay descriptor is recognised by its *field*, colon and all: `GetModuleHandleW` and
+            # `GetModuleHandleExA` are ordinary symbol names, and a bare substring for the word
+            # "ModuleHandle" drops the whole block of the DLL that happens to import them.
+            if "  ModuleHandle:" in body or "  ImportAddressTable:" in body:
+                continue
+            named = re.search(r"Name: (\S+)", body)
+            table = re.search(r"ImportAddressTableRVA: 0x([0-9a-fA-F]+)", body)
+            lookup = re.search(r"ImportLookupTableRVA: 0x([0-9a-fA-F]+)", body)
+            if not named or not table:
+                continue
+            rows = found.setdefault(named.group(1), {
+                "ilt": int(lookup.group(1), 16) if lookup else None,
+                "iat": int(table.group(1), 16),
+                "symbols": [],
+            })
+            for symbol in re.findall(r"Symbol: +(.*)", body):
+                # llvm leaves the name out for an ordinal import, so the parenthesis can sit right
+                # against the start of the field: `Symbol: _CorDllMain (0)` and `Symbol:  (12)`.
+                hit = re.match(r"^(.*?) ?\((\d+)\)$", symbol.strip())
+                name, number = (hit.group(1).strip(), int(hit.group(2))) if hit else (symbol.strip(), None)
+                rows["symbols"].append({"slot": rows["iat"], "ordinal": None if name else number,
+                                        "hint": number if name else None, "name": name or None})
     return found
 
 
@@ -220,40 +255,35 @@ def check(name, raw, work):
     bfd = objdump_imports(run(["objdump", "-x", name], work))
     llvm = readobj_imports(run(["llvm-readobj", "--coff-imports", name], work))
     mine = {each["dll"]: each for each in found["dlls"]}
-    if set(mine) != set(each for each in bfd if not each.endswith("@head")):
-        raise SystemExit("%s: the DLL lists disagree: walk %r, bfd %r" % (name, sorted(mine), sorted(bfd)))
-    if set(mine) != set(llvm):
-        raise SystemExit("%s: the DLL lists disagree: walk %r, llvm %r" % (name, sorted(mine), sorted(llvm)))
+    if set(mine) != set(bfd) or set(mine) != set(llvm):
+        raise SystemExit("%s: the DLL lists disagree: %r / %r / %r"
+                         % (name, sorted(mine), sorted(bfd), sorted(llvm)))
     for dll, each in mine.items():
-        head = bfd.get(dll + "@head") or {}
-        for key, want in (("ilt", each["ilt"]), ("iat", each["iat"])):
-            if head and head.get(key) != want:
-                raise SystemExit("%s %s: %s %#x, bfd says %#x" % (name, dll, key, want, head[key]))
-        if each["ilt"] and llvm[dll][0]["ilt"] != each["ilt"]:
-            raise SystemExit("%s %s: lookup table %#x, llvm says %#x"
-                             % (name, dll, each["ilt"], llvm[dll][0]["ilt"]))
-        if len(bfd[dll]) != len(each["thunks"]) or len(llvm[dll]) != len(each["thunks"]):
-            raise SystemExit("%s %s: %d thunks, readers list %d and %d"
-                             % (name, dll, len(each["thunks"]), len(bfd[dll]), len(llvm[dll])))
+        for reader in (bfd[dll], llvm[dll]):
+            if each["ilt"] and reader["ilt"] is not None and reader["ilt"] != each["ilt"]:
+                raise SystemExit("%s %s: lookup table %#x, a reader says %#x"
+                                 % (name, dll, each["ilt"], reader["ilt"]))
+            if reader["iat"] != each["iat"]:
+                raise SystemExit("%s %s: address table %#x, a reader says %#x"
+                                 % (name, dll, each["iat"], reader["iat"]))
+            if len(reader["symbols"]) != len(each["thunks"]):
+                raise SystemExit("%s %s: %d thunks, a reader lists %d"
+                                 % (name, dll, len(each["thunks"]), len(reader["symbols"])))
         for index, thunk in enumerate(each["thunks"]):
-            one, two = bfd[dll][index], llvm[dll][index]
-            if one["slot"] != thunk["slot"] or two["iat"] != thunk["slot"]:
-                raise SystemExit("%s %s: slot %#x, readers say %#x / %#x"
-                                 % (name, dll, thunk["slot"], one["slot"], two["iat"]))
-            if thunk["ordinal"] is None:
-                if one["name"] != thunk["name"] or two["name"] != thunk["name"]:
-                    raise SystemExit("%s %s: name %r, readers say %r / %r"
-                                     % (name, dll, thunk["name"], one["name"], two["name"]))
-                if one["hint"] != thunk["hint"] or two["number"] != thunk["hint"]:
-                    raise SystemExit("%s %s: hint %r, readers say %r / %r"
-                                     % (name, dll, thunk["hint"], one["hint"], two["number"]))
-            else:
-                if one["ordinal"] != thunk["ordinal"] or two["number"] != thunk["ordinal"]:
-                    raise SystemExit("%s %s: ordinal %r, readers say %r / %r"
-                                     % (name, dll, thunk["ordinal"], one["ordinal"], two["number"]))
-                if one["name"] or two["name"]:
-                    raise SystemExit("%s %s: a name on an ordinal import: %r / %r"
-                                     % (name, dll, one["name"], two["name"]))
+            for reader in (bfd[dll], llvm[dll]):
+                seen = reader["symbols"][index]
+                if reader is bfd and seen["slot"] != thunk["slot"]:
+                    raise SystemExit("%s %s: slot %#x, bfd says %#x"
+                                     % (name, dll, thunk["slot"], seen["slot"]))
+                if thunk["ordinal"] is None:
+                    if seen["name"] != thunk["name"] or seen["hint"] != thunk["hint"]:
+                        raise SystemExit("%s %s: hint %r name %r, a reader says %r / %r"
+                                         % (name, dll, thunk["hint"], thunk["name"],
+                                            seen["hint"], seen["name"]))
+                elif seen["ordinal"] != thunk["ordinal"] or seen["name"]:
+                    raise SystemExit("%s %s: ordinal %r, a reader says %r named %r"
+                                     % (name, dll, thunk["ordinal"], seen["ordinal"],
+                                        seen["name"]))
     return found, rows_for(found)
 
 
