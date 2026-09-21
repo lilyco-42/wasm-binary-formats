@@ -44,7 +44,7 @@ const SELF = {
   doc: ['container'], xls: ['container'],
   arrow: ['fields'], parquet: ['fields'], onnx: ['fields'], heif: ['fields'], stlbinary: ['fields'],
   icc: ['fields'], emf: ['fields'], postscript: ['fields'], coff: ['fields'], crt: ['fields'], psd: ['fields'],
-  docx: ['container'], xlsx: ['container'], pptx: ['container'],
+  docx: ['container'], xlsx: ['container'], pptx: ['container'], dotx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
 };
 
@@ -53,7 +53,7 @@ const ALIAS = {
   elf: ['elf'], so: ['elf'], ko: ['elf'], rlib: ['elf'], object: ['elf'],
   macho: ['mach_o'], dylib: ['mach_o'],
   dex: ['dex'], javabytecode: ['java_class'], pythonbytecode: ['python_pyc_27'],
-  zip: ['zip'], jar: ['zip'], apk: ['zip'], crx: ['zip'], xpi: ['zip'], nupkg: ['zip'], docx: ['zip'], xlsx: ['zip'], pptx: ['zip'], odt: ['zip'], odp: ['zip'], ods: ['zip'], epub: ['zip'], npz: ['zip'], msix: ['zip'], ooxml: ['zip'],
+  zip: ['zip'], jar: ['zip'], apk: ['zip'], crx: ['zip'], xpi: ['zip'], nupkg: ['zip'], docx: ['zip'], dotx: ['zip'], xlsx: ['zip'], pptx: ['zip'], odt: ['zip'], odp: ['zip'], ods: ['zip'], epub: ['zip'], npz: ['zip'], msix: ['zip'], ooxml: ['zip'],
   gzip: ['gzip'], zlibstream: ['gzip'], tar: ['tar'], ar: ['ar'], cpio: ['cpio_old_le'], rar: ['rar'], sevenzip: ['seven_z'], xar: ['xar'], rpm: ['rpm'], deb: ['deb'],
   png: ['png'], jpeg: ['jpeg'], gif: ['gif'], bmp: ['bmp'], tiff: ['tiff'], ico: ['ico'], icns: ['icns'], tga: ['tga'], pcx: ['pcx'], wmf: ['wmf'], dicom: ['dicom'], xcf: ['xcf'], psd: ['psd'], qoi: ['qoi'],
   wav: ['wav'], riff: ['riff'], au: ['au'], avi: ['avi'], mp4: ['quicktime_mov'], qt: ['quicktime_mov'], mkv: ['matroska'], webm: ['matroska'], ebml: ['ebml'], ogg: ['ogg'], flac: ['flac'], mp3: ['id3v2_3'], midi: ['standard_midi_file'], aac: ['adts'], asf: ['asf'], flv: ['flv'], wma: ['asf'], wmv: ['asf'], webp: ['webp'], heif: ['heif'], avif: ['avif'],

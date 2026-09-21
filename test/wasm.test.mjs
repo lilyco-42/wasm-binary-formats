@@ -814,7 +814,7 @@ test('the audio, stream and package readers answer the same way', () => {
     ['stream', 'stream.lz4', 7], ['stream', 'stream.zst', 8],
     ['document', 'tiny.docx', 1], ['document', 'tiny.xlsx', 2], ['document', 'tiny.pptx', 3],
     ['document', 'tiny.odt', 4], ['document', 'tiny.ods', 5], ['document', 'tiny.odp', 6],
-    ['document', 'tiny.epub', 7],
+    ['document', 'tiny.epub', 7], ['document', 'lab-fixture.dotx', 8],
   ];
   for (const [shape, file, code] of cases) assertReadable(shape, file, code);
 });
@@ -845,6 +845,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
     ['stream', 'stream.lz4', 'lz4'], ['stream', 'stream.zst', 'zstd'],
     ['document', 'tiny.docx', 'docx'], ['document', 'tiny.epub', 'epub'], ['document', 'tiny.odp', 'odp'],
+    ['document', 'lab-fixture.dotx', 'dotx'],
   ];
   for (const [shape, file, name] of cases) {
     assert.equal(drive(shape, file).name, name, `${file} reported a different family name`);

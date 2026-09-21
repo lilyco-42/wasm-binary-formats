@@ -1,0 +1,24 @@
+{
+ "bytes": 20188,
+ "docx": {
+  "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+  "first_word_part": "word/document.xml",
+  "has_manifest": true,
+  "main_size": 1718,
+  "parts": 17
+ },
+ "dotx": {
+  "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+  "first_word_part": "word/document.xml",
+  "has_manifest": true,
+  "main_size": 1740,
+  "parts": 15
+ },
+ "rows": [
+  "document\t20188\t1740",
+  "main_part\tword/document.xml\tcontent\twordprocessingml.template.main+xml",
+  "entries\t15",
+  "archive_bytes\t20188",
+  "has_manifest\t1"
+ ]
+}

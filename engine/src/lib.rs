@@ -405,7 +405,7 @@ pub extern "C" fn audio_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
 }
 
 /// Office document packages (OOXML, OpenDocument, EPUB): 0 none, 1 docx, 2 xlsx, 3 pptx,
-/// 4 odt, 5 ods, 6 odp, 7 epub; -1 not a zip, -2 a zip that is not one of these packages.
+/// 4 odt, 5 ods, 6 odp, 7 epub, 8 dotx; -1 not a zip, -2 a zip that is not one of these packages.
 #[no_mangle]
 pub extern "C" fn parse_document(ptr: *const u8, len: i32) -> i32 {
     if ptr.is_null() || len <= 0 {

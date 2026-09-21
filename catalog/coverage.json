@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 49,
-    "selfContainer": 27,
+    "selfContainer": 28,
     "binarySpecAvailable": 0,
-    "gaps": 102,
+    "gaps": 101,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -23,7 +23,7 @@
       "image": 8,
       "archive": 10,
       "code": 5,
-      "document": 7,
+      "document": 6,
       "executable": 4,
       "text": 1,
       "application": 9,
@@ -1151,10 +1151,12 @@
       "extensions": [
         "dotx"
       ],
-      "kaitaiSpecs": [],
-      "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "kaitaiSpecs": [
+        "zip"
+      ],
+      "generatedHere": true,
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "dsstore",

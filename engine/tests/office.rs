@@ -1,5 +1,6 @@
 use apk_lens::documents::{
-    at, count, kind, parse, DOC_DOCX, DOC_EPUB, DOC_ODP, DOC_ODS, DOC_ODT, DOC_PPTX, DOC_XLSX,
+    at, count, kind, parse, DOC_DOCX, DOC_DOTX, DOC_EPUB, DOC_ODP, DOC_ODS, DOC_ODT, DOC_PPTX,
+    DOC_XLSX,
 };
 use std::fs;
 
@@ -81,6 +82,30 @@ fn identifies_the_ooxml_families_by_their_part_prefix() {
         number(&lines, "document", 2) > 1000,
         "word/document.xml from python-docx is a kilobyte and a half: {lines:#?}"
     );
+}
+
+#[test]
+fn tells_a_word_template_from_a_word_document_only_by_what_the_package_says() {
+    // `lab-fixture.dotx` is LibreOffice's `Office Open XML Text Template` export of a python-docx
+    // document, so both files in this test came from real writers, and `scripts/make-dotx-fixture.py`
+    // refuses to write its probe unless the manifest of the source says `document.main+xml` and the
+    // manifest of the template says `template.main+xml` for the same part name.
+    check("lab-fixture.dotx", DOC_DOTX, "dotx");
+    let lines = report();
+    assert_eq!(
+        row(&lines, "main_part"),
+        "main_part\tword/document.xml\tcontent\twordprocessingml.template.main+xml"
+    );
+    assert_eq!(number(&lines, "entries", 1), 15, "the probe lists fifteen parts");
+    assert_eq!(number(&lines, "document", 2), 1740, "word/document.xml's own size");
+    assert_eq!(number(&lines, "has_manifest", 1), 1);
+
+    // The other half of the claim: a document that differs only by that one word still reads as a
+    // document, with no content column invented for it.
+    assert_eq!(parse(&fixture("tiny.docx")), DOC_DOCX);
+    let plain = report();
+    assert_eq!(row(&plain, "main_part"), "main_part\tword/document.xml");
+    assert_ne!(kind(), DOC_DOTX, "the two must not share a code");
 }
 
 #[test]

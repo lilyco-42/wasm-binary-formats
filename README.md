@@ -264,13 +264,13 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 49 | 22.4% |
-| own Rust reader, container framing only | 27 | 12.3% |
+| own Rust reader, container framing only | 28 | 12.8% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **102** | 46.6% |
-| **covered, any level** | **117** | 53.4% |
+| **no parser at all - real gap** | **101** | 46.1% |
+| **covered, any level** | **118** | 53.9% |
 
-Top binary gap groups by count: unknown 53, archive 10, image 8, application 9, document 7,
+Top binary gap groups by count: unknown 53, archive 10, image 8, application 9, document 6,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -286,9 +286,9 @@ about the machine, the second because no Kaitai spec covers it, the third becaus
 does exist upstream, and `sevenzip` because `py7zr` turned out to be installed as both a writer and a
 reader for it here - see below.
 
-So the honest answer to the objective is **no, not yet**: 117 of 219 binary labels have a parser
-that runs here (49 field-level and 27 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 102 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 118 of 219 binary labels have a parser
+that runs here (49 field-level and 28 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 101 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -302,7 +302,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 117 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 118 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries and the control-flow edges between blocks, for x86-64, AArch64 and Thumb bytes |
 
@@ -427,6 +427,7 @@ temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl sign
 temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
 temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
 temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
+temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -535,8 +536,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **117 covered** (49 field-level and 27
-container-level from this repo's own readers, 41 generated and mostly load-gated), **102 with no
+Coverage is scored against magika's 219 binary labels: **118 covered** (49 field-level and 28
+container-level from this repo's own readers, 41 generated and mostly load-gated), **101 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -861,6 +862,18 @@ does not re-derive them:
   against those bytes would be fitted to one library's bug, so the section is reported as a span and the
   claim is left off rather than made quietly. Indexed colour is out for a related reason: `frompil` derives
   the colour mode from the PIL mode name and refuses `P`, so there is no palette file to read.
+* Word template (+1 container-level label, 118 covered, 101 gaps) added a label with **no new parsing
+  code**: a `.dotx` is the same OOXML package as a `.docx` - same part names, same `word/document.xml`,
+  and no extension stored inside - so the only thing in either file that says which one it is, is the
+  content type the package's own manifest declares for its main part: `wordprocessingml.template.main+xml`
+  against `wordprocessingml.document.main+xml`. The classifier already opened `[Content_Types].xml` to find
+  the package, so it now reads that line and prints it beside the part name; the name `word/` used to
+  collapse every Word package into one code, and a template was therefore not a gap of knowledge but a gap
+  of bookkeeping. `python-docx` writes the source and LibreOffice's `Office Open XML Text Template` filter
+  writes the template from it, so the file is not hand-assembled; the witness is the manifest of both files
+  re-read with `zipfile`, and the script refuses to commit unless the two content types differ in that
+  one word and nothing else - which is also why only `dotx` is credited: `xltx` and `potx` are not magika
+  labels at all, so this is one label rather than a family.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless
