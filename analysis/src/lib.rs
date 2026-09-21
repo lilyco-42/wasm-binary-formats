@@ -310,7 +310,7 @@ fn elf_spans(raw: &[u8]) -> Option<(Vec<Span>, Vec<(u64, u64)>)> {
         // Each entry is read or the walk stops: a file whose program headers run off its own end still
         // has a header, a section table and gaps worth showing, and voiding the map for that would hide
         // them behind one bad count.
-        let at = match phoff.checked_add(index.checked_mul(phentsize)) {
+        let at = match phoff.checked_add(index.checked_mul(phentsize).unwrap_or(u64::MAX)) {
             Some(at) => match usize::try_from(at) {
                 Ok(value) => value,
                 Err(_) => break,
@@ -339,7 +339,7 @@ fn elf_spans(raw: &[u8]) -> Option<(Vec<Span>, Vec<(u64, u64)>)> {
     }
     let mut index = 0u64;
     while index < shnum.min(256) {
-        let at = match shoff.checked_add(index.checked_mul(shentsize)) {
+        let at = match shoff.checked_add(index.checked_mul(shentsize).unwrap_or(u64::MAX)) {
             Some(at) => match usize::try_from(at) {
                 Ok(value) => value,
                 Err(_) => break,
@@ -450,7 +450,8 @@ fn pe_spans(raw: &[u8]) -> Option<Vec<Span>> {
     }
     let mut index = 0u64;
     while index < nsec.min(192) {
-        let at = match table.checked_add(usize::try_from(index.checked_mul(40)).unwrap_or(usize::MAX)) {
+        let step = index.checked_mul(40).unwrap_or(u64::MAX);
+        let at = match table.checked_add(usize::try_from(step).unwrap_or(usize::MAX)) {
             Some(at) => at,
             None => break,
         };
