@@ -933,20 +933,20 @@ fn msf_types(bytes: &[u8]) -> Option<(String, Vec<String>)> {
     // Stream 2 is the type stream by position, which is what llvm-pdbutil's table calls `TPI Stream`.
     // The block list follows the size list, one entry per page each stream needs, so the offset of
     // stream 2's blocks is the size list plus every block counted before it.
-    let mut blocks = Vec::with_capacity(count);
+    let mut blocks: Vec<Vec<usize>> = Vec::with_capacity(count);
+    let mut seen = 0usize;
     for index in 0..count {
         let size = usize::try_from(cv_u32(&dir, 4 + 4 * index)?).ok()?;
         let used = size.checked_add(page - 1)? / page;
-        let start = 4 + 4 * count + 4 * blocks.iter().map(|each| each.len()).sum::<usize>();
+        let start = 4 + 4 * count + 4 * seen;
         if start + 4 * used > dir_bytes {
             return None;
         }
-        let found: Vec<usize> = (0..used)
-            .filter_map(|n| Some(usize::try_from(cv_u32(&dir, start + 4 * n)?).ok()?))
-            .collect();
-        if found.len() != used {
-            return None;
+        let mut found: Vec<usize> = Vec::with_capacity(used);
+        for n in 0..used {
+            found.push(usize::try_from(cv_u32(&dir, start + 4 * n)?).ok()?);
         }
+        seen += used;
         blocks.push(found);
     }
     let stream = match blocks.get(2) {
