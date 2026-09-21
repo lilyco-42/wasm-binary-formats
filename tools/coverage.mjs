@@ -52,6 +52,13 @@ const SELF = {
   // relations, materials and the build transforms are not read, and a model past the walker's element
   // cap is refused rather than half listed.
   '3mf': ['fields'],
+  // The label has no mime type and no description in the catalogue, only the extension - which is the
+  // whole difficulty: a schema is XML whose root declares one particular namespace, and that binding is
+  // the only self-assertion the format makes. Credited at `fields` because the named declarations come
+  // out of the tree (globals, bases, facets, particles, imports and includes), while validity - what a
+  // compiler is for - is reported nowhere, and `broken.xsd` in the fixtures is the file that keeps the
+  // two claims apart.
+  xsd: ['fields'],
 };
 
 const ALIAS = {

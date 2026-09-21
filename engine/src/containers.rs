@@ -157,6 +157,7 @@ pub fn name() -> &'static str {
         FORMAT_PDB => "pdb",
         FORMAT_JSONC => "jsonc",
         FORMAT_GPX => "gpx",
+        FORMAT_XSD => "xsd",
         _ => "unknown",
     }
 }
@@ -8051,6 +8052,35 @@ fn xml_text(raw: &[u8]) -> Option<String> {
     Some(out)
 }
 
+/// The line endings inside an attribute value are spaces as far as the information set goes, which is
+/// what every conforming processor hands back: `ElementTree` and Xerces both give a space where the
+/// file has a newline. Character references are decoded after this step, so an explicit `&#10;` still
+/// arrives as a newline, which is the other half of the same rule.
+fn xml_unfold(raw: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    if !raw.iter().any(|byte| *byte == b'\n' || *byte == b'\r') {
+        return std::borrow::Cow::Borrowed(raw);
+    }
+    let mut out = Vec::with_capacity(raw.len());
+    let mut at = 0usize;
+    while at < raw.len() {
+        match raw[at] {
+            b'\r' => {
+                out.push(b' ');
+                at += usize::from(raw.get(at + 1) == Some(&b'\n')) + 1;
+            }
+            b'\n' => {
+                out.push(b' ');
+                at += 1;
+            }
+            one => {
+                out.push(one);
+                at += 1;
+            }
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// The name a GPX element is known by. A prefix is a document-local alias for a namespace URI, so it
 /// says nothing about which element this is; the part after the colon does.
 fn xml_local(name: &str) -> &str {
@@ -8062,10 +8092,16 @@ fn xml_local(name: &str) -> &str {
 
 /// One element of the tree, with the text directly inside it and the elements under that.
 ///
-/// The shape is shared with the other XML-backed label, 3MF, so the accessors are crate-visible: the
-/// two readers walk the same tree the same way and a second XML parser is not what a new label needs.
+/// The shape is shared with the other XML-backed labels, 3MF's model part and XML Schema, so the
+/// accessors are crate-visible: those readers walk the same tree the same way and a second XML parser
+/// is not what a new label needs.
 pub(crate) struct Node {
     pub(crate) name: String,
+    /// The namespace this element's *own* declarations bind its name to: the value of `xmlns:P` for
+    /// the prefix the element carries, or of `xmlns` when it carries none. Empty when the element has
+    /// no namespace, and also when the binding sits on an ancestor - which a reader of one document
+    /// cannot see, and which is why only a root element's `uri` can be trusted to mean anything.
+    pub(crate) uri: String,
     pub(crate) attrs: Vec<(String, String)>,
     pub(crate) text: String,
     pub(crate) kids: Vec<Node>,
@@ -8202,8 +8238,11 @@ impl<'a> Xml<'a> {
             return None;
         }
         self.at += 1;
-        let name = xml_local(self.name()?).to_string();
+        let spelled = self.name()?.to_string();
+        let prefix = spelled.split_once(':').map_or("", |(one, _)| one);
+        let name = xml_local(&spelled).to_string();
         let mut attrs: Vec<(String, String)> = Vec::new();
+        let mut uri = String::new();
         let mut closed = false;
         loop {
             self.ws();
@@ -8216,7 +8255,8 @@ impl<'a> Xml<'a> {
                 self.at += 1;
                 break;
             }
-            let key = xml_local(self.name()?).to_string();
+            let raw_key = self.name()?.to_string();
+            let key = xml_local(&raw_key).to_string();
             self.ws();
             if !self.starts(b"=") {
                 self.failed = true;
@@ -8230,7 +8270,16 @@ impl<'a> Xml<'a> {
                 return None;
             }
             self.at += 1;
-            attrs.push((key, xml_text(self.take(&[quote])?)?));
+            let value = xml_text(&xml_unfold(self.take(&[quote])?))?;
+            // A namespace declaration is the one attribute whose *spelling* carries meaning: `xmlns`
+            // binds the default and `xmlns:xs` binds the prefix `xs`, so the element's own prefix is
+            // what selects between them. Everything else about the tree is a local name.
+            if raw_key == "xmlns" || raw_key.starts_with("xmlns:") {
+                if raw_key.strip_prefix("xmlns:").unwrap_or("") == prefix {
+                    uri = value.clone();
+                }
+            }
+            attrs.push((key, value));
         }
         self.nodes += 1;
         let mut kids = Vec::new();
@@ -8263,6 +8312,7 @@ impl<'a> Xml<'a> {
         }
         Some(Node {
             name,
+            uri,
             attrs,
             text,
             kids,
@@ -8448,6 +8498,235 @@ fn read_gpx(bytes: &[u8]) -> Option<Vec<String>> {
         if total > GPX_MAX_LISTED {
             rows.push(format!("cut\t{kind}\t{total}"));
         }
+    }
+    Some(rows)
+}
+
+// ------------------------------------------------------------------- XSD: an XML Schema definition
+/// What magika labels a schema. A GPX log is recognised *in spite of* its namespace - the rule there
+/// is the root element's name and a version attribute; this label has nothing else to go on, because
+/// `schema` is an element name a hundred grammars use and the URI is the only statement the document
+/// makes about what it is. So the acceptance rule is that one binding: a `schema` element that
+/// declares itself to be in the schema namespace.
+///
+/// What this reader does not claim is validity. Two of the three witnesses consulted for the fixtures
+/// here are schema *compilers*, and the file `broken.xsd` is one both of them refuse while this reader
+/// still lists its components - correctly, since a schema that references a type it never declares is
+/// still a schema, and a viewer that showed nothing for it would be the worse reader.
+pub const FORMAT_XSD: i32 = 58;
+/// The namespace the root has to declare itself in. XSD 1.0 and 1.1 share this URI, so the reader
+/// cannot tell the two versions apart and does not pretend to.
+const XSD_NAMESPACE: &str = "http://www.w3.org/2001/XMLSchema";
+/// Components listed before the report says where it stopped. The counts in row 0 stay the file's own.
+const XSD_MAX_LISTED: usize = 64;
+/// The children of a schema element, in the order row 0 reports them - which is not the order the
+/// specification introduces them, because the three that point at other documents read better beside
+/// the counts of what is in this one. The last entry is not a name a file can carry: it is the bucket
+/// for anything else the root holds.
+const XSD_KINDS: [&str; 11] = [
+    "element", "attribute", "complexType", "simpleType", "group", "attributeGroup", "import",
+    "include", "notation", "annotation", "unknown",
+];
+/// What may stand inside a model group, which is what `particles` counts.
+const XSD_MODEL: [&str; 5] = ["element", "group", "choice", "sequence", "any"];
+/// The child of a complex type that says where it comes from.
+const XSD_DERIVES: [&str; 4] = ["extension", "restriction", "complexContent", "simpleContent"];
+
+/// An attribute exactly as the file spells it, or `-` when the file does not carry one. An empty value
+/// counts as absent: a type that writes `mixed=""` has said no more than one that writes nothing.
+fn xsd_shown(node: &Node, key: &str) -> String {
+    match node.attr(key) {
+        Some(one) if !one.is_empty() => printable(one),
+        _ => "-".to_string(),
+    }
+}
+
+/// Every element of the subtree, this one included - the same total `ElementTree` gives for an
+/// `iter()` over the document. Depth is capped by the walker, so this recursion is bounded.
+fn xsd_nodes(node: &Node) -> usize {
+    1 + node.kids.iter().map(xsd_nodes).sum::<usize>()
+}
+
+fn xsd_particles(node: &Node) -> usize {
+    node.kids
+        .iter()
+        .filter(|one| XSD_MODEL.contains(&one.name.as_str()))
+        .count()
+}
+
+/// The text of a subtree in document order: each element's own runs, trimmed, blanks dropped, joined
+/// with a single space. An annotation keeps its sentence one level down in `documentation`, so a walk
+/// that only looked at the element itself would report an empty note.
+fn xsd_held_text(root: &Node) -> String {
+    let mut found: Vec<&str> = Vec::new();
+    let mut queue: Vec<&Node> = vec![root];
+    let mut at = 0usize;
+    while at < queue.len() {
+        let one = queue[at];
+        at += 1;
+        let piece = one.text.trim();
+        if !piece.is_empty() {
+            found.push(piece);
+        }
+        // Children go in front of what is already waiting, which is the order the witness gets by
+        // joining an element's `text` onto its children's `tail`.
+        queue.splice(at..at, one.kids.iter());
+    }
+    found.join(" ")
+}
+
+fn read_xsd(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 32 {
+        return None;
+    }
+    let root = xml_document(bytes)?;
+    if root.name != "schema" || root.uri != XSD_NAMESPACE {
+        return None;
+    }
+    let mut counts = [0usize; 11];
+    for kid in &root.kids {
+        counts[XSD_KINDS
+            .iter()
+            .position(|one| *one == kid.name)
+            .unwrap_or(XSD_KINDS.len() - 1)] += 1;
+    }
+    let listed = XSD_MAX_LISTED.min(root.kids.len());
+    let mut rows = vec![format!(
+        "schema\tpieces\t{}\telements\t{}\tattributes\t{}\tcomplexTypes\t{}\tsimpleTypes\t{}\tgroups\t{}\tattributeGroups\t{}\timports\t{}\tincludes\t{}\tnotations\t{}\tannotations\t{}\tunknown\t{}\tnodes\t{}\ttarget\t{}\teform\t{}\taform\t{}\tbytes\t{}",
+        root.kids.len(),
+        counts[0],
+        counts[1],
+        counts[2],
+        counts[3],
+        counts[4],
+        counts[5],
+        counts[6],
+        counts[7],
+        counts[8],
+        counts[9],
+        counts[10],
+        xsd_nodes(&root),
+        xsd_shown(&root, "targetNamespace"),
+        xsd_shown(&root, "elementFormDefault"),
+        xsd_shown(&root, "attributeFormDefault"),
+        bytes.len()
+    )];
+    for (index, kid) in root.kids.iter().enumerate() {
+        if index >= listed {
+            continue;
+        }
+        let number = index.to_string();
+        match kid.name.as_str() {
+            "annotation" => {
+                let text = xsd_held_text(kid);
+                let body = if text.is_empty() {
+                    "-".to_string()
+                } else {
+                    printable(&text.chars().take(72).collect::<String>())
+                };
+                rows.push(format!(
+                    "doc\t{number}\tchars\t{}\ttext\t{body}",
+                    text.chars().count()
+                ));
+            }
+            "import" => rows.push(format!(
+                "import\t{number}\tnamespace\t{}\tloc\t{}",
+                xsd_shown(kid, "namespace"),
+                xsd_shown(kid, "schemaLocation")
+            )),
+            "include" => rows.push(format!(
+                "include\t{number}\tloc\t{}",
+                xsd_shown(kid, "schemaLocation")
+            )),
+            "element" | "attribute" | "complexType" | "simpleType" | "group" | "attributeGroup"
+            | "notation" => {
+                let mut row = vec![
+                    "comp".to_string(),
+                    number,
+                    "kind".to_string(),
+                    kid.name.clone(),
+                    "name".to_string(),
+                    xsd_shown(kid, "name"),
+                ];
+                let word = |one: Option<&Node>| {
+                    one.map_or_else(|| "-".to_string(), |found| found.name.clone())
+                };
+                match kid.name.as_str() {
+                    "element" => {
+                        row.push("ref".to_string());
+                        row.push(xsd_shown(kid, "ref"));
+                        row.push("type".to_string());
+                        row.push(xsd_shown(kid, "type"));
+                        row.push("nested".to_string());
+                        row.push(word(kid.kids.iter().find(|one| {
+                            matches!(one.name.as_str(), "complexType" | "simpleType")
+                        })));
+                    }
+                    "attribute" => {
+                        row.push("type".to_string());
+                        row.push(xsd_shown(kid, "type"));
+                        row.push("use".to_string());
+                        row.push(xsd_shown(kid, "use"));
+                    }
+                    "complexType" => {
+                        row.push("mixed".to_string());
+                        row.push(xsd_shown(kid, "mixed"));
+                        row.push("derives".to_string());
+                        row.push(word(
+                            kid.kids
+                                .iter()
+                                .find(|one| XSD_DERIVES.contains(&one.name.as_str())),
+                        ));
+                        row.push("particles".to_string());
+                        row.push(xsd_particles(kid).to_string());
+                        row.push("attributes".to_string());
+                        row.push(kid.held("attribute").to_string());
+                    }
+                    "simpleType" => {
+                        // A restriction names its base, a list names its item type, and a union names
+                        // neither - its members sit in an attribute this row does not open out.
+                        let face = kid.kids.iter().find(|one| {
+                            matches!(one.name.as_str(), "restriction" | "list" | "union")
+                        });
+                        let base = face
+                            .and_then(|one| {
+                                ["base", "itemType"]
+                                    .into_iter()
+                                    .filter_map(|key| one.attr(key))
+                                    .find(|one| !one.is_empty())
+                                    .map(|one| printable(one))
+                            })
+                            .unwrap_or_else(|| "-".to_string());
+                        row.push("base".to_string());
+                        row.push(base);
+                        row.push("facets".to_string());
+                        row.push(face.map_or(0usize, |one| one.kids.len()).to_string());
+                    }
+                    "group" => {
+                        row.push("particles".to_string());
+                        row.push(xsd_particles(kid).to_string());
+                    }
+                    "attributeGroup" => {
+                        row.push("attributes".to_string());
+                        row.push(kid.held("attribute").to_string());
+                    }
+                    _ => {
+                        row.push("public".to_string());
+                        row.push(xsd_shown(kid, "public"));
+                        row.push("system".to_string());
+                        row.push(xsd_shown(kid, "system"));
+                    }
+                }
+                rows.push(row.join("\t"));
+            }
+            other => rows.push(format!("other\t{number}\tkind\t{}", printable(other))),
+        }
+    }
+    if root.kids.len() > listed {
+        rows.push(format!(
+            "cut\tcomponents\t{}\tlisted\t{listed}",
+            root.kids.len()
+        ));
     }
     Some(rows)
 }
@@ -9167,6 +9446,12 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_gpx(bytes) {
         return accept(FORMAT_GPX, lines);
     }
+    // Beside GPX rather than before it: both are XML, and neither can steal the other's file, because
+    // one asks for a root named `gpx` and the other for a root named `schema` that binds the schema
+    // namespace to itself. A JSONC document is not XML at all, so it stays last of the three.
+    if let Some(lines) = read_xsd(bytes) {
+        return accept(FORMAT_XSD, lines);
+    }
     // Last, because a JSON document carries no signature at all: its claim is that the whole file
     // parses and that a strict parser would refuse it, which nothing here can satisfy by accident.
     // Every container with a real magic answers first, and a plain JSON file is refused by this one -
@@ -9175,7 +9460,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_JSONC, lines);
     }
     reject(
-        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, GPX log, JSONC document, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, GPX log, XML Schema, JSONC document, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

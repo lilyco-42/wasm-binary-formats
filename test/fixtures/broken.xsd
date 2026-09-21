@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:t="http://lab.example.invalid/broken"
+           targetNamespace="http://lab.example.invalid/broken">
+  <xs:element name="thing" type="t:Missing"/>
+  <xs:complexType name="Other">
+    <xs:complexContent>
+      <xs:extension base="t:AlsoMissing">
+        <xs:sequence>
+          <xs:element name="x" type="xs:int"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>

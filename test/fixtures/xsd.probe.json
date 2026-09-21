@@ -1,0 +1,539 @@
+{
+ "broken.xsd": {
+  "bytes": 512,
+  "counts": {
+   "annotations": 0,
+   "attributeGroups": 0,
+   "attributes": 0,
+   "bytes": 512,
+   "complexTypes": 1,
+   "elements": 1,
+   "groups": 0,
+   "imports": 0,
+   "includes": 0,
+   "nodes": 7,
+   "notations": 0,
+   "pieces": 2,
+   "simpleTypes": 0,
+   "unknown": 0
+  },
+  "globals": {
+   "complexType": [
+    "Other"
+   ],
+   "element": [
+    "thing"
+   ]
+  },
+  "rows": [
+   "schema\tpieces\t2\telements\t1\tattributes\t0\tcomplexTypes\t1\tsimpleTypes\t0\tgroups\t0\tattributeGroups\t0\timports\t0\tincludes\t0\tnotations\t0\tannotations\t0\tunknown\t0\tnodes\t7\ttarget\thttp://lab.example.invalid/broken\teform\t-\taform\t-\tbytes\t512",
+   "comp\t0\tkind\telement\tname\tthing\tref\t-\ttype\tt:Missing\tnested\t-",
+   "comp\t1\tkind\tcomplexType\tname\tOther\tmixed\t-\tderives\tcomplexContent\tparticles\t0\tattributes\t0"
+  ],
+  "xerces": {
+   "errors": 2,
+   "messages": [
+    "error\tsrc-resolve: Cannot resolve the name 't:AlsoMissing' to a(n) 'type definition' component."
+   ],
+   "returned": "yes",
+   "warnings": 0
+  },
+  "xmlschema": {
+   "errors": [
+    "missing base type '{http://lab.example.invalid/broken}AlsoMissing':\n\nSchema component:\n\n  <xs:extension xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" base=\"t:AlsoMissing\">\n    <xs:sequence>\n      <xs:el"
+   ],
+   "imports": null,
+   "includes": null,
+   "maps": null,
+   "raised": "XMLSchemaParseError",
+   "target": null,
+   "valid": false
+  }
+ },
+ "hand.xsd": {
+  "bytes": 905,
+  "counts": {
+   "annotations": 1,
+   "attributeGroups": 0,
+   "attributes": 1,
+   "bytes": 905,
+   "complexTypes": 1,
+   "elements": 1,
+   "groups": 0,
+   "imports": 0,
+   "includes": 1,
+   "nodes": 18,
+   "notations": 0,
+   "pieces": 8,
+   "simpleTypes": 3,
+   "unknown": 0
+  },
+  "globals": {
+   "attribute": [
+    "stamp"
+   ],
+   "complexType": [
+    "Money"
+   ],
+   "element": [
+    "amount"
+   ],
+   "simpleType": [
+    "Amount",
+    "Tags",
+    "Kind"
+   ]
+  },
+  "rows": [
+   "schema\tpieces\t8\telements\t1\tattributes\t1\tcomplexTypes\t1\tsimpleTypes\t3\tgroups\t0\tattributeGroups\t0\timports\t0\tincludes\t1\tnotations\t0\tannotations\t1\tunknown\t0\tnodes\t18\ttarget\t-\teform\t-\taform\t-\tbytes\t905",
+   "doc\t0\tchars\t56\ttext\tno target namespace, and a default namespace on the root",
+   "include\t1\tloc\tpart.xsd",
+   "comp\t2\tkind\tsimpleType\tname\tAmount\tbase\txs:decimal\tfacets\t2",
+   "comp\t3\tkind\tsimpleType\tname\tTags\tbase\txs:string\tfacets\t0",
+   "comp\t4\tkind\tsimpleType\tname\tKind\tbase\t-\tfacets\t0",
+   "comp\t5\tkind\tcomplexType\tname\tMoney\tmixed\ttrue\tderives\t-\tparticles\t1\tattributes\t1",
+   "comp\t6\tkind\telement\tname\tamount\tref\t-\ttype\txs:decimal\tnested\t-",
+   "comp\t7\tkind\tattribute\tname\tstamp\ttype\txs:dateTime\tuse\t-"
+  ],
+  "xerces": {
+   "errors": 0,
+   "messages": [],
+   "returned": "yes",
+   "warnings": 0
+  },
+  "xmlschema": {
+   "errors": [],
+   "imports": 0,
+   "includes": 1,
+   "maps": {
+    "attribute": [
+     "stamp"
+    ],
+    "attributeGroup": [],
+    "complexType": [
+     "Money"
+    ],
+    "element": [
+     "amount",
+     "where",
+     "who"
+    ],
+    "group": [],
+    "notation": [],
+    "simpleType": [
+     "Amount",
+     "Kind",
+     "Tags"
+    ]
+   },
+   "raised": null,
+   "target": "-",
+   "valid": true
+  }
+ },
+ "lab.xsd": {
+  "bytes": 1781,
+  "counts": {
+   "annotations": 1,
+   "attributeGroups": 1,
+   "attributes": 1,
+   "bytes": 1781,
+   "complexTypes": 1,
+   "elements": 2,
+   "groups": 1,
+   "imports": 1,
+   "includes": 0,
+   "nodes": 30,
+   "notations": 1,
+   "pieces": 10,
+   "simpleTypes": 1,
+   "unknown": 0
+  },
+  "globals": {
+   "attribute": [
+    "reviewed"
+   ],
+   "attributeGroup": [
+    "Common"
+   ],
+   "complexType": [
+    "Item"
+   ],
+   "element": [
+    "line",
+    "order"
+   ],
+   "group": [
+    "Parts"
+   ],
+   "notation": [
+    "JPEG"
+   ],
+   "simpleType": [
+    "Code"
+   ]
+  },
+  "rows": [
+   "schema\tpieces\t10\telements\t2\tattributes\t1\tcomplexTypes\t1\tsimpleTypes\t1\tgroups\t1\tattributeGroups\t1\timports\t1\tincludes\t0\tnotations\t1\tannotations\t1\tunknown\t0\tnodes\t30\ttarget\thttp://lab.example.invalid/fixture\teform\tqualified\taform\tunqualified\tbytes\t1781",
+   "import\t0\tnamespace\thttp://www.w3.org/XML/1998/namespace\tloc\t-",
+   "doc\t1\tchars\t31\ttext\ta fixture schema & nothing else",
+   "comp\t2\tkind\tsimpleType\tname\tCode\tbase\txs:token\tfacets\t1",
+   "comp\t3\tkind\tcomplexType\tname\tItem\tmixed\t-\tderives\t-\tparticles\t1\tattributes\t1",
+   "comp\t4\tkind\tgroup\tname\tParts\tparticles\t1",
+   "comp\t5\tkind\tattributeGroup\tname\tCommon\tattributes\t1",
+   "comp\t6\tkind\tattribute\tname\treviewed\ttype\txs:boolean\tuse\t-",
+   "comp\t7\tkind\tnotation\tname\tJPEG\tpublic\timage/jpeg\tsystem\tviewer",
+   "comp\t8\tkind\telement\tname\tline\tref\t-\ttype\ttns:Item\tnested\t-",
+   "comp\t9\tkind\telement\tname\torder\tref\t-\ttype\t-\tnested\tcomplexType"
+  ],
+  "xerces": {
+   "errors": 0,
+   "messages": [],
+   "returned": "yes",
+   "warnings": 0
+  },
+  "xmlschema": {
+   "errors": [],
+   "imports": 1,
+   "includes": 0,
+   "maps": {
+    "attribute": [
+     "reviewed"
+    ],
+    "attributeGroup": [
+     "Common"
+    ],
+    "complexType": [
+     "Item"
+    ],
+    "element": [
+     "line",
+     "order"
+    ],
+    "group": [
+     "Parts"
+    ],
+    "notation": [
+     "JPEG"
+    ],
+    "simpleType": [
+     "Code"
+    ]
+   },
+   "raised": null,
+   "target": "http://lab.example.invalid/fixture",
+   "valid": true
+  }
+ },
+ "many.xsd": {
+  "bytes": 3171,
+  "counts": {
+   "annotations": 0,
+   "attributeGroups": 0,
+   "attributes": 0,
+   "bytes": 3171,
+   "complexTypes": 0,
+   "elements": 70,
+   "groups": 0,
+   "imports": 0,
+   "includes": 0,
+   "nodes": 71,
+   "notations": 0,
+   "pieces": 70,
+   "simpleTypes": 0,
+   "unknown": 0
+  },
+  "globals": {
+   "element": [
+    "c00",
+    "c01",
+    "c02",
+    "c03",
+    "c04",
+    "c05",
+    "c06",
+    "c07",
+    "c08",
+    "c09",
+    "c10",
+    "c11",
+    "c12",
+    "c13",
+    "c14",
+    "c15",
+    "c16",
+    "c17",
+    "c18",
+    "c19",
+    "c20",
+    "c21",
+    "c22",
+    "c23",
+    "c24",
+    "c25",
+    "c26",
+    "c27",
+    "c28",
+    "c29",
+    "c30",
+    "c31",
+    "c32",
+    "c33",
+    "c34",
+    "c35",
+    "c36",
+    "c37",
+    "c38",
+    "c39",
+    "c40",
+    "c41",
+    "c42",
+    "c43",
+    "c44",
+    "c45",
+    "c46",
+    "c47",
+    "c48",
+    "c49",
+    "c50",
+    "c51",
+    "c52",
+    "c53",
+    "c54",
+    "c55",
+    "c56",
+    "c57",
+    "c58",
+    "c59",
+    "c60",
+    "c61",
+    "c62",
+    "c63",
+    "c64",
+    "c65",
+    "c66",
+    "c67",
+    "c68",
+    "c69"
+   ]
+  },
+  "rows": [
+   "schema\tpieces\t70\telements\t70\tattributes\t0\tcomplexTypes\t0\tsimpleTypes\t0\tgroups\t0\tattributeGroups\t0\timports\t0\tincludes\t0\tnotations\t0\tannotations\t0\tunknown\t0\tnodes\t71\ttarget\t-\teform\t-\taform\t-\tbytes\t3171",
+   "comp\t0\tkind\telement\tname\tc00\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t1\tkind\telement\tname\tc01\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t2\tkind\telement\tname\tc02\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t3\tkind\telement\tname\tc03\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t4\tkind\telement\tname\tc04\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t5\tkind\telement\tname\tc05\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t6\tkind\telement\tname\tc06\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t7\tkind\telement\tname\tc07\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t8\tkind\telement\tname\tc08\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t9\tkind\telement\tname\tc09\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t10\tkind\telement\tname\tc10\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t11\tkind\telement\tname\tc11\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t12\tkind\telement\tname\tc12\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t13\tkind\telement\tname\tc13\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t14\tkind\telement\tname\tc14\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t15\tkind\telement\tname\tc15\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t16\tkind\telement\tname\tc16\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t17\tkind\telement\tname\tc17\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t18\tkind\telement\tname\tc18\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t19\tkind\telement\tname\tc19\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t20\tkind\telement\tname\tc20\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t21\tkind\telement\tname\tc21\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t22\tkind\telement\tname\tc22\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t23\tkind\telement\tname\tc23\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t24\tkind\telement\tname\tc24\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t25\tkind\telement\tname\tc25\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t26\tkind\telement\tname\tc26\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t27\tkind\telement\tname\tc27\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t28\tkind\telement\tname\tc28\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t29\tkind\telement\tname\tc29\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t30\tkind\telement\tname\tc30\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t31\tkind\telement\tname\tc31\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t32\tkind\telement\tname\tc32\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t33\tkind\telement\tname\tc33\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t34\tkind\telement\tname\tc34\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t35\tkind\telement\tname\tc35\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t36\tkind\telement\tname\tc36\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t37\tkind\telement\tname\tc37\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t38\tkind\telement\tname\tc38\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t39\tkind\telement\tname\tc39\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t40\tkind\telement\tname\tc40\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t41\tkind\telement\tname\tc41\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t42\tkind\telement\tname\tc42\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t43\tkind\telement\tname\tc43\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t44\tkind\telement\tname\tc44\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t45\tkind\telement\tname\tc45\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t46\tkind\telement\tname\tc46\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t47\tkind\telement\tname\tc47\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t48\tkind\telement\tname\tc48\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t49\tkind\telement\tname\tc49\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t50\tkind\telement\tname\tc50\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t51\tkind\telement\tname\tc51\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t52\tkind\telement\tname\tc52\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t53\tkind\telement\tname\tc53\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t54\tkind\telement\tname\tc54\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t55\tkind\telement\tname\tc55\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t56\tkind\telement\tname\tc56\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t57\tkind\telement\tname\tc57\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t58\tkind\telement\tname\tc58\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t59\tkind\telement\tname\tc59\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t60\tkind\telement\tname\tc60\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t61\tkind\telement\tname\tc61\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t62\tkind\telement\tname\tc62\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t63\tkind\telement\tname\tc63\tref\t-\ttype\txs:string\tnested\t-",
+   "cut\tcomponents\t70\tlisted\t64"
+  ],
+  "xerces": {
+   "errors": 0,
+   "messages": [],
+   "returned": "yes",
+   "warnings": 0
+  },
+  "xmlschema": {
+   "errors": [],
+   "imports": 0,
+   "includes": 0,
+   "maps": {
+    "attribute": [],
+    "attributeGroup": [],
+    "complexType": [],
+    "element": [
+     "c00",
+     "c01",
+     "c02",
+     "c03",
+     "c04",
+     "c05",
+     "c06",
+     "c07",
+     "c08",
+     "c09",
+     "c10",
+     "c11",
+     "c12",
+     "c13",
+     "c14",
+     "c15",
+     "c16",
+     "c17",
+     "c18",
+     "c19",
+     "c20",
+     "c21",
+     "c22",
+     "c23",
+     "c24",
+     "c25",
+     "c26",
+     "c27",
+     "c28",
+     "c29",
+     "c30",
+     "c31",
+     "c32",
+     "c33",
+     "c34",
+     "c35",
+     "c36",
+     "c37",
+     "c38",
+     "c39",
+     "c40",
+     "c41",
+     "c42",
+     "c43",
+     "c44",
+     "c45",
+     "c46",
+     "c47",
+     "c48",
+     "c49",
+     "c50",
+     "c51",
+     "c52",
+     "c53",
+     "c54",
+     "c55",
+     "c56",
+     "c57",
+     "c58",
+     "c59",
+     "c60",
+     "c61",
+     "c62",
+     "c63",
+     "c64",
+     "c65",
+     "c66",
+     "c67",
+     "c68",
+     "c69"
+    ],
+    "group": [],
+    "notation": [],
+    "simpleType": []
+   },
+   "raised": null,
+   "target": "-",
+   "valid": true
+  }
+ },
+ "part.xsd": {
+  "bytes": 181,
+  "counts": {
+   "annotations": 0,
+   "attributeGroups": 0,
+   "attributes": 0,
+   "bytes": 181,
+   "complexTypes": 0,
+   "elements": 2,
+   "groups": 0,
+   "imports": 0,
+   "includes": 0,
+   "nodes": 3,
+   "notations": 0,
+   "pieces": 2,
+   "simpleTypes": 0,
+   "unknown": 0
+  },
+  "globals": {
+   "element": [
+    "who",
+    "where"
+   ]
+  },
+  "rows": [
+   "schema\tpieces\t2\telements\t2\tattributes\t0\tcomplexTypes\t0\tsimpleTypes\t0\tgroups\t0\tattributeGroups\t0\timports\t0\tincludes\t0\tnotations\t0\tannotations\t0\tunknown\t0\tnodes\t3\ttarget\t-\teform\t-\taform\t-\tbytes\t181",
+   "comp\t0\tkind\telement\tname\twho\tref\t-\ttype\txs:string\tnested\t-",
+   "comp\t1\tkind\telement\tname\twhere\tref\t-\ttype\txs:string\tnested\t-"
+  ],
+  "xerces": {
+   "errors": 0,
+   "messages": [],
+   "returned": "yes",
+   "warnings": 0
+  },
+  "xmlschema": {
+   "errors": [],
+   "imports": 0,
+   "includes": 0,
+   "maps": {
+    "attribute": [],
+    "attributeGroup": [],
+    "complexType": [],
+    "element": [
+     "where",
+     "who"
+    ],
+    "group": [],
+    "notation": [],
+    "simpleType": []
+   },
+   "raised": null,
+   "target": "-",
+   "valid": true
+  }
+ }
+}

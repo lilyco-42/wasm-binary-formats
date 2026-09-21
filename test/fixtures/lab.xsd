@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://lab.example.invalid/fixture"
+           targetNamespace="http://lab.example.invalid/fixture"
+           elementFormDefault="qualified" attributeFormDefault="unqualified">
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"/>
+  <xs:annotation>
+    <xs:documentation>a fixture schema &amp; nothing else</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="Code">
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[A-Z]{2,4}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="Item">
+    <xs:sequence>
+      <xs:element name="code" type="tns:Code"/>
+      <xs:element name="price" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="qty">
+        <xs:simpleType>
+          <xs:restriction base="xs:int">
+            <xs:minInclusive value="0"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:int" use="required"/>
+  </xs:complexType>
+  <xs:group name="Parts">
+    <xs:sequence>
+      <xs:element ref="tns:line"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:attributeGroup name="Common">
+    <xs:attribute name="lang" type="xs:language"/>
+  </xs:attributeGroup>
+  <xs:attribute name="reviewed" type="xs:boolean"/>
+  <xs:notation name="JPEG" public="image/jpeg" system="viewer"/>
+  <xs:element name="line" type="tns:Item"/>
+  <xs:element name="order">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:line" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="note" type="xs:string" use="optional"/>
+      <xs:attributeGroup ref="tns:Common"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

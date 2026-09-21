@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 56 | 25.6% |
+| own Rust reader, named header fields decoded | 57 | 26.0% |
 | own Rust reader, container framing only | 29 | 13.2% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **94** | 42.9% |
-| **covered, any level** | **126** | 57.5% |
+| **no parser at all - real gap** | **92** | 42.0% |
+| **covered, any level** | **127** | 58.0% |
 
-Top binary gap groups by count: unknown 49, archive 10, image 8, application 7, document 6,
+Top binary gap groups by count: unknown 48, archive 10, image 7, application 7, document 6,
 code 5, executable 4, inode 3, text 1, undefined 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 126 of 219 binary labels have a parser
-that runs here (55 field-level and 29 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 93 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 127 of 219 binary labels have a parser
+that runs here (57 field-level and 29 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 92 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 126 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, and the base relocations a loader is told to apply |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -684,6 +684,7 @@ temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
 temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports test/fixtures/lab.3mf and then re-reads it, zipfile lists the parts and xml.etree.ElementTree walks the mesh; the probe is not written unless the two counts agree across all three readings, and hand.3mf exists to carry the four shapes trimesh will not produce
+temp/venv/Scripts/python.exe scripts/make-xsd-fixtures.py        # authors five fixtures, then gates the probe on `xmlschema`'s compiled component maps and the JDK's Xerces agreeing with ElementTree's tree name by name; neither witness is reachable from CI, so the committed probe is the evidence
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
 temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
@@ -804,8 +805,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **126 covered** (56 field-level and 29
-container-level from this repo's own readers, 41 generated and mostly load-gated), **93 with no
+Coverage is scored against magika's 219 binary labels: **127 covered** (57 field-level and 29
+container-level from this repo's own readers, 41 generated and mostly load-gated), **92 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -1184,6 +1185,27 @@ does not re-derive them:
   check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
   file's size and not the torrent's, so named values are read at the key they were reached under, and
   the shape row says `single` or `multi` from which of the two the file actually has.
+* XSD (+1 field-level label, 127 covered, 92 gaps) is a schema, and the only self-assertion the format
+  makes is one attribute: the root element is `schema` and it binds `http://www.w3.org/2001/XMLSchema` to
+  *its own prefix*. That last part is the rule - scanning the root for any attribute whose *value* is the
+  URI would also accept a document standing in some other namespace that merely imports schema types - so
+  the walker keeps the element's own declarations beside its stripped name.
+  `scripts/make-xsd-fixtures.py` authors the five fixtures and then asks three readers nobody in this
+  chain wrote: `xml.etree.ElementTree` supplies the tree every row is built from, `xmlschema` (MIT)
+  *compiles* the schema and its global component maps are compared name by name against that tree, and
+  Xerces - the JDK's own `SchemaFactory` - compiles it a second time and reports what its error handler
+  collected. No probe is written unless both compilers agree with the tree on every global name.
+  `hand.xsd` is where the `include` fact lives: an included document's globals merge into the includer's
+  maps, so a compiler lists three elements for a file that declares one, and the summary row keeps the
+  file's own number rather than the merged one. `many.xsd` carries 70 globals to exercise the listing
+  cap, and `broken.xsd` - well-formed, right namespace, two references to types that are never declared -
+  is refused by *both* compilers and listed anyway, because a schema whose derivation is wrong is still a
+  schema. Two findings cost a round each and are recorded in the script's header: `newSchema` reports a
+  broken schema through the handler and still hands back a `Schema`, so "it compiled" had to be redefined
+  as "the handler said nothing"; and an unprefixed type reference is refused by both compilers when the
+  root sets the schema namespace as its *default* namespace, so that fixture reaches builtins by their
+  prefixed names only. Version is not reported - XSD 1.0 and 1.1 share the URI - and references are
+  printed exactly as spelled, because resolving `tns:Item` means loading whatever `import` points at.
 * 3MF (+1 field-level label, 126 covered, 93 gaps) is an OPC package - the zip-and-XML framing OOXML uses - whose one required part is a mesh document, so the package is identified by following a pointer rather than by matching a part-name prefix: `_rels/.rels` carries a relationship of type `.../3dmodel`, a leading `/` in its target means the package root, and the part it names has to be in the archive or the package is refused with the pointer said out loud. `lab.3mf` is written by `trimesh`, which then re-reads it and reports the same 8 vertices and 12 faces `xml.etree.ElementTree` counts, so the two numbers a mesh is about come from two other implementations; `hand.3mf` is authored here because trimesh cannot be made to omit a unit, to leave an object unnamed and untyped, to cover the part by `Override` instead of `Default`, or to spell a target without the slash - and an absent attribute is printed `-` rather than as the default the specification would supply. This is the second label served by `containers::xml_document`, and the same 4 096-element cap applies: a model bigger than that is refused rather than half listed.
 * GPX (+1 field-level label, 125 covered, 94 gaps) is a log of positions, and it is XML, so the only
   recognition available is the file's own claim: the root element is `gpx` and it carries a `version`

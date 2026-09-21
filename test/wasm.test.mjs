@@ -336,6 +336,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['rgb.psd', 50], ['grey.psd', 50], ['rgba.psd', 50], ['raw.psd', 50],
     ['lab.jsonc', 56], ['trailing.jsonc', 56],
     ['lab.gpx', 57], ['hand.gpx', 57],
+    ['lab.xsd', 58], ['hand.xsd', 58], ['part.xsd', 58], ['broken.xsd', 58], ['many.xsd', 58],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -959,6 +960,52 @@ test('a GPS log crosses the ABI with its entities decoded and its numbers as spe
   }
 });
 
+test('a schema crosses the ABI with the components two compilers agreed it declares', () => {
+  // scripts/make-xsd-fixtures.py authors the five fixtures, asks ElementTree for the tree, `xmlschema`
+  // for a compiled schema and the JDK's Xerces for a second compilation, and writes the probe only if
+  // all three name the same globals. Neither the python library nor java is reachable from CI, so the
+  // committed probe is the evidence and what is compared below is the deployed reader against it.
+  const probe = JSON.parse(readFileSync('test/fixtures/xsd.probe.json', 'utf8'));
+  for (const file of ['lab.xsd', 'hand.xsd', 'part.xsd', 'broken.xsd', 'many.xsd']) {
+    const seen = assertReadable('container', file, 58);
+    assert.equal(seen.name, 'xsd');
+    assert.deepEqual(seen.rows, probe[file].rows, `${file} is not the witnesses' tree`);
+  }
+  // Four of the five compile. `broken.xsd` is the one both compilers refuse - and the reader lists its
+  // two components anyway, because what this label reports is the tree, not the derivation.
+  for (const file of ['lab.xsd', 'hand.xsd', 'part.xsd', 'many.xsd']) {
+    assert.equal(probe[file].xmlschema.valid, true, `xmlschema refused ${file}`);
+    assert.equal(probe[file].xerces.errors, 0, `Xerces complained about ${file}`);
+  }
+  assert.equal(probe['broken.xsd'].xmlschema.valid, false, 'nothing refused the broken schema');
+  assert.ok(probe['broken.xsd'].xerces.errors > 0, 'Xerces stayed silent on the broken schema');
+  // A compiler's component map is not the file's own list: `hand.xsd` includes `part.xsd`, and an
+  // include merges that document's globals into the includer, while the summary row counts what stands
+  // in this tree. Both facts are in the probe, and they are deliberately different numbers.
+  assert.deepEqual(probe['hand.xsd'].xmlschema.maps.element, ['amount', 'where', 'who']);
+  assert.deepEqual(probe['hand.xsd'].globals.element, ['amount']);
+  const head = assertReadable('container', 'hand.xsd', 58).rows[0].split('\t');
+  assert.equal(Number(head[head.indexOf('elements') + 1]), 1, 'the row counted the merged map');
+  // The listing cap, on a file nobody hand-wrote 70 lines of: rows stop, the totals do not.
+  assert.equal(probe['many.xsd'].rows.at(-1), 'cut\tcomponents\t70\tlisted\t64');
+  assert.equal(probe['many.xsd'].counts.pieces, 70);
+  // `schema` by itself is not enough, and neither is the URI appearing somewhere on the root: the
+  // binding that counts is the one on the element's own prefix.
+  for (const [label, body] of [
+    ['a database schema', '<?xml version="1.0"?>\n<schema xmlns="urn:elsewhere"><table/></schema>\n'],
+    ['the URI under a foreign prefix',
+     '<s:schema xmlns:s="urn:elsewhere" xmlns:x="http://www.w3.org/2001/XMLSchema"><x:element name="a"/></s:schema>\n'],
+    ['an element that is not the root',
+     '<xs:element xmlns:xs="http://www.w3.org/2001/XMLSchema" name="a" type="xs:string"/>\n'],
+  ]) {
+    const seen = driveBytes('container', new TextEncoder().encode(body));
+    assert.notEqual(seen.code, 58, `${label} was read as a schema`);
+  }
+  // The two XML labels cannot stand in for each other, whatever order they are tried in.
+  assert.notEqual(drive('container', 'lab.gpx').code, 58, 'a GPS log answered as a schema');
+  assert.notEqual(drive('container', 'lab.xsd').code, 57, 'a schema answered as a GPS log');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -1010,6 +1057,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],
     ['container', 'lab.jsonc', 'jsonc'], ['container', 'trailing.jsonc', 'jsonc'],
     ['container', 'lab.gpx', 'gpx'], ['container', 'hand.gpx', 'gpx'],
+    ['container', 'lab.xsd', 'xsd'], ['container', 'many.xsd', 'xsd'],
     ['audio', 'media.flac', 'flac'], ['audio', 'media.mp3', 'mpeg-audio'], ['audio', 'media.ogg', 'ogg'],
     ['audio', 'media.wav', 'wave'], ['audio', 'media.mp2', 'mp2'], ['audio', 'media-192k.mp2', 'mp2'],
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],

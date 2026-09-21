@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <annotation><appinfo>no target namespace, and a default namespace on the root</appinfo></annotation>
+  <include schemaLocation="part.xsd"/>
+  <simpleType name="Amount">
+    <restriction base="xs:decimal">
+      <minInclusive value="0"/>
+      <fractionDigits value="2"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="Tags">
+    <list itemType="xs:string"/>
+  </simpleType>
+  <simpleType name="Kind">
+    <union memberTypes="xs:NCName xs:Name"/>
+  </simpleType>
+  <complexType name="Money" mixed="true">
+    <sequence>
+      <element name="when" type="xs:dateTime" minOccurs="0"/>
+    </sequence>
+    <attribute name="unit" type="xs:string" use="prohibited"/>
+  </complexType>
+  <element name="amount" type="xs:decimal"/>
+  <attribute name="stamp" type="xs:dateTime"/>
+</schema>
