@@ -16,12 +16,12 @@
 //!
 //! Three facts the fixtures settled. `/pdbaltpath` is what keeps a local absolute path out of a
 //! committed file, and it is also the realistic shape, since that name is what a symbol service looks
-//! up. `/timeStamp` has to be pinned: the linker otherwise stamps the header and the debug entry from
-//! the clock, and a fixture whose probe was written yesterday would fail today.
-//! And a COFF object carries `.debug$S` *sections* with no directory to point at them, which `cv.obj`
-//! shows: two readers list nothing there, so this reader must not invent a table either. The one thing
-//! `/timeStamp` cannot pin is the PDB GUID, which lld randomises per link, so the script links the same
-//! object twice and requires the two files to match everywhere but those sixteen bytes.
+//! up. `/timeStamp` has to be pinned, because the linker otherwise stamps the header and the debug
+//! entry from the clock and a probe written yesterday would fail today. Re-running the generator gives
+//! the committed file back exactly, but a *second* link inside one run moves eight bytes of the GUID, so
+//! those digits are compared against the probe and never spelled out in an assertion. And a COFF object
+//! carries `.debug$S` *sections* with no directory to point at them,
+//! which `cv.obj` shows: two readers list nothing there, so this reader must not invent a table either.
 
 use apk_lens_analysis::{analyse, debug_at, debug_count};
 use std::fs;
@@ -115,9 +115,9 @@ fn the_codeview_block_names_the_program_database_and_the_guid_that_ties_it() {
         listed[1],
         "entry\t0\ttype\t2\tname\tCodeView\ttime\t0x6553f100\tmajor\t0\tminor\t0\tbytes\t32\trva\t0x201c\tbody\t1564\tptr\t1564"
     );
-    // The GUID is the one thing a linker randomises per link, so the row is checked at its ends rather
-    // than as a string: the whole row still has to equal the probe's, in `difference` below, and the
-    // fixture and the probe are committed as a pair for that reason.
+    // The GUID row is checked at its ends rather than as one string: a second link of the same command
+    // moves those digits, so no assertion here spells them out, while `difference` below still compares
+    // the whole row against the probe the same run wrote.
     let cv = &listed[2];
     assert!(cv.starts_with("cv\t0\tsig\tRSDS\tguid\t"), "{cv}");
     assert!(cv.ends_with("\tage\t1\tpath\tdbg.pdb"), "{cv}");

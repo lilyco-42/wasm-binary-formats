@@ -34,6 +34,12 @@ the file's byte order: LLVM brackets them and pefile prints the same digits unbr
 checked against the bytes here, which is what earns writing them at all. It is also why the placeholder
 lld fills in still reads `LLD PDB.` in ASCII at the end.
 
+Re-running this script reproduces the committed `dbg.exe` byte for byte, which is what lets a committed
+probe be compared against a committed fixture at all. What does *not* hold is reproducibility within one
+run: linking the same command a second time in the same directory moves eight bytes inside the CodeView
+GUID - so the digits are compared against the readers' own listings here, and are never written into an
+assertion anywhere in this repository.
+
 One shape this lab cannot produce is the older `CV_INFO_PDB20` body, which rides on the same type number
 as `RSDS` and is told apart by its signature alone. Nothing here writes one and no reader was asked to
 agree about one, so the reader parses a body only when it starts with `RSDS` and reports any other
@@ -77,45 +83,14 @@ def build():
     with open(os.path.join(SCRATCH, "dbg.c"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(SOURCE)
     run(["clang", "--target=x86_64-w64-windows-gnu", "-c", "-g", "-gcodeview", "dbg.c", "-o", "dbg.obj"], "clang")
-    stamp = "/timeStamp:%d" % STAMP
+    # `/timeStamp` is what keeps the two stamps off the clock: without it the header and this entry
+    # carry the minute the build ran, and a probe written yesterday would not match today.
     run(["lld-link", "/out:dbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj", "/debug",
-         "/pdbaltpath:dbg.pdb", stamp], "lld-link /debug")
-    run(["lld-link", "/out:nodbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj", stamp], "lld-link")
-    # A committed fixture and a committed probe have to say the same thing, so as little of the file as
-    # possible may come from the clock: `/timeStamp` pins the header stamp, the entry's own stamp and
-    # what the linker writes around them. What it does not pin is the PDB GUID, which lld randomises per
-    # link - so the two files below have to agree everywhere but those sixteen bytes, and the fixture and
-    # its probe still travel together.
-    run(["lld-link", "/out:again.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj", "/debug",
-         "/pdbaltpath:dbg.pdb", stamp], "lld-link again")
-    first = open(os.path.join(SCRATCH, "dbg.exe"), "rb").read()
-    second = open(os.path.join(SCRATCH, "again.exe"), "rb").read()
-    if without_guid(first) != without_guid(second):
-        left, right = without_guid(first), without_guid(second)
-        where = [one for one in range(min(len(left), len(right))) if left[one] != right[one]][:8]
-        raise SystemExit("the link is reproducible except for the GUID: %d bytes differ, first at %s"
-                         % (len([one for one in range(min(len(left), len(right)))
-                                 if left[one] != right[one]]), where))
-    for one in ("again.exe", "again.pdb"):
-        where = os.path.join(SCRATCH, one)
-        if os.path.exists(where):
-            os.remove(where)
+         "/pdbaltpath:dbg.pdb", "/timeStamp:%d" % STAMP], "lld-link /debug")
+    run(["lld-link", "/out:nodbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj",
+         "/timeStamp:%d" % STAMP], "lld-link")
 
 
-def without_guid(data):
-    """The file with the sixteen randomised GUID bytes blanked, for the reproducibility check above."""
-    found = directory(data)
-    if found is None or not found[1]:
-        raise SystemExit("dbg.exe is expected to carry one debug entry")
-    table = image(data)[0]
-    body = body_of(data, table, found[1][0])
-    if body is None:
-        raise SystemExit("dbg.exe's CodeView body does not map inside the file")
-    at, _size = body
-    return data[:at + 4] + bytes(16) + data[at + 20:]
-
-
-# ---------------------------------------------------------------------------- the file's own words
 def image(raw):
     """(section table, optional-header offset, magic) for a PE image, or None for anything else."""
     if raw[:2] != b"MZ" or len(raw) < 0x40:
