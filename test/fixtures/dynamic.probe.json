@@ -437,6 +437,136 @@
   ],
   "width": 16
  },
+ "libuse.so": {
+  "bits": 64,
+  "entries": 15,
+  "rows": [
+   "dynamic\tentries\t15\twidth\t16\tvaddr\t0x23b0\toff\t944\tfilesz\t240\tstrtab\t0x2c8\tstrlen\t41\tneeded\t1\ttext\t2",
+   "entry\t0\ttag\t0x1\tname\tNEEDED\tvalue\t0xf\ttext\tlibver.so",
+   "entry\t1\ttag\t0xe\tname\tSONAME\tvalue\t0x1f\ttext\tlibuse.so",
+   "entry\t2\ttag\t0x17\tname\tJMPREL\tvalue\t0x2f8",
+   "entry\t3\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x18\tword\tBYTES",
+   "entry\t4\ttag\t0x3\tname\tPLTGOT\tvalue\t0x34a0",
+   "entry\t5\ttag\t0x14\tname\tPLTREL\tvalue\t0x7\tword\tRELA",
+   "entry\t6\ttag\t0x6\tname\tSYMTAB\tvalue\t0x238",
+   "entry\t7\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t8\ttag\t0x5\tname\tSTRTAB\tvalue\t0x2c8",
+   "entry\t9\ttag\t0xa\tname\tSTRSZ\tvalue\t0x29\tword\tBYTES",
+   "entry\t10\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x2a8",
+   "entry\t11\ttag\t0x6ffffff0\tname\tVERSYM\tvalue\t0x280",
+   "entry\t12\ttag\t0x6ffffffe\tname\tVERNEED\tvalue\t0x288",
+   "entry\t13\ttag\t0x6fffffff\tname\tVERNEEDNUM\tvalue\t0x1",
+   "entry\t14\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "NEEDED",
+    "tag": "0x1",
+    "text": "libver.so",
+    "value": "0xf",
+    "word": null
+   },
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "libuse.so",
+    "value": "0x1f",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x2f8",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x34a0",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x2c8",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x29",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x2a8",
+    "word": null
+   },
+   {
+    "name": "VERSYM",
+    "tag": "0x6ffffff0",
+    "text": null,
+    "value": "0x280",
+    "word": null
+   },
+   {
+    "name": "VERNEED",
+    "tag": "0x6ffffffe",
+    "text": null,
+    "value": "0x288",
+    "word": null
+   },
+   {
+    "name": "VERNEEDNUM",
+    "tag": "0x6fffffff",
+    "text": null,
+    "value": "0x1",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
  "libuser.so": {
   "bits": 64,
   "entries": 14,
@@ -558,6 +688,250 @@
    }
   ],
   "width": 16
+ },
+ "libver.so": {
+  "bits": 64,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t16\tvaddr\t0x2440\toff\t1088\tfilesz\t224\tstrtab\t0x304\tstrlen\t44\tneeded\t0\ttext\t1",
+   "entry\t0\ttag\t0xe\tname\tSONAME\tvalue\t0x16\ttext\tlibver.so",
+   "entry\t1\ttag\t0x17\tname\tJMPREL\tvalue\t0x330",
+   "entry\t2\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x18\tword\tBYTES",
+   "entry\t3\ttag\t0x3\tname\tPLTGOT\tvalue\t0x3520",
+   "entry\t4\ttag\t0x14\tname\tPLTREL\tvalue\t0x7\tword\tRELA",
+   "entry\t5\ttag\t0x6\tname\tSYMTAB\tvalue\t0x238",
+   "entry\t6\ttag\t0xb\tname\tSYMENT\tvalue\t0x18\tword\tBYTES",
+   "entry\t7\ttag\t0x5\tname\tSTRTAB\tvalue\t0x304",
+   "entry\t8\ttag\t0xa\tname\tSTRSZ\tvalue\t0x2c\tword\tBYTES",
+   "entry\t9\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x2e0",
+   "entry\t10\ttag\t0x6ffffff0\tname\tVERSYM\tvalue\t0x280",
+   "entry\t11\ttag\t0x6ffffffc\tname\tVERDEF\tvalue\t0x288",
+   "entry\t12\ttag\t0x6ffffffd\tname\tVERDEFNUM\tvalue\t0x3",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "libver.so",
+    "value": "0x16",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x330",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x3520",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x7",
+    "word": "RELA"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x238",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x18",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x304",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x2c",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x2e0",
+    "word": null
+   },
+   {
+    "name": "VERSYM",
+    "tag": "0x6ffffff0",
+    "text": null,
+    "value": "0x280",
+    "word": null
+   },
+   {
+    "name": "VERDEF",
+    "tag": "0x6ffffffc",
+    "text": null,
+    "value": "0x288",
+    "word": null
+   },
+   {
+    "name": "VERDEFNUM",
+    "tag": "0x6ffffffd",
+    "text": null,
+    "value": "0x3",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 16
+ },
+ "libver32.so": {
+  "bits": 32,
+  "entries": 14,
+  "rows": [
+   "dynamic\tentries\t14\twidth\t8\tvaddr\t0x2320\toff\t800\tfilesz\t112\tstrtab\t0x200\tstrlen\t44\tneeded\t0\ttext\t1",
+   "entry\t0\ttag\t0xe\tname\tSONAME\tvalue\t0x16\ttext\tlibver.so",
+   "entry\t1\ttag\t0x17\tname\tJMPREL\tvalue\t0x22c",
+   "entry\t2\ttag\t0x2\tname\tPLTRELSZ\tvalue\t0x8\tword\tBYTES",
+   "entry\t3\ttag\t0x3\tname\tPLTGOT\tvalue\t0x3390",
+   "entry\t4\ttag\t0x14\tname\tPLTREL\tvalue\t0x11\tword\tREL",
+   "entry\t5\ttag\t0x6\tname\tSYMTAB\tvalue\t0x154",
+   "entry\t6\ttag\t0xb\tname\tSYMENT\tvalue\t0x10\tword\tBYTES",
+   "entry\t7\ttag\t0x5\tname\tSTRTAB\tvalue\t0x200",
+   "entry\t8\ttag\t0xa\tname\tSTRSZ\tvalue\t0x2c\tword\tBYTES",
+   "entry\t9\ttag\t0x6ffffef5\tname\tGNU_HASH\tvalue\t0x1e0",
+   "entry\t10\ttag\t0x6ffffff0\tname\tVERSYM\tvalue\t0x184",
+   "entry\t11\ttag\t0x6ffffffc\tname\tVERDEF\tvalue\t0x18c",
+   "entry\t12\ttag\t0x6ffffffd\tname\tVERDEFNUM\tvalue\t0x3",
+   "entry\t13\ttag\t0x0\tname\tNULL\tvalue\t0x0"
+  ],
+  "tags": [
+   {
+    "name": "SONAME",
+    "tag": "0xe",
+    "text": "libver.so",
+    "value": "0x16",
+    "word": null
+   },
+   {
+    "name": "JMPREL",
+    "tag": "0x17",
+    "text": null,
+    "value": "0x22c",
+    "word": null
+   },
+   {
+    "name": "PLTRELSZ",
+    "tag": "0x2",
+    "text": null,
+    "value": "0x8",
+    "word": "BYTES"
+   },
+   {
+    "name": "PLTGOT",
+    "tag": "0x3",
+    "text": null,
+    "value": "0x3390",
+    "word": null
+   },
+   {
+    "name": "PLTREL",
+    "tag": "0x14",
+    "text": null,
+    "value": "0x11",
+    "word": "REL"
+   },
+   {
+    "name": "SYMTAB",
+    "tag": "0x6",
+    "text": null,
+    "value": "0x154",
+    "word": null
+   },
+   {
+    "name": "SYMENT",
+    "tag": "0xb",
+    "text": null,
+    "value": "0x10",
+    "word": "BYTES"
+   },
+   {
+    "name": "STRTAB",
+    "tag": "0x5",
+    "text": null,
+    "value": "0x200",
+    "word": null
+   },
+   {
+    "name": "STRSZ",
+    "tag": "0xa",
+    "text": null,
+    "value": "0x2c",
+    "word": "BYTES"
+   },
+   {
+    "name": "GNU_HASH",
+    "tag": "0x6ffffef5",
+    "text": null,
+    "value": "0x1e0",
+    "word": null
+   },
+   {
+    "name": "VERSYM",
+    "tag": "0x6ffffff0",
+    "text": null,
+    "value": "0x184",
+    "word": null
+   },
+   {
+    "name": "VERDEF",
+    "tag": "0x6ffffffc",
+    "text": null,
+    "value": "0x18c",
+    "word": null
+   },
+   {
+    "name": "VERDEFNUM",
+    "tag": "0x6ffffffd",
+    "text": null,
+    "value": "0x3",
+    "word": null
+   },
+   {
+    "name": "NULL",
+    "tag": "0x0",
+    "text": null,
+    "value": "0x0",
+    "word": null
+   }
+  ],
+  "width": 8
  },
  "many.so": {
   "bits": 64,

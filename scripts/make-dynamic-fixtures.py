@@ -260,7 +260,8 @@ def main():
     os.makedirs(SCRATCH)
     build()
     probe = {}
-    for name in ("liblab.so", "libuser.so", "many.so", "lab.so", "lab32.so", "labarm.so", "lab.elf"):
+    for name in ("liblab.so", "libuser.so", "many.so", "libver.so", "libver32.so", "libuse.so",
+                 "lab.so", "lab32.so", "labarm.so", "lab.elf"):
         if not os.path.exists(os.path.join(SCRATCH, name)):
             shutil.copyfile(os.path.join(FIX, name), os.path.join(SCRATCH, name))
         path = os.path.join(SCRATCH, name)
@@ -321,7 +322,7 @@ def main():
         for row in made[:4] + made[-2:]:
             print("%-11s %s" % (name, row.replace("\t", " | ")))
 
-    for name in ("liblab.so", "libuser.so", "many.so"):
+    for name in ("liblab.so", "libuser.so", "many.so", "libver.so", "libver32.so", "libuse.so"):
         shutil.copyfile(os.path.join(SCRATCH, name), os.path.join(FIX, name))
     with open(os.path.join(FIX, "dynamic.probe.json"), "w", encoding="utf-8") as handle:
         json.dump(probe, handle, indent=1, sort_keys=True)

@@ -563,10 +563,13 @@ load acts on (`DT_NEEDED`, `DT_SONAME`, and a `DT_RUNPATH` read back out of the 
 command line that asked for it), and `many.so` is told to need seventy stub libraries with `--no-as-needed`,
 which is what pushes the list past the cap every window shares - a linker allowed to drop what nothing
 references writes a file with no `DT_NEEDED` in it at all, and the fixture would then prove nothing.
-Three readers had to agree on all six files before `dynamic.probe.json` was written: a python walk of the
+Three readers had to agree on all ten files before `dynamic.probe.json` was written: a python walk of the
 bytes, `readelf -dW` and `llvm-readobj --dynamic-table`. A tag gets a word only where both external readers
-used the same one in the same file, which is the whole of the `DT_*` table here - none of it copied out of
-memory, because `0x1c` is `FINI_ARRAYSZ` while `0x1d` is `RUNPATH` and `0xf` is `RPATH`. A value gets a word
+used the same one in the same file, which is the whole of the `DT_*` table here - twenty-seven names, none
+of it copied out of memory, because `0x1c` is `FINI_ARRAYSZ` while `0x1d` is `RUNPATH` and `0xf` is `RPATH`.
+The version tags (`VERSYM`, `VERDEF`, `VERDEFNUM`, `VERNEED`, `VERNEEDNUM`) joined that table only when the
+versioning fixtures below arrived: the files that carry them are what let two readers name them here, so a
+window grew by five words without anyone adding a constant by hand. A value gets a word
 the same way: `DT_PLTREL` holds a relocation type and both readers say `RELA` or `REL` rather than `7`, and
 the size tags both say `BYTES`, so those rows carry the word and the rest carry only their number. That
 rule caught one mistake before it could be written down: the first draft of the string list held `DT_INIT`
@@ -817,7 +820,9 @@ temp/venv/Scripts/python.exe scripts/make-symver-fixtures.py  # clang -shared -W
 libver.so and libver32.so (one object, a two-node LAB_1/LAB_2 script, -Wl,-soname so the BASE record names
 the file and not the build directory) and libuse.so from a caller that needs LAB_2 out of the first; the
 walk, readelf -VW and llvm-readobj --version-info must agree on every index, hash, flag, name and count,
-and DT_VERDEFNUM / DT_VERNEEDNUM must match the chains, before symver.probe.json is written
+and DT_VERDEFNUM / DT_VERNEEDNUM must match the chains, before symver.probe.json is written. The same three
+files are then read by scripts/make-dynamic-fixtures.py as well, which is where the five DT_VER* tag names
+earned their words
 temp/venv/Scripts/python.exe scripts/make-debug-fixtures.py       # clang -g -gcodeview and lld-link /debug
 /link /debug write dbg.exe (with /pdbaltpath so no local path is recorded, and /timeStamp so the file is
 reproducible); the walk, llvm-readobj --coff-debug-directory and pefile must agree on every number and on the

@@ -1729,8 +1729,8 @@ pub extern "C" fn version_at(index: i32, out: *mut u8, cap: i32) -> i32 {
     })
 }
 
-/// The tag numbers two readers named in the files here. Twenty-two, because those are the ones
-/// `readelf -dW` and `llvm-readobj --dynamic-table` were both asked about, in six files, and agreed on
+/// The tag numbers two readers named in the files here. Twenty-seven, because those are the ones
+/// `readelf -dW` and `llvm-readobj --dynamic-table` were both asked about, in ten files, and agreed on
 /// word for word - and a `DT_*` table copied out of memory is the classic off-by-one (`0x1d` is
 /// `RUNPATH`, `0xf` is `RPATH`, and `0x1c` is neither). A number outside this set prints as a number.
 fn dynamic_name(tag: u64) -> Option<&'static str> {
@@ -1755,6 +1755,11 @@ fn dynamic_name(tag: u64) -> Option<&'static str> {
         0x17 => "JMPREL",
         0x1d => "RUNPATH",
         0x6fff_fef5 => "GNU_HASH",
+        0x6fff_fff0 => "VERSYM",
+        0x6fff_fffc => "VERDEF",
+        0x6fff_fffd => "VERDEFNUM",
+        0x6fff_fffe => "VERNEED",
+        0x6fff_ffff => "VERNEEDNUM",
         0x6fff_fff9 => "RELACOUNT",
         0x6fff_fffa => "RELCOUNT",
         _ => return None,
