@@ -1,0 +1,5 @@
+# The bytes of a fixture are the claim: a reader is pinned to offsets, lengths and line endings that
+# some other program wrote, so no end-of-line conversion may touch them on the way in or out. This is
+# not a style choice - a vCard fixture committed through `core.autocrlf` came back with its CRLF
+# endings folded to LF, which is the one property the `endings` row exists to report.
+test/fixtures/** -text

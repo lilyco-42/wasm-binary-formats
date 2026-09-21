@@ -137,7 +137,9 @@ def main():
             raise SystemExit("{} has no escape to count: {!r}".format(label, record["n_line"]))
         print("   {}: N: {} with {} backslash(es)".format(
             label, record["n_line"], record["backslashes"]))
-    with open(os.path.join(OUT, "vcard.probe.json"), "w", encoding="utf8") as handle:
+    # newline="\n" on purpose: the probe is a committed artefact, and a generator that let the platform
+    # choose its line endings would rewrite the whole file on a second run.
+    with open(os.path.join(OUT, "vcard.probe.json"), "w", encoding="utf8", newline="\n") as handle:
         json.dump(report, handle, indent=1, sort_keys=True)
     print("wrote lab.vcard, lab3.vcard and vcard.probe.json")
     return 0
