@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 48 | 21.9% |
+| own Rust reader, named header fields decoded | 49 | 22.4% |
 | own Rust reader, container framing only | 27 | 12.3% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **103** | 47.0% |
-| **covered, any level** | **116** | 53.0% |
+| **no parser at all - real gap** | **102** | 46.6% |
+| **covered, any level** | **117** | 53.4% |
 
-Top binary gap groups by count: unknown 53, archive 10, image 9, application 9, document 7,
+Top binary gap groups by count: unknown 53, archive 10, image 8, application 9, document 7,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -286,9 +286,9 @@ about the machine, the second because no Kaitai spec covers it, the third becaus
 does exist upstream, and `sevenzip` because `py7zr` turned out to be installed as both a writer and a
 reader for it here - see below.
 
-So the honest answer to the objective is **no, not yet**: 116 of 219 binary labels have a parser
-that runs here (48 field-level and 27 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 103 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 117 of 219 binary labels have a parser
+that runs here (49 field-level and 27 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 102 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -302,7 +302,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 116 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 117 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references and basic blocks / function boundaries for x86-64, AArch64 and Thumb bytes |
 
@@ -404,6 +404,7 @@ temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice a
 temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
 temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
 temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
+temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -512,8 +513,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **116 covered** (48 field-level and 27
-container-level from this repo's own readers, 41 generated and mostly load-gated), **103 with no
+Coverage is scored against magika's 219 binary labels: **117 covered** (49 field-level and 27
+container-level from this repo's own readers, 41 generated and mostly load-gated), **102 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -565,7 +566,8 @@ does not re-derive them:
   not there. `all6.qoi` exists because a flat image only exercises two of the six classes. The
   near-miss: Pillow also *writes* SGI (`\x01\xda`) and JPEG 2000 (`jP  ` boxes), and magika has no
   `sgi` label but does have `jp2` - so SGI earns nothing here while JP2 is now reachable, and `psd`,
-  which Pillow reads but cannot write, stays a gap named rather than quietly dropped.
+  which Pillow reads but cannot write, stayed a gap named rather than quietly dropped - until a wheel for
+  `psd-tools` turned out to install here, which made Pillow the second reader instead of the missing writer.
   JP2 took the reachable branch (+1 field-level label, 99 covered, 120 gaps) and caught two more
   remembered-table traps on the way: the `ihdr` box lists **height before width**, the opposite of the
   `Xsiz`/`Ysiz` order in the codestream beside it, and it stores sample depth minus one, so the byte
@@ -817,6 +819,26 @@ does not re-derive them:
   note is about. So this one is credited exactly where `cab` is, and a truncation that removes the header
   block reads as `kind unreadable` plus a CRC row that says `unreachable` instead of printing a checksum
   over bytes that are gone.
+* Photoshop document (+1 field-level label, 117 covered, 102 gaps) had been named as unreachable for the
+  simplest reason - Pillow reads PSD and cannot write one - and the blocker was a package index away:
+  `psd-tools` installs from a wheel and writes them. Pillow then does the job it can still do, which is
+  being a second parser that shares no code with the writer, and the fixture script refuses to commit a
+  file unless both agree on the header, the resource ids **and** the resource sizes. That matters more here
+  than in most rounds, because a PSD has no total-length field at all: the only self-check the format
+  offers is the image data's own arithmetic, either the sum of RLE's per-row byte counts equalling the
+  payload that follows the table, or - uncompressed - the header predicting `channels x rows x columns x
+  depth/8` exactly. Four fixtures rather than one because that is one file per branch the header can take:
+  three channels, one, four under the same colour mode, and raw instead of RLE. Section spans are reported
+  and a length that falls outside the file prints as `128+?` with the walk stopping there; six non-zero
+  reserved bytes are counted as one broken claim rather than a reason to refuse; and a version-2 header -
+  hand-built, labelled as such, because no PSB writer exists here - stops after its own row, since its
+  section lengths are 64-bit and every offset below would be read at the wrong width.
+  The layer records are **not** decoded, and the report says so in a row of its own. psd-tools can add
+  pixel layers, and both it and ImageMagick list them afterwards with correct geometry - but the file it
+  saves declares a zero-length layer section while the layer payload sits later in it. A walker written
+  against those bytes would be fitted to one library's bug, so the section is reported as a span and the
+  claim is left off rather than made quietly. Indexed colour is out for a related reason: `frompil` derives
+  the colour mode from the PIL mode name and refuses `P`, so there is no palette file to read.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

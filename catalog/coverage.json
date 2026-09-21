@@ -7,10 +7,10 @@
     "specGenerated": 43,
     "specAvailable": 0,
     "binaryGenerated": 41,
-    "selfFields": 48,
+    "selfFields": 49,
     "selfContainer": 27,
     "binarySpecAvailable": 0,
-    "gaps": 103,
+    "gaps": 102,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -20,7 +20,7 @@
     ],
     "gapByGroup": {
       "unknown": 53,
-      "image": 9,
+      "image": 8,
       "archive": 10,
       "code": 5,
       "document": 7,
@@ -3261,8 +3261,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "fields",
+      "status": "self-fields"
     },
     {
       "label": "pytorch",

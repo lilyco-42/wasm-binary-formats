@@ -1,0 +1,424 @@
+{
+ "grey": {
+  "bytes": 170,
+  "rows": [
+   "psd\t170\tbroken\t0\tversion\t1\treserved\t000000000000\t6x4\tchannels\t1\tdepth\t8\tmode\t1(GRAYSCALE)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132",
+   "resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-",
+   "image\tcompression\t1(RLE)\trows\t4\tcounts\t28\tpayload\t28\tends\tyes",
+   "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone",
+   "walked\tend"
+  ],
+  "walk": {
+   "channels": 1,
+   "colour_at": 132,
+   "colour_len": 0,
+   "compression": 1,
+   "counts": 28,
+   "depth": 8,
+   "ends": true,
+   "height": 4,
+   "image_at": 132,
+   "layer_at": 30,
+   "layer_key": "0000005e",
+   "layer_len": 0,
+   "mode": 1,
+   "payload": 28,
+   "problems": 0,
+   "reserved": "000000000000",
+   "reserved_ok": true,
+   "resource_at": 34,
+   "resource_len": 94,
+   "resources": [
+    [
+     1057,
+     81,
+     "",
+     34
+    ]
+   ],
+   "rows": 4,
+   "spans": [
+    [
+     "layers",
+     30,
+     0
+    ],
+    [
+     "resources",
+     34,
+     94
+    ],
+    [
+     "colour",
+     132,
+     0
+    ]
+   ],
+   "table": 8,
+   "version": 1,
+   "width": 6
+  },
+  "witnesses": {
+   "pillow": {
+    "layers": 0,
+    "mode": "L",
+    "resource_names": [
+     "b''"
+    ],
+    "resource_sizes": [
+     81
+    ],
+    "resources": [
+     1057
+    ],
+    "size": [
+     6,
+     4
+    ]
+   },
+   "psd_tools": {
+    "channels": 1,
+    "color_mode": 1,
+    "depth": 8,
+    "layers": [],
+    "mode_name": "GRAYSCALE",
+    "resources": [
+     1057
+    ],
+    "size": [
+     6,
+     4
+    ],
+    "version": 1
+   }
+  }
+ },
+ "psb-header": {
+  "hand_built": true,
+  "rows": [
+   "psd\t46\tbroken\t1\tversion\t2\treserved\t000000000000\t5x4\tchannels\t3\tdepth\t8\tmode\t3(RGB)",
+   "note\ta version-2 document states its section lengths differently, so the walk stops here",
+   "stopped\tbroken\t1"
+  ]
+ },
+ "raw": {
+  "bytes": 170,
+  "rows": [
+   "psd\t170\tbroken\t0\tversion\t1\treserved\t000000000000\t4x3\tchannels\t3\tdepth\t8\tmode\t3(RGB)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132",
+   "resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-",
+   "image\tcompression\t0(RAW)\tbytes\t36\texpect\t36\tends\tyes",
+   "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone",
+   "walked\tend"
+  ],
+  "walk": {
+   "channels": 3,
+   "colour_at": 132,
+   "colour_len": 0,
+   "compression": 0,
+   "depth": 8,
+   "ends": true,
+   "expect": 36,
+   "height": 3,
+   "image_at": 132,
+   "layer_at": 30,
+   "layer_key": "0000005e",
+   "layer_len": 0,
+   "mode": 3,
+   "payload": 36,
+   "problems": 0,
+   "reserved": "000000000000",
+   "reserved_ok": true,
+   "resource_at": 34,
+   "resource_len": 94,
+   "resources": [
+    [
+     1057,
+     81,
+     "",
+     34
+    ]
+   ],
+   "spans": [
+    [
+     "layers",
+     30,
+     0
+    ],
+    [
+     "resources",
+     34,
+     94
+    ],
+    [
+     "colour",
+     132,
+     0
+    ]
+   ],
+   "version": 1,
+   "width": 4
+  },
+  "witnesses": {
+   "pillow": {
+    "layers": 0,
+    "mode": "RGB",
+    "resource_names": [
+     "b''"
+    ],
+    "resource_sizes": [
+     81
+    ],
+    "resources": [
+     1057
+    ],
+    "size": [
+     4,
+     3
+    ]
+   },
+   "psd_tools": {
+    "channels": 3,
+    "color_mode": 3,
+    "depth": 8,
+    "layers": [],
+    "mode_name": "RGB",
+    "resources": [
+     1057
+    ],
+    "size": [
+     4,
+     3
+    ],
+    "version": 1
+   }
+  }
+ },
+ "rgb": {
+  "bytes": 284,
+  "rows": [
+   "psd\t284\tbroken\t0\tversion\t1\treserved\t000000000000\t7x5\tchannels\t3\tdepth\t8\tmode\t3(RGB)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132",
+   "resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-",
+   "image\tcompression\t1(RLE)\trows\t15\tcounts\t120\tpayload\t120\tends\tyes",
+   "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone",
+   "walked\tend"
+  ],
+  "walk": {
+   "channels": 3,
+   "colour_at": 132,
+   "colour_len": 0,
+   "compression": 1,
+   "counts": 120,
+   "depth": 8,
+   "ends": true,
+   "height": 5,
+   "image_at": 132,
+   "layer_at": 30,
+   "layer_key": "0000005e",
+   "layer_len": 0,
+   "mode": 3,
+   "payload": 120,
+   "problems": 0,
+   "reserved": "000000000000",
+   "reserved_ok": true,
+   "resource_at": 34,
+   "resource_len": 94,
+   "resources": [
+    [
+     1057,
+     81,
+     "",
+     34
+    ]
+   ],
+   "rows": 15,
+   "spans": [
+    [
+     "layers",
+     30,
+     0
+    ],
+    [
+     "resources",
+     34,
+     94
+    ],
+    [
+     "colour",
+     132,
+     0
+    ]
+   ],
+   "table": 30,
+   "version": 1,
+   "width": 7
+  },
+  "witnesses": {
+   "pillow": {
+    "layers": 0,
+    "mode": "RGB",
+    "resource_names": [
+     "b''"
+    ],
+    "resource_sizes": [
+     81
+    ],
+    "resources": [
+     1057
+    ],
+    "size": [
+     7,
+     5
+    ]
+   },
+   "psd_tools": {
+    "channels": 3,
+    "color_mode": 3,
+    "depth": 8,
+    "layers": [],
+    "mode_name": "RGB",
+    "resources": [
+     1057
+    ],
+    "size": [
+     7,
+     5
+    ],
+    "version": 1
+   }
+  }
+ },
+ "rgb-cut": {
+  "rows": [
+   "psd\t60\tbroken\t1\tversion\t1\treserved\t000000000000\t7x5\tchannels\t3\tdepth\t8\tmode\t3(RGB)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t128+?\timage\tunreadable",
+   "stopped\tbroken\t1\tcolour mode length\tdoes not fit in the file"
+  ]
+ },
+ "rgb-rle-cut": {
+  "rows": [
+   "psd\t140\tbroken\t1\tversion\t1\treserved\t000000000000\t7x5\tchannels\t3\tdepth\t8\tmode\t3(RGB)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132",
+   "resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-",
+   "image\tcompression\t1(RLE)\trows\t15\tcounts\t-\tpayload\t-\tends\tno",
+   "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone",
+   "stopped\tbroken\t1"
+  ]
+ },
+ "rgba": {
+  "bytes": 294,
+  "rows": [
+   "psd\t294\tbroken\t0\tversion\t1\treserved\t000000000000\t5x5\tchannels\t4\tdepth\t8\tmode\t3(RGB)",
+   "section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132",
+   "resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-",
+   "image\tcompression\t1(RLE)\trows\t20\tcounts\t120\tpayload\t120\tends\tyes",
+   "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone",
+   "walked\tend"
+  ],
+  "walk": {
+   "channels": 4,
+   "colour_at": 132,
+   "colour_len": 0,
+   "compression": 1,
+   "counts": 120,
+   "depth": 8,
+   "ends": true,
+   "height": 5,
+   "image_at": 132,
+   "layer_at": 30,
+   "layer_key": "0000005e",
+   "layer_len": 0,
+   "mode": 3,
+   "payload": 120,
+   "problems": 0,
+   "reserved": "000000000000",
+   "reserved_ok": true,
+   "resource_at": 34,
+   "resource_len": 94,
+   "resources": [
+    [
+     1057,
+     81,
+     "",
+     34
+    ]
+   ],
+   "rows": 20,
+   "spans": [
+    [
+     "layers",
+     30,
+     0
+    ],
+    [
+     "resources",
+     34,
+     94
+    ],
+    [
+     "colour",
+     132,
+     0
+    ]
+   ],
+   "table": 40,
+   "version": 1,
+   "width": 5
+  },
+  "witnesses": {
+   "pillow": {
+    "layers": 0,
+    "mode": "RGBA",
+    "resource_names": [
+     "b''"
+    ],
+    "resource_sizes": [
+     81
+    ],
+    "resources": [
+     1057
+    ],
+    "size": [
+     5,
+     5
+    ]
+   },
+   "psd_tools": {
+    "channels": 4,
+    "color_mode": 3,
+    "depth": 8,
+    "layers": [],
+    "mode_name": "RGB",
+    "resources": [
+     1057
+    ],
+    "size": [
+     5,
+     5
+    ],
+    "version": 1
+   }
+  }
+ },
+ "tables": {
+  "compressions": {
+   "0": "RAW",
+   "1": "RLE",
+   "2": "ZIP",
+   "3": "ZIP_WITH_PREDICTION"
+  },
+  "modes": {
+   "0": "BITMAP",
+   "1": "GRAYSCALE",
+   "2": "INDEXED",
+   "3": "RGB",
+   "4": "CMYK",
+   "7": "MULTICHANNEL",
+   "8": "DUOTONE",
+   "9": "LAB"
+  },
+  "resource_entries": 128
+ }
+}

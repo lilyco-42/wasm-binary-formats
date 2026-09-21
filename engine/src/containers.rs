@@ -142,6 +142,7 @@ pub fn name() -> &'static str {
         FORMAT_COFF => "coff",
         FORMAT_DER => "der",
         FORMAT_SEVENZIP => "sevenzip",
+        FORMAT_PSD => "psd",
         _ => "unknown",
     }
 }
@@ -6736,6 +6737,368 @@ fn read_7z(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+// -------------------------------------------------------------------------------- PSD / photoshop
+pub const FORMAT_PSD: i32 = 50;
+
+/// The four bytes every Photoshop document starts with; the 26-byte header after them is fixed-size and
+/// big-endian throughout, which is the opposite of everything else in this file.
+const PSD_MAGIC: [u8; 4] = [0x38, 0x42, 0x50, 0x53];
+const PSD_LISTED_RESOURCES: usize = 24;
+/// Colour mode names as `psd_tools.constants.ColorMode` spells them - the library that wrote the
+/// fixtures - with the numbers it uses beside them. The gaps at 5 and 6 are the library's too.
+const PSD_MODES: [(u16, &str); 8] = [
+    (0, "BITMAP"),
+    (1, "GRAYSCALE"),
+    (2, "INDEXED"),
+    (3, "RGB"),
+    (4, "CMYK"),
+    (7, "MULTICHANNEL"),
+    (8, "DUOTONE"),
+    (9, "LAB"),
+];
+/// Same, for the image data's compression field. There is no entry for 4 because the writer here cannot
+/// produce one and `psd_tools.constants.Compression` has no name for it either.
+const PSD_COMPRESSIONS: [(u16, &str); 4] = [
+    (0, "RAW"),
+    (1, "RLE"),
+    (2, "ZIP"),
+    (3, "ZIP_WITH_PREDICTION"),
+];
+/// Only the resource ids a fixture here was seen to carry, named as `psd_tools.constants.Resource` names
+/// that integer. Anything else prints as a bare number.
+const PSD_RESOURCES: [(u16, &str); 1] = [(1057, "VERSION_INFO")];
+
+fn psd_u8(bytes: &[u8], at: u64) -> Option<u8> {
+    let start = usize::try_from(at).ok()?;
+    bytes.get(start).copied()
+}
+
+fn psd_u16(bytes: &[u8], at: u64) -> Option<u16> {
+    let start = usize::try_from(at).ok()?;
+    let window = bytes.get(start..start.checked_add(2)?)?;
+    Some(u16::from_be_bytes([window[0], window[1]]))
+}
+
+fn psd_u32(bytes: &[u8], at: u64) -> Option<u32> {
+    let start = usize::try_from(at).ok()?;
+    let window = bytes.get(start..start.checked_add(4)?)?;
+    Some(u32::from_be_bytes([
+        window[0], window[1], window[2], window[3],
+    ]))
+}
+
+fn psd_name(table: &[(u16, &'static str)], value: u16) -> &'static str {
+    table
+        .iter()
+        .find(|(each, _)| *each == value)
+        .map_or("?", |(_, label)| *label)
+}
+
+/// A Pascal string is a byte count then that many bytes, and a NUL or a tab inside it would end the row
+/// or split it once the report crosses the C ABI, so anything outside printable ASCII is dropped rather
+/// than escaped.
+fn psd_pascal(bytes: &[u8], at: u64, length: u64) -> String {
+    let Some(start) = usize::try_from(at).ok().filter(|each| *each <= bytes.len()) else {
+        return String::new();
+    };
+    let stop = start.saturating_add(usize::try_from(length).unwrap_or(bytes.len())).min(bytes.len());
+    bytes[start..stop]
+        .iter()
+        .filter(|byte| **byte >= 0x20 && **byte < 0x7F)
+        .map(|byte| char::from(*byte))
+        .collect()
+}
+
+/// Header, section spans, resource list, and the image data's own arithmetic - which is the only place a
+/// PSD states how long it is, because the format has no total-length field at all.
+///
+/// The layer records are walked as a span and nothing more. `psd-tools` can add pixel layers, and both
+/// it and ImageMagick then list them with the right geometry, but the file it saves declares a zero-length
+/// layer section while the payload sits later in it, so a record walker written against those bytes would
+/// be fitted to that one writer's inconsistency rather than to the format.
+fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < 26 || bytes[..4] != PSD_MAGIC {
+        return None;
+    }
+    let version = psd_u16(bytes, 4)?;
+    let channels = psd_u16(bytes, 12)?;
+    let height = psd_u32(bytes, 14)?;
+    let width = psd_u32(bytes, 18)?;
+    let depth = psd_u16(bytes, 22)?;
+    let mode = psd_u16(bytes, 24)?;
+    let reserved: String = bytes
+        .get(6..12)?
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let mut broken = usize::from(version != 1) + usize::from(reserved != "000000000000");
+    let mut rows = vec![format!(
+        "psd\t{}\tbroken\t{broken}\tversion\t{version}\treserved\t{reserved}\t{width}x{height}\tchannels\t{channels}\tdepth\t{depth}\tmode\t{mode}({})",
+        bytes.len(),
+        psd_name(&PSD_MODES, mode),
+    )];
+    if version != 1 {
+        // A version-2 document puts 64 bits where this walk reads 32, so nothing below is somewhere it can
+        // be reached by arithmetic. It is still a Photoshop file, and it says which one.
+        rows.push(format!(
+            "note\ta version-{version} document states its section lengths differently, so the walk stops here"
+        ));
+        rows.push(format!("stopped\tbroken\t{broken}"));
+        return Some(rows);
+    }
+    // Each section's start is the previous start plus the previous length, so the chain stops at the first
+    // length field the file cannot hold and names it, rather than reading a length from bytes that are not
+    // there. The 30 is the layer section's body: the 4-byte length at 26 has just been read.
+    let mut spans: Vec<(&'static str, u64, Option<u64>)> = Vec::new();
+    let mut stop: Option<&'static str> = None;
+    let mut resource_at = 0u64;
+    let mut resource_len = 0u64;
+    let mut image_at = 0u64;
+    let mut fits = true;
+    match psd_u32(bytes, 26) {
+        None => {
+            spans.push(("layers", 30, None));
+            stop = Some("layer section length");
+            fits = false;
+        }
+        Some(length) => {
+            let length = u64::from(length);
+            spans.push(("layers", 30, Some(length)));
+            // Saturating rather than checked: a position past the end of the file is not an error to
+            // handle, it is simply a length field that cannot be read, and the next `psd_u32` says so.
+            resource_at = 34u64.saturating_add(length);
+            match psd_u32(bytes, resource_at) {
+                None => {
+                    spans.push(("resources", resource_at + 4, None));
+                    stop = Some("resource section length");
+                    fits = false;
+                }
+                Some(length) => {
+                    let length = u64::from(length);
+                    resource_len = length;
+                    spans.push(("resources", resource_at + 4, Some(length)));
+                    let colour_at = resource_at.saturating_add(4).saturating_add(length);
+                    match psd_u32(bytes, colour_at) {
+                        None => {
+                            spans.push(("colour", colour_at + 4, None));
+                            stop = Some("colour mode length");
+                            fits = false;
+                        }
+                        Some(length) => {
+                            let length = u64::from(length);
+                            spans.push(("colour", colour_at + 4, Some(length)));
+                            image_at = colour_at.saturating_add(4).saturating_add(length);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    broken += usize::from(!fits);
+    rows.push(format!(
+        "section\tlayers\t{}\tresources\t{}\tcolour\t{}\timage\t{}",
+        psd_span(&spans, "layers"),
+        psd_span(&spans, "resources"),
+        psd_span(&spans, "colour"),
+        if fits { image_at.to_string() } else { "unreadable".to_owned() }
+    ));
+    if let Some(reason) = stop {
+        rows.push(format!("stopped\tbroken\t{broken}\t{reason}\tdoes not fit in the file"));
+        return Some(rows);
+    }
+    // The compression field is read before any resource row, because a file that cannot reach it stops
+    // here and the report must not list resources under a walk that did not finish.
+    let compression = match psd_u16(bytes, image_at) {
+        Some(each) => each,
+        None => {
+            broken += 1;
+            rows.push(format!(
+                "stopped\tbroken\t{broken}\timage data\tdoes not fit in the file"
+            ));
+            return Some(rows);
+        }
+    };
+    let (listed, total) = psd_resources(bytes, resource_at, resource_len, &mut rows, &mut broken);
+    if listed < total {
+        rows.push(format!("cut\tresources\t{total}"));
+    }
+    psd_image_data(bytes, image_at, compression, channels, height, width, depth, &mut rows, &mut broken);
+    rows.push(
+        "layers\tnot decoded\tthe writer's own header mis-states this section, so its records are left alone".to_owned(),
+    );
+    rows.push(if broken == 0 {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\tbroken\t{broken}")
+    });
+    Some(rows)
+}
+
+/// One section of the `section` row: `at+len`, or `at+?` when the length itself was outside the file, or
+/// `unreadable` when the walk never reached that far.
+fn psd_span(spans: &[(&'static str, u64, Option<u64>)], name: &str) -> String {
+    match spans.iter().find(|(each, _, _)| *each == name) {
+        Some((_, at, Some(length))) => format!("{at}+{length}"),
+        Some((_, at, None)) => format!("{at}+?"),
+        None => "unreadable".to_owned(),
+    }
+}
+
+/// The `8BIM` blocks. Every advance is checked because the sizes come from the file, and a block that does
+/// not start with the signature ends the walk with one broken claim rather than a guess at what follows.
+/// Returns (listed, total).
+fn psd_resources(
+    bytes: &[u8],
+    resource_at: u64,
+    resource_len: u64,
+    rows: &mut Vec<String>,
+    broken: &mut usize,
+) -> (usize, usize) {
+    let Some(body) = resource_at.checked_add(4) else {
+        *broken += 1;
+        return (0, 0);
+    };
+    let Some(end) = body.checked_add(resource_len) else {
+        *broken += 1;
+        return (0, 0);
+    };
+    let end = end.min(bytes.len() as u64);
+    let mut cursor = body;
+    let mut listed = 0usize;
+    let mut total = 0usize;
+    while cursor < end {
+        let Some(head) = usize::try_from(cursor).ok().and_then(|start| {
+            bytes.get(start..start.checked_add(4)?)
+        }) else {
+            *broken += 1;
+            break;
+        };
+        if head != PSD_MAGIC.as_slice() {
+            *broken += 1;
+            break;
+        }
+        let Some(id) = psd_u16(bytes, cursor + 4) else {
+            *broken += 1;
+            break;
+        };
+        let Some(name_len) = psd_u8(bytes, cursor + 6) else {
+            *broken += 1;
+            break;
+        };
+        let field = u64::from(name_len) + 1;
+        let field = field + (field % 2);
+        let head_size = 6 + field;
+        let Some(size) = psd_u32(bytes, cursor + head_size) else {
+            *broken += 1;
+            break;
+        };
+        if listed < PSD_LISTED_RESOURCES {
+            let name = psd_pascal(bytes, cursor + 7, u64::from(name_len));
+            rows.push(format!(
+                "resource\t{listed}\t{id}({})\tsize\t{size}\tname\t{}",
+                psd_name(&PSD_RESOURCES, id),
+                if name.is_empty() { "-" } else { name.as_str() }
+            ));
+            listed += 1;
+        }
+        total += 1;
+        let padded = u64::from(size) + (u64::from(size) % 2);
+        let Some(next) = cursor.checked_add(head_size).and_then(|each| each.checked_add(4 + padded))
+        else {
+            break;
+        };
+        if next <= cursor {
+            *broken += 1;
+            break;
+        }
+        cursor = next;
+    }
+    (listed, total)
+}
+
+/// The image data is the only place a PSD's own numbers have to account for the whole file: RLE states a
+/// byte count per row per channel, and raw has no table at all so the header predicts the length.
+fn psd_image_data(
+    bytes: &[u8],
+    image_at: u64,
+    compression: u16,
+    channels: u16,
+    height: u32,
+    width: u32,
+    depth: u16,
+    rows: &mut Vec<String>,
+    broken: &mut usize,
+) {
+    let Some(data_at) = image_at.checked_add(2) else {
+        *broken += 1;
+        return;
+    };
+    let length = bytes.len() as u64;
+    let payload = length.saturating_sub(data_at);
+    let spelled = psd_name(&PSD_COMPRESSIONS, compression);
+    if compression == 1 {
+        let Some(lines) = u64::from(channels).checked_mul(u64::from(height)) else {
+            *broken += 1;
+            return;
+        };
+        // Proving the table fits is what keeps the loop below bounded by the file rather than by two
+        // numbers a corrupted header can make huge.
+        let table = data_at.saturating_add(lines.saturating_mul(2));
+        let (sum, rest) = if table <= length {
+            let mut total = 0u64;
+            let mut each = 0u64;
+            while each < lines {
+                match psd_u16(bytes, data_at.saturating_add(each * 2)) {
+                    Some(value) => total += u64::from(value),
+                    None => break,
+                }
+                each += 1;
+            }
+            (Some(total), length - table)
+        } else {
+            (None, payload)
+        };
+        match sum {
+            Some(counts) => {
+                let ends = counts == rest;
+                *broken += usize::from(!ends);
+                rows.push(format!(
+                    "image\tcompression\t1(RLE)\trows\t{lines}\tcounts\t{counts}\tpayload\t{rest}\tends\t{}",
+                    if ends { "yes" } else { "no" }
+                ));
+            }
+            None => {
+                *broken += 1;
+                rows.push(format!(
+                    "image\tcompression\t1(RLE)\trows\t{lines}\tcounts\t-\tpayload\t{rest}\tends\tno"
+                ));
+            }
+        }
+    } else if compression == 0 {
+        let plain = u64::from(depth)
+            .checked_div(8)
+            .and_then(|unit| {
+                u64::from(channels)
+                    .checked_mul(u64::from(height))
+                    .and_then(|each| each.checked_mul(u64::from(width)))
+                    .and_then(|each| each.checked_mul(unit))
+            });
+        let ends = plain == Some(payload);
+        *broken += usize::from(!ends);
+        rows.push(format!(
+            "image\tcompression\t0(RAW)\tbytes\t{payload}\texpect\t{}\tends\t{}",
+            plain.map_or("-".to_owned(), |each| each.to_string()),
+            if ends { "yes" } else { "no" }
+        ));
+    } else {
+        // A predicted or unknown codec needs a decoder before its length means anything, so the byte count
+        // is the only number here and no claim of accounting is made.
+        rows.push(format!(
+            "image\tcompression\t{compression}({spelled})\tbytes\t{payload}\tends\tunknown"
+        ));
+    }
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -6849,6 +7212,12 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_7z(bytes) {
         return accept(FORMAT_SEVENZIP, lines);
     }
+    // A Photoshop document states no total length anywhere, so this reader's whole-file claim is the image
+    // data's arithmetic rather than a header field; it is dispatched among the formats that carry a real
+    // signature, which everything above it does too.
+    if let Some(lines) = read_psd(bytes) {
+        return accept(FORMAT_PSD, lines);
+    }
     if let Some(lines) = read_coff(bytes) {
         return accept(FORMAT_COFF, lines);
     }
@@ -6864,7 +7233,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, COFF object, X.509 certificate or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

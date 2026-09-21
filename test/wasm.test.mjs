@@ -331,6 +331,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['answer.obj', 47], ['i686.obj', 47],
     ['rsa.crt', 48], ['ec.crt', 48],
     ['encoded.7z', 49], ['plain.7z', 49], ['libarchive.7z', 49],
+    ['rgb.psd', 50], ['grey.psd', 50], ['rgba.psd', 50], ['raw.psd', 50],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -742,6 +743,53 @@ test('a 7z archive is checked against its own two CRCs, in both header shapes', 
   assert.equal(stub.code, 49);
   assert.equal(stub.rows[0], '7z\t32\tbroken\t1\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tunreadable',
     stub.rows.join(' | '));
+});
+
+test('a Photoshop document is read to the limit of what it states about itself', () => {
+  // psd-tools 1.19 wrote these; Pillow - which cannot write a PSD and shares no code with psd-tools -
+  // parsed the same header, resource ids and resource sizes before `make-psd-fixtures.py` would commit
+  // them, so the numbers are two implementations' agreement rather than one library's self-report.
+  const rgb = assertReadable('container', 'rgb.psd', 50);
+  assert.equal(rgb.name, 'psd');
+  assert.equal(rgb.rows[0], 'psd\t284\tbroken\t0\tversion\t1\treserved\t000000000000\t7x5\tchannels\t3\tdepth\t8\tmode\t3(RGB)');
+  assert.equal(rgb.rows[1], 'section\tlayers\t30+0\tresources\t34+94\tcolour\t132+0\timage\t132');
+  assert.equal(rgb.rows[2], 'resource\t0\t1057(VERSION_INFO)\tsize\t81\tname\t-');
+  assert.equal(rgb.rows[3], 'image\tcompression\t1(RLE)\trows\t15\tcounts\t120\tpayload\t120\tends\tyes');
+  assert.equal(rgb.rows[4], 'layers\tnot decoded\tthe writer\'s own header mis-states this section, so its records are left alone');
+  assert.equal(rgb.rows[5], 'walked\tend');
+
+  // The uncompressed branch has no count table, so the header's own numbers predict the payload.
+  const raw = assertReadable('container', 'raw.psd', 50).rows;
+  assert.equal(raw[3], 'image\tcompression\t0(RAW)\tbytes\t36\texpect\t36\tends\tyes');
+
+  const bytes = new Uint8Array(readFileSync('test/fixtures/raw.psd'));
+  const short = driveBytes('container', bytes.subarray(0, bytes.length - 1));
+  assert.equal(short.rows[3], 'image\tcompression\t0(RAW)\tbytes\t35\texpect\t36\tends\tno');
+  assert.match(short.rows[0], /\tbroken\t1\t/, `a missing pixel did not count: ${short.rows[0]}`);
+  assert.equal(short.rows[short.rows.length - 1], 'stopped\tbroken\t1');
+
+  // Cut deeper and a section length itself falls outside the file: the report names that section, prints
+  // `128+?` for a length that cannot be read, and stops rather than inventing the rest of the walk.
+  const rgbBytes = new Uint8Array(readFileSync('test/fixtures/rgb.psd'));
+  const stub = driveBytes('container', rgbBytes.subarray(0, 60));
+  assert.equal(stub.rows[1], 'section\tlayers\t30+0\tresources\t34+94\tcolour\t128+?\timage\tunreadable');
+  assert.equal(stub.rows[2], 'stopped\tbroken\t1\tcolour mode length\tdoes not fit in the file');
+  assert.equal(stub.rows.length, 3);
+
+  // And a version-2 (PSB) header is refused deeper than its own row, because its lengths are 64-bit and
+  // every offset below would be read at the wrong width.
+  const psb = new Uint8Array(46);
+  psb.set([0x38, 0x42, 0x50, 0x53, 0x00, 0x02], 0);
+  new DataView(psb.buffer).setUint16(12, 3);
+  new DataView(psb.buffer).setUint32(14, 4);
+  new DataView(psb.buffer).setUint32(18, 5);
+  new DataView(psb.buffer).setUint16(22, 8);
+  new DataView(psb.buffer).setUint16(24, 3);
+  const psbRows = driveBytes('container', psb);
+  assert.equal(psbRows.code, 50);
+  assert.equal(psbRows.rows[0], 'psd\t46\tbroken\t1\tversion\t2\treserved\t000000000000\t5x4\tchannels\t3\tdepth\t8\tmode\t3(RGB)');
+  assert.equal(psbRows.rows[1], 'note\ta version-2 document states its section lengths differently, so the walk stops here');
+  assert.equal(psbRows.rows[psbRows.rows.length - 1], 'stopped\tbroken\t1');
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
