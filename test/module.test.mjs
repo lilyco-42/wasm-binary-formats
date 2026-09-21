@@ -99,10 +99,11 @@ test('a file that is not an object file is refused', () => {
 
 test('an address answers with the name objdump prints beside the instruction', async () => {
   // The base module's COFF reader was proved against this same object, whose objdump listing is
-  // frozen in test/fixtures/coff.probe.json: `answer` at 0, `helper` at 16, and the call at 19
-  // annotated `<helper+0x9>`. An object file is what the analyser hands the disassembler for one
-  // fetch, so the two bases have to be the same numbers - and they are, because a section of an
-  // object has no virtual address yet and a symbol's value is already its offset in one.
+  // frozen in test/fixtures/coff.probe.json: `answer` at 0, `helper` at 16, and the call written
+  // `call 19 <helper+0x9>` - objdump prints addresses in hex, so the target is 0x19, nine bytes into
+  // helper. An object file is what the analyser hands the disassembler for one fetch, so the two
+  // bases have to be the same numbers - and they are, because a section of an object has no virtual
+  // address yet and a symbol's value is already its offset in one.
   const bytes = new Uint8Array(await readFile('test/fixtures/answer.obj'));
   const { rc, rows } = report(bytes);
   assert.equal(rc, 0, `a clang -c object came back refused: ${rows[0]}`);
@@ -112,7 +113,8 @@ test('an address answers with the name objdump prints beside the instruction', a
   assert.equal(text('name_at', 0n), 'answer');
   assert.equal(text('name_at', 5n), 'answer+0x5');
   assert.equal(text('name_at', 16n), 'helper');
-  assert.equal(text('name_at', 19n), 'helper+0x9');
+  assert.equal(text('name_at', 0x13n), 'helper+0x3');
+  assert.equal(text('name_at', 0x19n), 'helper+0x9');
   assert.equal(text('name_at', -1n), '', 'a negative address is not an address');
 
   // A file with no symbol table has no names, so a panel can say "no names" rather than guess.

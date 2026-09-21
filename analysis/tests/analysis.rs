@@ -102,10 +102,10 @@ fn a_distribution_binary_comes_through_the_same_abi() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(0);
     assert!(declared >= 1, "the header row undercounts: {}", lines[0]);
-    // The same table read through the other direction: every listed symbol that the file says lives
-    // in a section has to answer for its own address. Skipping this is what would let the index be
-    // quietly empty for a real distribution binary.
-    let mut addressable = 0usize;
+    // Every *listed* symbol the file says lives in a section has to answer for its own address. The
+    // listing is capped at 64 and the index is not, and on this runner that distinction is visible:
+    // every dynsym row printed here is an undefined import - a linker puts those first - so this loop
+    // can legitimately check nothing while the index still holds the names further down the table.
     for line in &lines {
         let cells: Vec<&str> = line.split('\t').collect();
         if cells[0] != "symbol" && cells[0] != "dynsym" {
@@ -127,22 +127,28 @@ fn a_distribution_binary_comes_through_the_same_abi() {
         let Some(Ok(at)) = column("addr").map(str::parse::<u64>) else {
             continue;
         };
-        addressable += 1;
         assert!(
             name_for(at).is_some(),
             "{} lives in a section at {at:#x} and answered with nothing",
             cells[2]
         );
     }
-    assert!(addressable > 0, "no addressable symbol in {lines:#?}");
+    // Stripped means `.symtab` is gone, not that nothing is named: the dynamic table still defines
+    // `_init`, `_fini`, `data_start` and the rest, each in a section, each therefore indexed.
+    assert!(
+        names_len() > 0,
+        "a distribution binary with {declared} dynamic symbols named none of them"
+    );
 }
 
 #[test]
 fn an_address_answers_with_the_name_objdump_prints_beside_the_instruction() {
     // `answer.obj` is the `clang -c` object the base module's COFF reader was proved against, so the
     // two names below and the offsets between them are not this crate's invention: objdump's `-t`
-    // listing and `-d` annotations are frozen in test/fixtures/coff.probe.json, which says
-    // `answer` at 0, `helper` at 16, and prints `call 19 <helper+0x9>` for the call site.
+    // listing and `-d` annotations are frozen in test/fixtures/coff.probe.json, which says `answer` at
+    // 0, `helper` at 16, and prints the call as `call 19 <helper+0x9>` - and objdump writes addresses
+    // in hex, so that call target is 0x19, which is 0x10 nine bytes along. Reading the `19` as
+    // decimal is the one way to get this test wrong, and the pair below is written to make it obvious.
     let lines = rows(&fixture("answer.obj"));
     assert!(
         lines[0].contains("kind\trelocatable"),
@@ -157,7 +163,8 @@ fn an_address_answers_with_the_name_objdump_prints_beside_the_instruction() {
     assert_eq!(name_for(0).as_deref(), Some("answer"));
     assert_eq!(name_for(5).as_deref(), Some("answer+0x5"));
     assert_eq!(name_for(16).as_deref(), Some("helper"));
-    assert_eq!(name_for(19).as_deref(), Some("helper+0x9"));
+    assert_eq!(name_for(0x13).as_deref(), Some("helper+0x3"));
+    assert_eq!(name_for(0x19).as_deref(), Some("helper+0x9"));
 
     // The exclusions, each of which the rows carry and the index does not: `.text` is a section symbol
     // at the very address `answer` owns, `@feat.00` is clang's absolute feature word (no section), and

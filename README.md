@@ -408,7 +408,10 @@ per section, all of them at offset zero), and a **file** symbol names a compilat
 `test/fixtures/answer.obj` is the witness, and it is a strict one: eleven symbols are listed, four of
 them report address 0 - `.text`, `@feat.00`, the file record and `answer` itself - and only `answer` is
 allowed to win that address, so the lookup says `answer` at 0, `answer+0x5` five bytes in, `helper` at
-0x10 and `helper+0x9` at the call site, which is what `objdump -d` prints for those same four bytes. The
+0x10 and `helper+0x9` at `0x19`. objdump writes that call as `call 19 <helper+0x9>`, and since its
+addresses are hex, reading the `19` as decimal is the one way to get the witness wrong - it cost a CI
+cycle to learn it, so both the Rust test and the JS one assert `helper+0x3` at `0x13` beside
+`helper+0x9` at `0x19`. The
 offset form is objdump's hex spelling rather than IDA's decimal one so the row can be diffed against the
 listing it was checked against. What the lookup does *not* do is bound a name to its size: a COFF symbol
 carries no size unless the compiler wrote an aux record, so the nearest name below an address wins
@@ -416,6 +419,10 @@ however far below it is - which is objdump's rule too, and is why the page print
 named rather than implying every byte of a section belongs to something. For a function entry the file
 does not name, the page synthesises IDA's `sub_<hex>` label and marks it `合成` in its own column: an
 invented name and one read out of the file must never look alike.
+The listing cap and the index are deliberately different sizes, and the CI runner showed why: every one
+of the 64 dynamic-symbol rows it prints for `/bin/ls` is an undefined import, because the linker puts
+those first, so a check written against the printed rows can see nothing while the index - built over
+all 128 - still holds `_init`, `data_start` and the rest.
 
 ## Reproduce
 
