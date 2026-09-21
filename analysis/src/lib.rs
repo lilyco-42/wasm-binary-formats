@@ -811,6 +811,18 @@ fn type_rows(data: &[u8]) -> Vec<String> {
             Some(value) => value,
             None => break,
         };
+        // Counted before the two checks below, because a record that lies about its own size is still
+        // one record read, and the totals row has to say how many were attempted.
+        records += 1;
+        if length < 4 {
+            // A record shorter than its own kind field cannot hold anything: reading it as an empty
+            // body would invent a row for bytes that are not a record.
+            rows.push(format!(
+                "type\t{}\tbroken\tlength {length} is shorter than a kind",
+                hex(index)
+            ));
+            break;
+        }
         let body = match data.get(at + 4..at + length + 2) {
             Some(window) => window,
             None => {
@@ -821,7 +833,6 @@ fn type_rows(data: &[u8]) -> Vec<String> {
                 break;
             }
         };
-        records += 1;
         if listed < MAX_TYPES {
             listed += 1;
             rows.extend(type_record(index, leaf, body));
@@ -830,7 +841,9 @@ fn type_rows(data: &[u8]) -> Vec<String> {
         at += length + 2;
         index += 1;
     }
-    if records > listed {
+    if records > MAX_TYPES {
+        // The cap is the only reason rows are missing, so a walk that stopped early because a record
+        // lied says so in its own row rather than looking like a truncated list.
         rows.push(format!("cut\ttypes\t{records}"));
     }
     rows.insert(0, format!("types\t{records}\theader\t{header}"));

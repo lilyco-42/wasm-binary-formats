@@ -9,8 +9,8 @@
 //! index is checked against a file whose objdump listing is frozen in this repo.
 
 use apk_lens_analysis::{
-    abi_version, alloc, analyse, dealloc, name_at, name_for, names_count, names_len, region_at,
-    region_count, sample_elf, self_test, string_at, string_count, type_at, type_count,
+    abi_version, alloc, analyse, dealloc, name_for, names_len, region_at, region_count, sample_elf,
+    self_test, string_at, string_count, type_at, type_count,
 };
 use std::fs;
 
@@ -455,6 +455,20 @@ fn a_type_record_that_overruns_ends_the_list() {
         listed[1].starts_with("type\t0x1000\tbroken\tlength 65535"),
         "{listed:?}"
     );
+
+    // A length below the four bytes a record needs is refused for the same reason: an empty body would
+    // decode as a record of whatever kind those two bytes happen to spell.
+    let mut stunted = object;
+    stunted[at + 4] = 0;
+    stunted[at + 5] = 0;
+    rows(&stunted);
+    let listed = types();
+    assert_eq!(listed.len(), 2, "{listed:?}");
+    assert_eq!(
+        listed[1],
+        "type\t0x1000\tbroken\tlength 0 is shorter than a kind",
+        "{listed:?}"
+    );
 }
 
 /// Where a COFF object's `.debug$T` contents lie in the file. Written out here because the test is
@@ -465,7 +479,7 @@ fn find_debug_t(raw: &[u8]) -> Option<usize> {
     let table = 20 + optsz;
     for each in 0..nsec {
         let base = table + 40 * each;
-        if raw.get(base..base + 8)? != b".debug$T"[..] {
+        if raw.get(base..base + 8)? != &b".debug$T"[..] {
             continue;
         }
         let offset = u32::from_le_bytes(raw.get(base + 20..base + 24)?.try_into().ok()?) as usize;
