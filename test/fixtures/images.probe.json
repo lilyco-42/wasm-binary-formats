@@ -1,40 +1,43 @@
 {
  "lab.elf": {
-  "bytes": 1064,
+  "bytes": 1152,
   "header": {
    "class": 64,
    "ehsize": 64,
    "endianness": "little",
-   "entry": 2101584,
+   "entry": 2101648,
    "load": [
     [
      0,
-     332
+     385
     ],
     [
-     336,
-     342
+     400,
+     406
     ]
    ],
    "machine": 62,
    "phoff": 64,
-   "shoff": 616,
+   "shoff": 704,
    "type": 2
   },
   "rows": [
-   "regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0",
+   "regions\t12\tfile\t1152\tclaimed\t1128\tunloaded\t24\tloaded-unaddressed\t0",
+   "strings\t2\tmin\t4\tscanned\t97\tranges\t1",
+   "string\t0x200120\t288\t43\ta lab fixture string padded out to length!!\t.rodata",
+   "string\t0x200150\t336\t48\ta second literal the linker will place beside it\t.rodata",
    "region\t0\t64\theader\telf header\t-",
    "region\t64\t224\ttables\tprogram headers\t-",
-   "region\t288\t44\trodata\t.rodata\tloaded at 0x200120",
-   "region\t332\t4\tgap\tunreferenced\tnot loaded",
-   "region\t336\t6\tcode\t.text\tloaded at 0x201150",
-   "region\t342\t99\tmeta\t.comment\tnot loaded",
-   "region\t441\t7\tgap\tunreferenced\tnot loaded",
-   "region\t448\t96\tmeta\t.symtab\tnot loaded",
-   "region\t544\t50\tmeta\t.shstrtab\tnot loaded",
-   "region\t594\t15\tmeta\t.strtab\tnot loaded",
-   "region\t609\t7\tgap\tunreferenced\tnot loaded",
-   "region\t616\t448\ttables\tsection headers\t-"
+   "region\t288\t97\trodata\t.rodata\tloaded at 0x200120",
+   "region\t385\t15\tgap\tunreferenced\tnot loaded",
+   "region\t400\t6\tcode\t.text\tloaded at 0x201190",
+   "region\t406\t99\tmeta\t.comment\tnot loaded",
+   "region\t505\t7\tgap\tunreferenced\tnot loaded",
+   "region\t512\t120\tmeta\t.symtab\tnot loaded",
+   "region\t632\t50\tmeta\t.shstrtab\tnot loaded",
+   "region\t682\t20\tmeta\t.strtab\tnot loaded",
+   "region\t702\t2\tgap\tunreferenced\tnot loaded",
+   "region\t704\t448\ttables\tsection headers\t-"
   ]
  },
  "lab.exe": {
@@ -60,16 +63,21 @@
    "sizeofheaders": 1024
   },
   "rows": [
-   "regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0",
+   "regions\t9\tfile\t3072\tclaimed\t1273\tunloaded\t1799\tloaded-unaddressed\t0",
+   "strings\t4\tmin\t4\tscanned\t189\tranges\t2",
+   "string\t0x140002000\t1536\t43\ta lab fixture string padded out to length!!\t.rdata",
+   "string\t0x140002030\t1584\t48\ta second literal the linker will place beside it\t.rdata",
+   "string\t0x14000301c\t2076\t5\tRSDS,\t.buildid",
+   "string\t0x140003025\t2085\t11\tovsLLD PDB.\t.buildid",
    "region\t0\t1024\theader\tms-dos stub and nt headers\t-",
-   "region\t1024\t6\tcode\t.text\tvaddr 0x1000, raw 0x200 in file",
+   "region\t1024\t6\tcode\t.text\tvaddr 0x140001000, raw 0x200 in file",
    "region\t1030\t506\tgap\tunreferenced\tnot loaded",
-   "region\t1536\t80\trodata\t.rdata\tvaddr 0x2000, raw 0x200 in file",
-   "region\t1616\t432\tgap\tunreferenced\tnot loaded",
-   "region\t2048\t53\trodata\t.buildid\tvaddr 0x3000, raw 0x200 in file",
+   "region\t1536\t136\trodata\t.rdata\tvaddr 0x140002000, raw 0x200 in file",
+   "region\t1672\t376\tgap\tunreferenced\tnot loaded",
+   "region\t2048\t53\trodata\t.buildid\tvaddr 0x140003000, raw 0x200 in file",
    "region\t2101\t459\tgap\tunreferenced\tnot loaded",
-   "region\t2560\t36\tmeta\tcoff symbols\tnot loaded",
-   "region\t2596\t476\toverlay\tafter the last table\tnot loaded"
+   "region\t2560\t54\tmeta\tcoff symbols\tnot loaded",
+   "region\t2614\t458\toverlay\tafter the last table\tnot loaded"
   ]
  }
 }

@@ -70,7 +70,8 @@ function stubElf() {
 
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
-    'names_count', 'name_at', 'region_count', 'region_at', 'abi_version', 'self_test']) {
+    'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
+    'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -149,7 +150,7 @@ test('the base module the page always downloads carries none of this', async () 
   if (!basePath) return;
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
-    'region_count', 'region_at', 'self_test']) {
+    'region_count', 'region_at', 'string_count', 'string_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -160,8 +161,8 @@ test('the region map accounts for the whole file, in both image formats', async 
   // `images.probe.json` unless its own reading of the headers agrees with `readelf` and `objdump`. The
   // rows asserted here are those readings, so the byte counts below are the linker's.
   const expect = {
-    'lab.elf': 'regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0',
-    'lab.exe': 'regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0',
+    'lab.elf': 'regions\t12\tfile\t1152\tclaimed\t1128\tunloaded\t24\tloaded-unaddressed\t0',
+    'lab.exe': 'regions\t9\tfile\t3072\tclaimed\t1273\tunloaded\t1799\tloaded-unaddressed\t0',
   };
   for (const [name, head] of Object.entries(expect)) {
     const bytes = new Uint8Array(await readFile(`test/fixtures/${name}`));
@@ -194,4 +195,74 @@ test('the region map accounts for the whole file, in both image formats', async 
   // painted over the whole file.
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.region_count(), 0, 'an object file should get no map');
+  assert.equal(ex.string_count(), 0, 'and no string list either');
+});
+
+test('the string list carries only bytes a running program touches', async () => {
+  // Both fixtures were compiled and linked here (`scripts/make-image-fixtures.py`), and that script
+  // refuses to write `images.probe.json` unless every row predicted below is one `strings -t x -a -n 4`
+  // also prints at the same offset and length. What binutils prints *extra* - the linker's own
+  // "Linker: LLD …" banner, which is the first byte of `.comment`, and `!This program cannot be run in
+  // DOS mode.` in the MS-DOS stub - must stay out, because a tool reads those bytes and the program
+  // never loads them. That is the difference between this list and `strings` output.
+  const cases = {
+    'lab.elf': [
+      'strings\t2\tmin\t4\tscanned\t97\tranges\t1',
+      'string\t0x200120\t288\t43\ta lab fixture string padded out to length!!\t.rodata',
+      'string\t0x200150\t336\t48\ta second literal the linker will place beside it\t.rodata',
+    ],
+    'lab.exe': [
+      'strings\t4\tmin\t4\tscanned\t189\tranges\t2',
+      'string\t0x140002000\t1536\t43\ta lab fixture string padded out to length!!\t.rdata',
+      'string\t0x140002030\t1584\t48\ta second literal the linker will place beside it\t.rdata',
+      'string\t0x14000301c\t2076\t5\tRSDS,\t.buildid',
+      'string\t0x140003025\t2085\t11\tovsLLD PDB.\t.buildid',
+    ],
+  };
+  for (const [name, want] of Object.entries(cases)) {
+    const bytes = new Uint8Array(await readFile(`test/fixtures/${name}`));
+    report(bytes);
+    const total = ex.string_count();
+    assert.equal(total, want.length, `${name}: the list has ${total} rows, not ${want.length}`);
+    const map = Array.from({ length: ex.region_count() }, (_, index) =>
+      text('region_at', index).split('\t')
+    );
+    for (let index = 0; index < total; index += 1) {
+      const row = text('string_at', index);
+      assert.equal(row, want[index], `${name}: row ${index} moved`);
+      if (!row.startsWith('string\t')) continue;
+      const cell = row.split('\t');
+      const address = BigInt(cell[1]);
+      const offset = Number(cell[2]);
+      const length = Number(cell[3]);
+      assert.ok(/^[0-9a-z_.]+\t$/.test(`${cell[5]}\t`), `${name}: ${row} names no section`);
+      // The address is the region's own virtual base plus the distance into that region, so a string
+      // row and a disassembly row mean the same byte - the basis the page's 引用 column depends on.
+      const holder = map.find((each) => each[0] === 'region'
+        && BigInt(each[1]) <= BigInt(offset)
+        && BigInt(offset) < BigInt(each[1]) + BigInt(each[2]));
+      assert.ok(holder, `${name}: ${row} falls outside the map`);
+      const base = /0x([0-9a-f]+)/.exec(holder[5]);
+      assert.ok(base, `${name}: ${holder.join('\t')} is loaded but names no address`);
+      assert.equal(
+        address,
+        BigInt(`0x${base[1]}`) + BigInt(offset - Number(holder[1])),
+        `${name}: ${row} is not on ${holder[4]}'s basis`
+      );
+      // Length is the printable run itself, read back out of the file: the fixture's first literal is 43
+      // bytes and the second starts at +48, so a run that ran on to the next byte would fail here.
+      const text_cell = cell[4];
+      assert.equal(
+        new TextDecoder().decode(bytes.subarray(offset, offset + length)),
+        text_cell,
+        `${name}: ${row} does not match the bytes at ${offset}`
+      );
+      const after = bytes[offset + length];
+      assert.ok(
+        after === undefined || !(after >= 0x20 && after <= 0x7e)
+          || offset + length >= Number(holder[1]) + Number(holder[2]),
+        `${name}: ${text_cell} is cut mid-run at ${offset + length} (${after})`
+      );
+    }
+  }
 });

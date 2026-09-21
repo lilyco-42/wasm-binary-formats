@@ -10,7 +10,7 @@
 
 use apk_lens_analysis::{
     abi_version, alloc, analyse, dealloc, name_at, name_for, names_count, names_len, region_at,
-    region_count, sample_elf, self_test,
+    region_count, sample_elf, self_test, string_at, string_count,
 };
 use std::fs;
 
@@ -219,32 +219,50 @@ fn the_map_of_an_elf_names_the_header_tables_and_the_padding_between_them() {
     let lines = regions();
     assert_eq!(
         lines[0],
-        "regions\t12\tfile\t1064\tclaimed\t1046\tunloaded\t18\tloaded-unaddressed\t0",
+        "regions\t12\tfile\t1152\tclaimed\t1128\tunloaded\t24\tloaded-unaddressed\t0",
         "{lines:#?}"
     );
     assert_eq!(lines[1], "region\t0\t64\theader\telf header\t-");
     assert_eq!(lines[2], "region\t64\t224\ttables\tprogram headers\t-");
     assert_eq!(
         lines[3],
-        "region\t288\t44\trodata\t.rodata\tloaded at 0x200120",
+        "region\t288\t97\trodata\t.rodata\tloaded at 0x200120",
         "the section name comes out of the file's own string table"
     );
-    assert_eq!(lines[4], "region\t332\t4\tgap\tunreferenced\tnot loaded");
-    assert_eq!(lines[5], "region\t336\t6\tcode\t.text\tloaded at 0x201150");
+    assert_eq!(lines[4], "region\t385\t15\tgap\tunreferenced\tnot loaded");
+    assert_eq!(lines[5], "region\t400\t6\tcode\t.text\tloaded at 0x201190");
     assert_eq!(
         lines[lines.len() - 1],
-        "region\t616\t448\ttables\tsection headers\t-",
+        "region\t704\t448\ttables\tsection headers\t-",
         "an ELF ends with its section header table, so there is nothing after it"
     );
-    assert!(tiles(1064, &lines), "the map must account for every byte: {lines:#?}");
+    assert!(tiles(1152, &lines), "the map must account for every byte: {lines:#?}");
     // .comment, .symtab and both string tables are structure a tool reads, not data the program runs.
     for named in [
-        "region\t342\t99\tmeta\t.comment\tnot loaded",
-        "region\t448\t96\tmeta\t.symtab\tnot loaded",
-        "region\t594\t15\tmeta\t.strtab\tnot loaded",
+        "region\t406\t99\tmeta\t.comment\tnot loaded",
+        "region\t512\t120\tmeta\t.symtab\tnot loaded",
+        "region\t682\t20\tmeta\t.strtab\tnot loaded",
     ] {
         assert!(lines.contains(&named.to_string()), "missing {named}");
     }
+
+    // The string list, over those loaded data ranges only. The linker's own banner ("Linker: LLD
+    // 22.1.8 …") is the first byte of `.comment` (`strings -t x` prints it at 0x196 = 406), which is not
+    // loaded, and a Strings window that showed it would be a hex dump with a nicer name.
+    let listed = strings();
+    assert_eq!(listed[0], "strings\t2\tmin\t4\tscanned\t97\tranges\t1");
+    assert_eq!(
+        listed,
+        vec![
+            "strings\t2\tmin\t4\tscanned\t97\tranges\t1",
+            "string\t0x200120\t288\t43\ta lab fixture string padded out to length!!\t.rodata",
+            "string\t0x200150\t336\t48\ta second literal the linker will place beside it\t.rodata",
+        ]
+    );
+    assert!(
+        !listed.iter().any(|row| row.contains("Linker:")),
+        "the string list reached outside the loaded data: {listed:#?}"
+    );
 }
 
 #[test]
@@ -254,7 +272,7 @@ fn a_pe_section_claims_only_the_bytes_it_says_it_uses_and_the_rest_is_padding() 
     let lines = regions();
     assert_eq!(
         lines[0],
-        "regions\t9\tfile\t3072\tclaimed\t1199\tunloaded\t1873\tloaded-unaddressed\t0",
+        "regions\t9\tfile\t3072\tclaimed\t1273\tunloaded\t1799\tloaded-unaddressed\t0",
         "{lines:#?}"
     );
     assert_eq!(
@@ -265,18 +283,33 @@ fn a_pe_section_claims_only_the_bytes_it_says_it_uses_and_the_rest_is_padding() 
     // alignment, and calling them `.text` would colour 500-odd bytes as code that nothing reads.
     assert_eq!(
         lines[2],
-        "region\t1024\t6\tcode\t.text\tvaddr 0x1000, raw 0x200 in file"
+        "region\t1024\t6\tcode\t.text\tvaddr 0x140001000, raw 0x200 in file"
     );
     assert_eq!(lines[3], "region\t1030\t506\tgap\tunreferenced\tnot loaded");
     assert_eq!(
         lines[lines.len() - 1],
-        "region\t2596\t476\toverlay\tafter the last table\tnot loaded",
+        "region\t2614\t458\toverlay\tafter the last table\tnot loaded",
         "what sits behind the last table is an overlay, and this file's is not a signature"
     );
     assert!(tiles(3072, &lines), "the map must account for every byte: {lines:#?}");
     assert!(
         !lines.iter().any(|row| row.contains("\tcert\t")),
         "an unsigned file must not be shown as signed: {lines:#?}"
+    );
+    // Two `rodata` ranges are scanned here, `.rdata` and `.buildid`, and the addresses are the loader's
+    // (image base included), which is what lets the page compare them with a disassembly's targets. The
+    // build-id's bytes contain printable accidents ("RSDS," and part of "LLD PDB."), which is the honest
+    // answer for a data scan: the rule is a run of four or more printable octets inside loaded data, not
+    // "looks like a sentence".
+    assert_eq!(
+        strings(),
+        vec![
+            "strings\t4\tmin\t4\tscanned\t189\tranges\t2",
+            "string\t0x140002000\t1536\t43\ta lab fixture string padded out to length!!\t.rdata",
+            "string\t0x140002030\t1584\t48\ta second literal the linker will place beside it\t.rdata",
+            "string\t0x14000301c\t2076\t5\tRSDS,\t.buildid",
+            "string\t0x140003025\t2085\t11\tovsLLD PDB.\t.buildid",
+        ]
     );
 }
 
@@ -297,7 +330,7 @@ fn an_object_file_gets_no_map_and_a_refused_file_takes_the_last_ones_with_it() {
     let honest = fixture("lab.elf");
     assert!(analyse(&honest).is_some());
     let lines = regions();
-    assert!(tiles(1064, &lines), "the honest file must still tile: {lines:#?}");
+    assert!(tiles(1152, &lines), "the honest file must still tile: {lines:#?}");
     assert!(region_count() > 1, "and the map has to show through the ABI");
     let mut lies = honest.clone();
     lies[60] = 0xff;
@@ -307,6 +340,23 @@ fn an_object_file_gets_no_map_and_a_refused_file_takes_the_last_ones_with_it() {
         "a section-header count that cannot be true is not a file"
     );
     assert_eq!(region_count(), 0, "a refused file kept the last file's map");
+}
+
+/// The string list, read through the same C ABI the page uses.
+fn strings() -> Vec<String> {
+    let cap = 4096;
+    let count = string_count();
+    assert!(count <= 1 + 128, "the list is capped, and said so: {count}");
+    (0..count)
+        .map(|index| {
+            let pointer = alloc(cap);
+            let written = string_at(index, pointer, cap).max(0) as usize;
+            let keep = written.min(cap as usize);
+            let bytes = unsafe { std::slice::from_raw_parts(pointer as *const u8, keep) }.to_vec();
+            dealloc(pointer, cap);
+            String::from_utf8_lossy(&bytes).into_owned()
+        })
+        .collect()
 }
 
 /// The map's rows, read through the same C ABI the page uses.

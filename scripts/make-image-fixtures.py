@@ -41,7 +41,8 @@ ROOT = os.path.normpath(os.path.join(HERE, ".."))
 OUT = os.path.join(ROOT, "test", "fixtures")
 WORK = os.path.join(ROOT, "temp", "image-work")
 SOURCE = ('const char msg[] = "a lab fixture string padded out to length!!";\n'
-          'long entry(void) { return msg[0]; }\n')
+          'const char note[] = "a second literal the linker will place beside it";\n'
+          'long entry(void) { return msg[0] + note[3]; }\n')
 CFLAGS = ["-O1", "-fno-asynchronous-unwind-tables", "-fno-ident"]
 
 # ELF, from the header layouts rather than from memory.
@@ -208,6 +209,10 @@ def pe(raw):
     dirs_at = opt + (112 if plus else 96)
     ndirs_at = dirs_at - 4
     size_of_headers = struct.unpack_from("<I", raw, opt + 60)[0]
+    # Every address the map prints is on the loader's basis, image base included: that is what
+    # `objdump -h` shows in its VMA column, and it is what makes a string's address comparable with the
+    # targets a disassembly names. The field is 8 bytes wide in PE32+ and 4 in PE32.
+    image_base = struct.unpack_from("<Q" if plus else "<I", raw, opt + (24 if plus else 28))[0]
     entry = {
         "machine": MACHINE.get(machine, hex(machine)), "magic": hex(magic), "sections": nsec,
         "sizeofheaders": size_of_headers, "entry": struct.unpack_from("<I", raw, opt + 16)[0],
@@ -240,7 +245,7 @@ def pe(raw):
         if rawsize:
             used = rawsize if not vsize else min(rawsize, vsize)
             found.append(region(roff, used, pe_kind(name, chars), name,
-                                "vaddr {:#x}, raw {:#x} in file".format(vaddr, rawsize)))
+                                "vaddr {:#x}, raw {:#x} in file".format(image_base + vaddr, rawsize)))
         sections.append({"name": name, "roff": roff, "rawsize": rawsize, "chars": chars})
     cert_at = dirs_at + 4 * 8
     if entry["directories"] > 4:
@@ -275,6 +280,51 @@ def shadow(raw):
     return None, [], {}
 
 
+MIN_RUN = 4
+
+
+def printable_runs(raw, start, stop):
+    """Maximal runs of printable ASCII at least MIN_RUN long - binutils' rule, and its default length.
+
+    High bytes break a run here as they do there, so a UTF-8 string is not half-listed: it is not listed,
+    and that is the same answer `strings` gives.
+    """
+    at, found = start, []
+    while at < stop:
+        if not 0x20 <= raw[at] <= 0x7E:
+            at += 1
+            continue
+        end = at
+        while end < stop and 0x20 <= raw[end] <= 0x7E:
+            end += 1
+        if end - at >= MIN_RUN:
+            found.append((at, end - at, raw[at:end].decode("ascii")))
+        at = end
+    return found
+
+
+def string_rows(raw, merged):
+    """The string list, over the ranges the map itself calls loaded data.
+
+    Scanning only `data` and `rodata` is what separates a string list from a dump of the file: the
+    executable bytes, the headers and the symbol tables all contain printable accidents, and IDA's
+    Strings window is about data. The address column is the section's own virtual base plus the offset
+    into it, which is the basis the region rows already carry in their note.
+    """
+    rows, scanned, ranges = [], 0, 0
+    for each in merged:
+        if each["kind"] not in ("data", "rodata"):
+            continue
+        ranges += 1
+        scanned += each["length"]
+        found = re.search(r"0x[0-9a-f]+", each["note"])
+        vaddr = int(found.group(0), 16) if found else 0
+        for at, length, text in printable_runs(raw, each["start"], each["start"] + each["length"]):
+            rows.append("string\t{:#x}\t{}\t{}\t{}\t{}".format(
+                vaddr + (at - each["start"]), at, length, text, each["name"]))
+    return rows, scanned, ranges
+
+
 def rows_for(raw):
     """The rows the reader prints: every claim in file order, with what falls between them named."""
     claims, loaded, entry = shadow(raw)
@@ -307,10 +357,33 @@ def rows_for(raw):
     claimed = sum(each["length"] for each in merged if each["kind"] not in (GAP, "overlay"))
     rows = ["regions\t{}\tfile\t{}\tclaimed\t{}\tunloaded\t{}\tloaded-unaddressed\t{}".format(
         len(merged), len(raw), claimed, free, mapped_free)]
+    found, scanned, ranges = string_rows(raw, merged)
+    # Row order is the reader's: the two totals first, then the string list, then the map - so a page can
+    # show either half without reading the other.
+    rows = [rows[0], "strings\t{}\tmin\t{}\tscanned\t{}\tranges\t{}".format(
+        len(found), MIN_RUN, scanned, ranges)] + found + rows[1:]
     rows += ["region\t{}\t{}\t{}\t{}\t{}".format(
         each["start"], each["length"], each["kind"], each["name"], each["note"] or "-")
         for each in merged]
     return rows, entry, merged
+
+
+def check_strings(name, path, raw, merged):
+    """Every run this scan reports must be one binutils reports, at the same offset and length."""
+    out = run([tool("strings"), "-t", "x", "-a", "-n", str(MIN_RUN), path])
+    listed = {}
+    for line in out.splitlines():
+        found = re.match(r"^\s*([0-9a-f]+) (.*)$", line)
+        if found:
+            listed.setdefault(int(found.group(1), 16), []).append(found.group(2))
+    for entry in string_rows(raw, merged)[0]:
+        _, addr, offset, length, text, _section = entry.split("\t")
+        at, want = int(offset), int(length)
+        if text not in listed.get(at, []):
+            raise SystemExit("{}: strings does not list {!r} at {:#x}".format(name, text, at))
+        if len(text) != want:
+            raise SystemExit("{}: the run at {:#x} is {} here and {} for strings".format(
+                name, at, want, len(text)))
 
 
 def cross_check(name, path, entry, merged):
@@ -342,13 +415,20 @@ def cross_check(name, path, entry, merged):
         text = run([tool("objdump"), "-h", path])
         for found in re.finditer(r"^\s+\d+\s+(\S+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+"
                                  r"([0-9a-f]+)", text, re.M):
-            label, vsize, _vma, _lma, foff = found.groups()
+            label, vsize, vma, _lma, foff = found.groups()
             match = [one for one in merged if one["name"] == label and one["kind"] not in (GAP, "overlay")]
             if not match:
                 continue
             if int(foff, 16) != match[0]["start"]:
                 raise SystemExit("{}: objdump puts {} at {:#x}, the parse at {:x}".format(
                     name, label, int(foff, 16), match[0]["start"]))
+            # And the address the map carries has to be objdump's VMA - image base included. That is what
+            # lets a string's address be compared with the target a disassembly names, which is the whole
+            # use of a Strings window with an xref column.
+            stated = re.search(r"0x[0-9a-f]+", match[0]["note"])
+            if not stated or int(stated.group(0), 16) != int(vma, 16):
+                raise SystemExit("{}: objdump gives {} vma {:#x}, the map says {!r}".format(
+                    name, label, int(vma, 16), match[0]["note"]))
             # objdump prints the section's *virtual* size, which is the part of its raw span the file
             # claims to use - so the claim's length is that number, not SizeOfRawData.
             if int(vsize, 16) != match[0]["length"]:
@@ -360,6 +440,7 @@ def probe(name, path):
     raw = open(path, "rb").read()
     rows, entry, merged = rows_for(raw)
     cross_check(name, path, entry, merged)
+    check_strings(name, path, raw, merged)
     print("== {} {} bytes, {} regions, {} kinds".format(
         name, len(raw), len(merged), len(set(each["kind"] for each in merged))))
     for row in rows:

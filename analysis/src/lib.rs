@@ -35,6 +35,9 @@ thread_local! {
     /// The byte-region map of the same file, in file order. Rows rather than spans, because the page only
     /// ever asks for one at a time: a colour per range, and a count of the bytes no range claims.
     static REGIONS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// The string list for the same file again, over the ranges the map calls loaded data. Kept apart
+    /// from the map because a page that wants one should not have to read the other.
+    static STRINGS: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -124,6 +127,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     // have been replaced - and a stale colour strip is exactly as wrong as a stale name.
     NAMES.with(|slot| slot.borrow_mut().clear());
     REGIONS.with(|slot| slot.borrow_mut().clear());
+    STRINGS.with(|slot| slot.borrow_mut().clear());
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
@@ -184,7 +188,9 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     named.sort_by(|left, right| left.0.cmp(&right.0));
     named.dedup_by(|later, earlier| later.0 == earlier.0);
     NAMES.with(|slot| *slot.borrow_mut() = named);
-    REGIONS.with(|slot| *slot.borrow_mut() = region_rows(bytes));
+    let (regions, strings) = map_rows(bytes);
+    REGIONS.with(|slot| *slot.borrow_mut() = regions);
+    STRINGS.with(|slot| *slot.borrow_mut() = strings);
 
     rows.insert(
         0,
@@ -446,6 +452,14 @@ fn pe_spans(raw: &[u8]) -> Option<Vec<Span>> {
     let plus = magic == 0x20b;
     let dirs_at = opt.checked_add(if plus { 112 } else { 96 })?;
     let size_of_headers = word_at(raw, opt + 60, true)?;
+    // The loader's basis, so an address in this map is comparable with an address a disassembly names:
+    // `objdump -h` prints its VMA column the same way, and that is the column the fixture generator
+    // checks the map against. Eight bytes wide in PE32+, four in PE32.
+    let image_base = if plus {
+        addr_at(raw, opt + 24, true, true)?
+    } else {
+        word_at(raw, opt + 28, true)?
+    };
     let mut spans = Vec::new();
     spans.extend(span(0, size_of_headers, "header", "ms-dos stub and nt headers", ""));
     let table = opt.checked_add(optsz)?;
@@ -488,7 +502,7 @@ fn pe_spans(raw: &[u8]) -> Option<Vec<Span>> {
         // Only the bytes the section states it *uses* are named; what is left of its raw span is file
         // alignment, and the merge below colours that as a gap rather than letting the section claim it.
         let used = if vsize == 0 { rawsize } else { rawsize.min(vsize) };
-        let note = format!("vaddr {:#x}, raw {:#x} in file", vaddr, rawsize);
+        let note = format!("vaddr {:#x}, raw {:#x} in file", image_base + vaddr, rawsize);
         spans.extend(span(roff, used, pe_kind(&name, chars), &name, &note));
     }
     let directories = if optsz >= dirs_at - opt {
@@ -534,12 +548,13 @@ fn pe_kind(name: &str, chars: u64) -> &'static str {
 
 /// The map: every range the file names, in order, with what falls between them called what it is -
 /// padding inside a segment the loader maps, or bytes no table and no segment reaches at all.
-fn region_rows(raw: &[u8]) -> Vec<String> {
+/// The map and the string list, from the same walk of the same bytes.
+fn map_rows(raw: &[u8]) -> (Vec<String>, Vec<String>) {
     let (mut spans, loaded) = match elf_spans(raw) {
         Some(found) => (found.0, found.1),
         None => match pe_spans(raw) {
             Some(found) => (found, Vec::new()),
-            None => return Vec::new(),
+            None => return (Vec::new(), Vec::new()),
         },
     };
     spans.sort_by(|left, right| {
@@ -646,6 +661,16 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
         .filter(|each| each.kind != "gap" && each.kind != "overlay")
         .map(|each| each.length)
         .sum();
+    let (found, scanned, ranges) = string_runs(raw, &merged);
+    let listed_strings = found.len().min(MAX_STRINGS);
+    let mut strings = vec![format!(
+        "strings\t{}\tmin\t{MIN_PRINTABLE}\tscanned\t{scanned}\tranges\t{ranges}",
+        found.len()
+    )];
+    if found.len() > listed_strings {
+        strings.push(format!("cut\tstrings\t{}", found.len()));
+    }
+    strings.extend(found.into_iter().take(listed_strings));
     let mut rows = vec![format!(
         "regions\t{}\tfile\t{}\tclaimed\t{claimed}\tunloaded\t{unloaded}\tloaded-unaddressed\t{idle_mapped}",
         merged.len(),
@@ -664,7 +689,78 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
             if each.note.is_empty() { "-" } else { &each.note }
         ));
     }
-    rows
+    (rows, strings)
+}
+
+/// Printable runs of at least this many bytes, which is binutils' `strings` default and IDA's.
+const MIN_PRINTABLE: u64 = 4;
+/// Strings listed before the report says it stopped.
+const MAX_STRINGS: usize = 128;
+
+/// The first `0x…` in a region's note, which is where the map keeps the section's own virtual base.
+fn note_base(note: &str) -> u64 {
+    let at = match note.find("0x") {
+        Some(where_at) => where_at + 2,
+        None => return 0,
+    };
+    let digits = note[at..]
+        .chars()
+        .take_while(|each| each.is_ascii_hexdigit())
+        .collect::<String>();
+    u64::from_str_radix(&digits, 16).unwrap_or(0)
+}
+
+/// The string list, over the ranges the map itself calls loaded data.
+///
+/// Scanning only those is what separates a string list from a dump of the file: the executable bytes, the
+/// headers and the symbol tables are all full of printable accidents, and a Strings window is about data.
+/// The address is the section's virtual base plus the offset into it - the same basis the section table
+/// reports, an RVA for a PE - and every run is one `strings -t x -a` prints at the same file offset.
+fn string_runs(raw: &[u8], merged: &[Span]) -> (Vec<String>, u64, usize) {
+    let mut found = Vec::new();
+    let mut scanned = 0u64;
+    let mut ranges = 0usize;
+    for each in merged {
+        if each.kind != "data" && each.kind != "rodata" {
+            continue;
+        }
+        ranges += 1;
+        scanned += each.length;
+        let stop = match each.start.checked_add(each.length) {
+            Some(stop) => stop as usize,
+            None => continue,
+        };
+        let bytes = match raw.get(each.start as usize..stop) {
+            Some(window) => window,
+            None => continue,
+        };
+        let base = note_base(&each.note);
+        let mut at = 0usize;
+        while at < bytes.len() {
+            if !(0x20..=0x7E).contains(&bytes[at]) {
+                at += 1;
+                continue;
+            }
+            let mut end = at;
+            while end < bytes.len() && (0x20..=0x7E).contains(&bytes[end]) {
+                end += 1;
+            }
+            if (end - at) as u64 >= MIN_PRINTABLE {
+                found.push(format!(
+                    "string\t{:#x}\t{}\t{}\t{}\t{}",
+                    // `at` is already relative to the region's start, and `base` is that region's own
+                    // virtual address, so the sum is the address the loader will use.
+                    base + at as u64,
+                    each.start as usize + at,
+                    end - at,
+                    String::from_utf8_lossy(&bytes[at..end]),
+                    each.name
+                ));
+            }
+            at = end;
+        }
+    }
+    (found, scanned, ranges)
 }
 
 /// Regions listed before the report says it stopped. A stripped binary needs a dozen; a debug build with
@@ -720,6 +816,7 @@ pub extern "C" fn analyse_run(ptr: *const u8, len: i32) -> i32 {
         None => {
             REPORT.with(|stored| stored.borrow_mut().clear());
             REGIONS.with(|stored| stored.borrow_mut().clear());
+            STRINGS.with(|stored| stored.borrow_mut().clear());
             -2
         }
     }
@@ -777,6 +874,26 @@ pub extern "C" fn region_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     REGIONS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many string rows the last file produced, including its totals row. Zero means the file had no
+/// loaded data ranges to scan - a COFF object, or a file the map refused to draw.
+#[no_mangle]
+pub extern "C" fn string_count() -> i32 {
+    STRINGS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One string: `string`, then its address in the section's own basis, its file offset, its length, the
+/// text and the section it came out of. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn string_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    STRINGS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

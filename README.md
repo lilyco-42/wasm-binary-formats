@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 122 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, and the byte-region map below |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, and the printable strings that map loads |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -316,13 +316,25 @@ reaches at all. The colours say the difference, and the page says the limit out 
 in the file's own structure points there, which is not a promise that editing it is safe: a checksum, a
 signature, or a program that reads its own file by offset are three things this map cannot see.
 
+**The string list** (`string_count` / `string_at`) is the map's direct answer: a printable run counts only
+when it lies inside a range the file's own load tables name - `data` or `rodata`, never `meta`, never a
+`gap`. That is why it is not simply `strings -a`: the linker's `"Linker: LLD 22.1.8"` banner is the first
+byte of `.comment`, `!This program cannot be run in DOS mode.` sits in the MS-DOS stub, both are printable,
+binutils prints both, and no part of the running program ever reads them. Each row carries the address on
+the same basis as the disassembly (`0x140002000`, image base included), the file offset, the run's exact
+length and its section, so the page can say which strings an instruction actually points at and print that
+as `引用` without guessing.
+
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
-is also the answer to "no ELF or PE image can be produced on this host": 1 464 bytes of ELF64 and 3 072 of
+is also the answer to "no ELF or PE image can be produced on this host": 1 152 bytes of ELF64 and 3 072 of
 PE32+, each with alignment gaps the map has to find. The script refuses to write its probe unless its own
 reading of the headers agrees with `readelf -h -l -S` and `objdump -h` field for field, which is how two
 wrong offsets in the first draft - ELF64's `e_phentsize`, and the COFF `TimeDateStamp` sitting before the
-symbol pointer - died before the Rust port did.
+symbol pointer - died before the Rust port did. The same gate runs over the strings: every row the scan
+predicts has to be one `strings -t x -a -n 4` prints at that offset with that length, which is the check
+that pins `.buildid` down to `RSDS,` and `ovsLLD PDB.` - the two runs binutils finds there, cut apart by
+the CodeView GUID's non-printable bytes, rather than one word guessed at.
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -

@@ -150,10 +150,21 @@ function analyseHere(mod) {
 function analysisRows() {
   const state = toolState.get('analysis');
   if (!state) return null;
+  // Cross-references were computed from one file's bytes. If the page now stands on another, the 引用
+  // column would count edges that point into a different binary, so it goes with the old listing.
+  if (state.xrefFile !== pickedKey()) {
+    delete state.xrefs;
+    delete state.xrefFile;
+  }
   const fresh = state.mod ? analyseHere(state.mod) : null;
   if (fresh) state.rows = fresh;
   paintRegions(state);
   return state.rows || null;
+}
+
+/// What the held analysis module and its edges describe right now, or '' for nothing.
+function pickedKey() {
+  return picked ? `${picked.name}:${picked.bytes.length}` : '';
 }
 
 // The colour map: which bytes of the file a table of its own points at, and which none do.
@@ -272,7 +283,52 @@ function paintRegions(state) {
   box.appendChild(legend);
   box.appendChild(total);
   box.appendChild(caveat);
+  const listed = stringList(state.mod);
+  if (listed && listed.length > 1) {
+    const head = listed[0].split('\t');
+    const at = (label) => {
+      const index = head.indexOf(label);
+      return index > 0 ? head[index + 1] : '?';
+    };
+    const title = document.createElement('p');
+    title.textContent = `字符串（只在被加载的数据区里找，连续 ${at('min')} 个以上可见字符；`
+      + `共 ${head[1]} 条，扫过 ${at('scanned')} 字节）：`;
+    const table = document.createElement('pre');
+    table.textContent = listed.slice(1).map((row) => {
+      const cell = row.split('\t');
+      const address = Number.parseInt(cell[1].slice(2), 16);
+      const hits = (state.xrefs || []).filter((to) => to >= address && to < address + Number(cell[3])).length;
+      const used = !state.xrefs ? '引用：未反汇编' : hits ? `引用 ${hits} 处` : '无引用';
+      return `${cell[1]}  off ${cell[2]}  ${cell[3]} 字节  ${cell[5]}  ${used}  ${cell[4]}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+    if (!state.xrefs) {
+      const note = document.createElement('p');
+      note.textContent = '「引用」要有人指向这个地址才算得出来，那是反汇编模块的事 —— 没跑过就没有这一列，'
+        + '这里不猜。';
+      box.appendChild(note);
+    }
+  }
   host.out.parentElement.insertBefore(box, host.out.nextSibling);
+}
+
+/// The string list, or null when the loaded module does not have it (an older cached build).
+function stringList(mod) {
+  if (!mod || typeof mod.string_count !== 'function' || typeof mod.string_at !== 'function') {
+    return null;
+  }
+  const total = mod.string_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.string_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
 }
 
 /* The two modules compose the way the tools they stand for do: the analyser says which instruction
@@ -352,6 +408,18 @@ function disassembleHere(mod) {
     const edges = pass((at) => mod.disasm_xrefs(at, slice.length, BigInt(address), arch));
     refs = edges.rc < 0 ? `\n\n交叉引用：拒绝（返回 ${edges.rc}）`
       : `\n\n交叉引用：\n${edges.rows.join('\n')}`;
+    const stored = toolState.get('analysis');
+    if (stored) {
+      // Remember where the code points, because that is the first moment it is knowable: the analyser's
+      // string list uses it for the 引用 column, and repaints itself now rather than showing a stale
+      // "not disassembled" for a listing that has just been computed.
+      stored.xrefs = edges.rc < 0 ? [] : edges.rows
+        .map((row) => /to\s+0x([0-9a-f]+)/i.exec(row))
+        .filter(Boolean)
+        .map((hit) => Number.parseInt(hit[1], 16));
+      stored.xrefFile = pickedKey();
+      paintRegions(stored);
+    }
   }
   let flow = '';
   let starts = [];
