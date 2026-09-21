@@ -1,0 +1,330 @@
+{
+ "degrees": [
+  "degree\t0\tpreds\t0\tsuccs\t2\tentry\tyes",
+  "degree\t1\tpreds\t2\tsuccs\t0\tentry\tno",
+  "degree\t2\tpreds\t1\tsuccs\t1\tentry\tno",
+  "degree\t3\tpreds\t0\tsuccs\t1\tentry\tno",
+  "degree\t4\tpreds\t2\tsuccs\t2\tentry\tno",
+  "degree\t5\tpreds\t2\tsuccs\t1\tentry\tno",
+  "degree\t6\tpreds\t3\tsuccs\t2\tentry\tno",
+  "degree\t7\tpreds\t2\tsuccs\t2\tentry\tno",
+  "degree\t8\tpreds\t1\tsuccs\t2\tentry\tno",
+  "degree\t9\tpreds\t1\tsuccs\t1\tentry\tno",
+  "degree\t10\tpreds\t1\tsuccs\t1\tentry\tno"
+ ],
+ "edges": [
+  "edge\t0\tfrom\t0x0\tto\t0x30\tkind\ttaken\tback\tno",
+  "edge\t1\tfrom\t0x0\tto\t0x22\tkind\tfall\tback\tno",
+  "edge\t2\tfrom\t0x30\tto\t0x4f\tkind\ttaken\tback\tno",
+  "edge\t3\tfrom\t0x3d\tto\t0x40\tkind\tfall\tback\tno",
+  "edge\t4\tfrom\t0x40\tto\t0x45\tkind\tcall\tback\tno",
+  "edge\t5\tfrom\t0x40\tto\t0x45\tkind\tfall\tback\tno",
+  "edge\t6\tfrom\t0x45\tto\t0x47\tkind\tfall\tback\tno",
+  "edge\t7\tfrom\t0x47\tto\t0x22\tkind\ttaken\tback\tyes",
+  "edge\t8\tfrom\t0x47\tto\t0x4f\tkind\tfall\tback\tno",
+  "edge\t9\tfrom\t0x4f\tto\t0x40\tkind\ttaken\tback\tyes",
+  "edge\t10\tfrom\t0x4f\tto\t0x57\tkind\tfall\tback\tno",
+  "edge\t11\tfrom\t0x57\tto\t0x5f\tkind\ttaken\tback\tno",
+  "edge\t12\tfrom\t0x57\tto\t0x5b\tkind\tfall\tback\tno",
+  "edge\t13\tfrom\t0x5b\tto\t0x47\tkind\ttaken\tback\tyes",
+  "edge\t14\tfrom\t0x5f\tto\t0x47\tkind\ttaken\tback\tyes"
+ ],
+ "instructions": 42,
+ "leaders": [
+  "0x0",
+  "0x22",
+  "0x30",
+  "0x40",
+  "0x45",
+  "0x47",
+  "0x4f",
+  "0x5f"
+ ],
+ "objdump_listing": [
+  {
+   "address": "0x0",
+   "mnemonic": "push",
+   "operand": "%r15",
+   "target": null
+  },
+  {
+   "address": "0x2",
+   "mnemonic": "push",
+   "operand": "%r14",
+   "target": null
+  },
+  {
+   "address": "0x4",
+   "mnemonic": "push",
+   "operand": "%rsi",
+   "target": null
+  },
+  {
+   "address": "0x5",
+   "mnemonic": "push",
+   "operand": "%rdi",
+   "target": null
+  },
+  {
+   "address": "0x6",
+   "mnemonic": "push",
+   "operand": "%rbx",
+   "target": null
+  },
+  {
+   "address": "0x7",
+   "mnemonic": "sub",
+   "operand": "$0x20,%rsp",
+   "target": null
+  },
+  {
+   "address": "0xb",
+   "mnemonic": "mov",
+   "operand": "%rcx,%rdi",
+   "target": null
+  },
+  {
+   "address": "0xe",
+   "mnemonic": "test",
+   "operand": "%rcx,%rcx",
+   "target": null
+  },
+  {
+   "address": "0x11",
+   "mnemonic": "sete",
+   "operand": "%al",
+   "target": null
+  },
+  {
+   "address": "0x14",
+   "mnemonic": "test",
+   "operand": "%edx,%edx",
+   "target": null
+  },
+  {
+   "address": "0x16",
+   "mnemonic": "setle",
+   "operand": "%cl",
+   "target": null
+  },
+  {
+   "address": "0x19",
+   "mnemonic": "or",
+   "operand": "%al,%cl",
+   "target": null
+  },
+  {
+   "address": "0x1b",
+   "mnemonic": "mov",
+   "operand": "$0xffffffff,%ebx",
+   "target": null
+  },
+  {
+   "address": "0x20",
+   "mnemonic": "je",
+   "operand": "30 <classify+0x30>",
+   "target": "0x30"
+  },
+  {
+   "address": "0x22",
+   "mnemonic": "mov",
+   "operand": "%ebx,%eax",
+   "target": null
+  },
+  {
+   "address": "0x24",
+   "mnemonic": "add",
+   "operand": "$0x20,%rsp",
+   "target": null
+  },
+  {
+   "address": "0x28",
+   "mnemonic": "pop",
+   "operand": "%rbx",
+   "target": null
+  },
+  {
+   "address": "0x29",
+   "mnemonic": "pop",
+   "operand": "%rdi",
+   "target": null
+  },
+  {
+   "address": "0x2a",
+   "mnemonic": "pop",
+   "operand": "%rsi",
+   "target": null
+  },
+  {
+   "address": "0x2b",
+   "mnemonic": "pop",
+   "operand": "%r14",
+   "target": null
+  },
+  {
+   "address": "0x2d",
+   "mnemonic": "pop",
+   "operand": "%r15",
+   "target": null
+  },
+  {
+   "address": "0x2f",
+   "mnemonic": "ret",
+   "operand": "",
+   "target": null
+  },
+  {
+   "address": "0x30",
+   "mnemonic": "mov",
+   "operand": "%r8d,%esi",
+   "target": null
+  },
+  {
+   "address": "0x33",
+   "mnemonic": "mov",
+   "operand": "%edx,%r14d",
+   "target": null
+  },
+  {
+   "address": "0x36",
+   "mnemonic": "xor",
+   "operand": "%ebx,%ebx",
+   "target": null
+  },
+  {
+   "address": "0x38",
+   "mnemonic": "xor",
+   "operand": "%r15d,%r15d",
+   "target": null
+  },
+  {
+   "address": "0x3b",
+   "mnemonic": "jmp",
+   "operand": "4f <classify+0x4f>",
+   "target": "0x4f"
+  },
+  {
+   "address": "0x3d",
+   "mnemonic": "nopl",
+   "operand": "(%rax)",
+   "target": null
+  },
+  {
+   "address": "0x40",
+   "mnemonic": "call",
+   "operand": "45 <classify+0x45>",
+   "target": "0x45"
+  },
+  {
+   "address": "0x45",
+   "mnemonic": "add",
+   "operand": "%eax,%ebx",
+   "target": null
+  },
+  {
+   "address": "0x47",
+   "mnemonic": "inc",
+   "operand": "%r15",
+   "target": null
+  },
+  {
+   "address": "0x4a",
+   "mnemonic": "cmp",
+   "operand": "%r15,%r14",
+   "target": null
+  },
+  {
+   "address": "0x4d",
+   "mnemonic": "je",
+   "operand": "22 <classify+0x22>",
+   "target": "0x22"
+  },
+  {
+   "address": "0x4f",
+   "mnemonic": "mov",
+   "operand": "(%rdi,%r15,4),%ecx",
+   "target": null
+  },
+  {
+   "address": "0x53",
+   "mnemonic": "cmp",
+   "operand": "%esi,%ecx",
+   "target": null
+  },
+  {
+   "address": "0x55",
+   "mnemonic": "jg",
+   "operand": "40 <classify+0x40>",
+   "target": "0x40"
+  },
+  {
+   "address": "0x57",
+   "mnemonic": "test",
+   "operand": "%ecx,%ecx",
+   "target": null
+  },
+  {
+   "address": "0x59",
+   "mnemonic": "js",
+   "operand": "5f <classify+0x5f>",
+   "target": "0x5f"
+  },
+  {
+   "address": "0x5b",
+   "mnemonic": "inc",
+   "operand": "%ebx",
+   "target": null
+  },
+  {
+   "address": "0x5d",
+   "mnemonic": "jmp",
+   "operand": "47 <classify+0x47>",
+   "target": "0x47"
+  },
+  {
+   "address": "0x5f",
+   "mnemonic": "sub",
+   "operand": "%ecx,%ebx",
+   "target": null
+  },
+  {
+   "address": "0x61",
+   "mnemonic": "jmp",
+   "operand": "47 <classify+0x47>",
+   "target": "0x47"
+  }
+ ],
+ "rows": [
+  "edge\t0\tfrom\t0x0\tto\t0x30\tkind\ttaken\tback\tno",
+  "edge\t1\tfrom\t0x0\tto\t0x22\tkind\tfall\tback\tno",
+  "edge\t2\tfrom\t0x30\tto\t0x4f\tkind\ttaken\tback\tno",
+  "edge\t3\tfrom\t0x3d\tto\t0x40\tkind\tfall\tback\tno",
+  "edge\t4\tfrom\t0x40\tto\t0x45\tkind\tcall\tback\tno",
+  "edge\t5\tfrom\t0x40\tto\t0x45\tkind\tfall\tback\tno",
+  "edge\t6\tfrom\t0x45\tto\t0x47\tkind\tfall\tback\tno",
+  "edge\t7\tfrom\t0x47\tto\t0x22\tkind\ttaken\tback\tyes",
+  "edge\t8\tfrom\t0x47\tto\t0x4f\tkind\tfall\tback\tno",
+  "edge\t9\tfrom\t0x4f\tto\t0x40\tkind\ttaken\tback\tyes",
+  "edge\t10\tfrom\t0x4f\tto\t0x57\tkind\tfall\tback\tno",
+  "edge\t11\tfrom\t0x57\tto\t0x5f\tkind\ttaken\tback\tno",
+  "edge\t12\tfrom\t0x57\tto\t0x5b\tkind\tfall\tback\tno",
+  "edge\t13\tfrom\t0x5b\tto\t0x47\tkind\ttaken\tback\tyes",
+  "edge\t14\tfrom\t0x5f\tto\t0x47\tkind\ttaken\tback\tyes",
+  "degree\t0\tpreds\t0\tsuccs\t2\tentry\tyes",
+  "degree\t1\tpreds\t2\tsuccs\t0\tentry\tno",
+  "degree\t2\tpreds\t1\tsuccs\t1\tentry\tno",
+  "degree\t3\tpreds\t0\tsuccs\t1\tentry\tno",
+  "degree\t4\tpreds\t2\tsuccs\t2\tentry\tno",
+  "degree\t5\tpreds\t2\tsuccs\t1\tentry\tno",
+  "degree\t6\tpreds\t3\tsuccs\t2\tentry\tno",
+  "degree\t7\tpreds\t2\tsuccs\t2\tentry\tno",
+  "degree\t8\tpreds\t1\tsuccs\t2\tentry\tno",
+  "degree\t9\tpreds\t1\tsuccs\t1\tentry\tno",
+  "degree\t10\tpreds\t1\tsuccs\t1\tentry\tno",
+  "cfg\tblocks\t11\tedges\t15\tfall\t7\ttaken\t7\tcall\t1\tback\t4\tunreached\t1"
+ ],
+ "summary": "cfg\tblocks\t11\tedges\t15\tfall\t7\ttaken\t7\tcall\t1\tback\t4\tunreached\t1",
+ "text_bytes": 99,
+ "text_hex": "415741565657534883ec204889cf4885c90f94c085d20f9ec108c1bbffffffff740e89d84883c4205b5f5e415e415fc34489c64189d631db4531ffeb120f1f00e80000000001c349ffc74d39fe74d3428b0cbf39f17fe985c97804ffc3ebe829cbebe4",
+ "text_offset": 300
+}

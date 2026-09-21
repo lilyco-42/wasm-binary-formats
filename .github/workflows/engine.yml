@@ -56,7 +56,7 @@ jobs:
           cmake --build build-capstone -j3
           emcc -O2 -I vendor/capstone/include disasm/shim.c build-capstone/libcapstone.a \
             -o apk-lens-disasm.wasm -s STANDALONE_WASM \
-            -s EXPORTED_FUNCTIONS=_disasm_run,_disasm_count,_disasm_at,_disasm_xrefs,_disasm_funcs,_self_test,_malloc,_free \
+            -s EXPORTED_FUNCTIONS=_disasm_run,_disasm_count,_disasm_at,_disasm_xrefs,_disasm_funcs,_disasm_cfg,_self_test,_malloc,_free \
             -s ERROR_ON_UNDEFINED_SYMBOLS=0
           ls -l apk-lens-disasm.wasm | awk '{print "disassembler module:", $5, "bytes"}'
 

@@ -304,7 +304,7 @@ time after it.
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 117 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
-| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references and basic blocks / function boundaries for x86-64, AArch64 and Thumb bytes |
+| `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries and the control-flow edges between blocks, for x86-64, AArch64 and Thumb bytes |
 
 The third module is the reason the second one reports a `machine` and a section's file offset at all:
 the page hands the analyser's answer - which instruction set, and where the code lies in the file -
@@ -340,7 +340,7 @@ something smaller: **BinCAT** needs Z3, Boost and a host C++ build, and has no w
 multi-hour build whose useful subset still runs to tens of megabytes - an order of magnitude beyond a
 200 KB demo. Instruction decoding, by contrast, turned out to be reachable the same day the question
 was measured, so it ships: what is left on this lane is the rest of the pipeline those tools are known
-for - per-block successors and then names and types over the blocks and edges that now exist - one
+for - names and types over the blocks and edges that now exist - one
 opt-in module at a time. A decompiler is not on the list: the well-known one is proprietary, and
 "we ported it" would not be true.
 
@@ -354,8 +354,8 @@ window that was disassembled or outside it, which is the difference between a ca
 section and a pointer into something the loader has not shown you; and the summary row gives the counts
 against the number of instructions scanned. `self_test` exercises this second path too, on a five-byte
 `call rel32 + 10`, so a build that decodes text but not edges returns a negative number and the page
-says so. What it does **not** claim: a control-flow graph, function detection, or any statement that an
-address it prints is a function entry.
+says so. What it does **not** claim: that an address it prints is a function entry, which is what the
+third and fourth passes are for.
 
 The third pass is `disasm_funcs`, and it is the reason the edges above are kept rather than thrown
 away: a **block** ends at a call, a jump or a return, or just before any address one of this window's
@@ -367,9 +367,30 @@ terminator kind it holds, and `block` carries its own extent, its function and i
 and `ret` mean the same thing for all three instruction sets, and `self_test` refuses a build whose
 six-byte `call` + `ret` does not come back as one function and two blocks.
 
+The fourth pass is `disasm_cfg`, and it turns the blocks into a graph by naming their successors. An
+edge is drawn per way out of a block: `taken` for a branch whose target is inside the window, `fall` for
+the block that begins at the byte after the terminator, and `call` for a call whose target is inside the
+window - labelled separately, because a call leaves the function and drawing it as flow inside one would
+be wrong even though the bytes really do name a target. A conditional branch therefore has two successors
+and an unconditional jump or a `ret` has one or none, which is the difference between a list of blocks
+and a graph: `self_test` checks exactly that on four bytes (`jne +2`, a `nop`, a `ret`), where the taken
+edge and the fallthrough leave the same block and no linear walk can produce both. Two derived facts ride
+on top of the edges, because they are what people look a graph for: `back yes` marks an edge whose
+destination sits at or below its source - the loop - and a block with no predecessor that is not the
+entry is counted `unreached`, which in compiler output is alignment padding and in a truncated window is
+a block whose other half the caller did not hand over.
+
+The fixture for this one is `scripts/make-cfg-fixture.py`: `clang -c` writes a function with a guard, a
+loop and a three-way branch, and `objdump -d` reads it back, so every address and every branch target in
+the expected rows is another program's answer. The block boundaries themselves are this lab's rule applied
+to objdump's listing - objdump has no notion of a basic block - so what the test proves is that the module
+computes the graph the listing implies, not that two implementations agree on a graph. The rows say which
+facts they rest on: the guard's block has two successors, fifteen edges come back over eleven blocks, and
+the `nopl` padding at `0x3d` is the one block nothing reaches.
+
 Two limits are stated rather than smoothed over. The split is a linear scan, not reachability: a
-function is an address range, so bytes the control flow never touches still fall inside one, and no
-per-block successor list is claimed. And a call's target is what the raw bytes say, which for a `clang -c`
+function is an address range, so bytes the control flow never touches still fall inside one - the graph
+rows now say which blocks nothing reaches, but they do not remove them. And a call's target is what the raw bytes say, which for a `clang -c`
 object - where the linker has not filled the displacement in yet - means the instruction *after* the
 call; `objdump -d` splits those same bytes at its symbol table instead, which a window of instructions
 does not have. The page therefore says how many functions it found, and shows the rows.
@@ -405,6 +426,7 @@ temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c wri
 temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
 temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
 temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
+temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module

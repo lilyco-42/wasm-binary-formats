@@ -222,7 +222,13 @@ function disassembleHere(mod) {
     flow = split.rc < 0 ? `\n\n函数划分：拒绝（返回 ${split.rc}）`
       : `\n\n函数与基本块：${split.rc} 个函数\n${split.rows.join('\n')}`;
   }
-  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}${flow}`;
+  let graph = '';
+  if (typeof mod.disasm_cfg === 'function') {
+    const arrows = pass((at) => mod.disasm_cfg(at, slice.length, BigInt(address), arch));
+    graph = arrows.rc < 0 ? `\n\n控制流图：拒绝（返回 ${arrows.rc}）`
+      : `\n\n控制流边：${arrows.rc} 条\n${arrows.rows.join('\n')}`;
+  }
+  return `${picked.name} 的 .text @0x${address.toString(16)}：${lines.length} 条指令\n${lines.join('\n')}${refs}${flow}${graph}`;
 }
 
 function cString(mod, pointer) {

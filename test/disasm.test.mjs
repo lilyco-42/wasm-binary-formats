@@ -41,7 +41,7 @@ const instance = new WebAssembly.Instance(compiled, importsFor(compiled));
 const ex = instance.exports;
 
 for (const name of ['memory', 'self_test', 'disasm_run', 'disasm_count', 'disasm_at', 'disasm_xrefs',
-           'disasm_funcs']) {
+           'disasm_funcs', 'disasm_cfg']) {
   assert.ok(name in ex, `${path} does not export ${name}`);
 }
 
@@ -164,6 +164,68 @@ function funcs(code, pc, arch) {
   for (let i = 0; i < ex.disasm_count(); i++) rows.push(cString(ex.disasm_at(i)));
   return { rc, rows };
 }
+
+function cfg(code, pc, arch) {
+  const ptr = ex.malloc(code.length);
+  new Uint8Array(ex.memory.buffer, ptr, code.length).set(code);
+  const rc = ex.disasm_cfg(ptr, code.length, BigInt(pc), arch);
+  ex.free(ptr);
+  const rows = [];
+  for (let i = 0; i < ex.disasm_count(); i++) rows.push(cString(ex.disasm_at(i)));
+  return { rc, rows };
+}
+
+test('a conditional branch gives a block two successors, which no linear walk can find', () => {
+  // jne +2 at 0x3000 targets the ret at 0x3004, so the nop at 0x3002 is reached only by falling through
+  // and the block that ends at 0x3002 closes because 0x3004 is a leader: three blocks, three arrows.
+  const { rc, rows } = cfg(new Uint8Array([0x75, 0x02, 0x90, 0xc3]), 0x3000, 0);
+  assert.equal(rc, 3, rows.join(' | '));
+  assert.equal(rows[0], 'edge\t0\tfrom\t0x3000\tto\t0x3004\tkind\ttaken\tback\tno');
+  assert.equal(rows[1], 'edge\t1\tfrom\t0x3000\tto\t0x3002\tkind\tfall\tback\tno');
+  assert.equal(rows[2], 'edge\t2\tfrom\t0x3002\tto\t0x3004\tkind\tfall\tback\tno');
+  assert.equal(rows[3], 'degree\t0\tpreds\t0\tsuccs\t2\tentry\tyes');
+  assert.equal(rows[5], 'degree\t2\tpreds\t2\tsuccs\t0\tentry\tno');
+  assert.equal(rows[rows.length - 1], 'cfg\tblocks\t3\tedges\t3\tfall\t2\ttaken\t1\tcall\t0\tback\t0\tunreached\t0');
+});
+
+test('a jump to itself is the back edge, and a call out of the window is only a fallthrough', () => {
+  // jmp rel8 -2 at 0x3000 jumps to its own address, so the one edge points at or below its source.
+  const loop = cfg(new Uint8Array([0xeb, 0xfe]), 0x3000, 0);
+  assert.equal(loop.rc, 1, loop.rows.join(' | '));
+  assert.equal(loop.rows[0], 'edge\t0\tfrom\t0x3000\tto\t0x3000\tkind\ttaken\tback\tyes');
+  assert.ok(loop.rows[loop.rows.length - 1].includes('\tback\t1\t'), loop.rows.join(' | '));
+
+  // call rel32 +10 at 0x2000 leaves the six bytes in hand, so there is no call arrow - the block still
+  // falls through to the ret, which is what makes the window's graph a line rather than a loop.
+  const out = cfg(new Uint8Array([0xe8, 0x0a, 0x00, 0x00, 0x00, 0xc3]), 0x2000, 0);
+  assert.equal(out.rc, 1, out.rows.join(' | '));
+  assert.equal(out.rows[0], 'edge\t0\tfrom\t0x2000\tto\t0x2005\tkind\tfall\tback\tno');
+  assert.ok(out.rows[out.rows.length - 1].endsWith('\tunreached\t0'), out.rows.join(' | '));
+});
+
+test('the graph of a compiled loop matches the listing objdump printed for the same bytes', async () => {
+  // `scripts/make-cfg-fixture.py` compiles a C function with a guard, a loop and a three-way branch, then
+  // reads it back with objdump and writes the block and edge lists here. The addresses and every branch
+  // target are objdump's; the grouping into blocks is this module's rule, stated in the script, and the
+  // degrees are arithmetic over the edges. What the two agree on is therefore not "two implementations
+  // say the same graph" but "the module computes the graph the listing implies" - which is the honest reach
+  // of a fixture written by the same lab that reads it, and the reason the row is spelled out here.
+  const probe = JSON.parse(await readFile('test/fixtures/flow.probe.json', 'utf8'));
+  const code = Uint8Array.from(probe.text_hex.match(/../g).map((each) => parseInt(each, 16)));
+  assert.equal(code.length, probe.text_bytes, "the window does not match the probe's own hex");
+  const { rc, rows } = cfg(code, 0, 0);
+  const expected = [...probe.edges, ...probe.degrees, probe.summary];
+  assert.equal(rc, probe.edges.length, rows.join(' | '));
+  assert.deepEqual(rows, expected, rows.join('\n'));
+
+  // Two facts the byte listing alone does not give you, pinned separately so a regression cannot pass by
+  // both sides changing together: the loop comes back, and the alignment padding is unreachable.
+  const summary = rows[rows.length - 1];
+  assert.match(summary, /\tback\t4\t/, summary);
+  assert.match(summary, /\tunreached\t1$/, summary);
+  assert.ok(rows.some((row) => row.startsWith('edge') && row.includes('to\t0x22') && row.includes('back\tyes')),
+    `the loop's back edge is gone: ${rows[7]}`);
+});
 
 test('a call out of the window is one function and two blocks', () => {
   // call rel32 +10 at 0x2000 targets 0x200f, past the six bytes in hand, so nothing inside starts a
