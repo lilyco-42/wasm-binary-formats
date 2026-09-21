@@ -79,6 +79,7 @@ test('the analysis module stands on its own exports', () => {
     'dynamic_count', 'dynamic_at',
     'debug_count', 'debug_at',
     'symver_count', 'symver_at',
+    'tls_count', 'tls_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -167,6 +168,7 @@ test('the base module the page always downloads carries none of this', async () 
     'dynamic_count', 'dynamic_at',
     'debug_count', 'debug_at',
     'symver_count', 'symver_at',
+    'tls_count', 'tls_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -670,5 +672,64 @@ test('the version tables both listings read are the ones the module reports', as
   for (const name of ['lab.so', 'lab.elf', 'res.dll']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.symver_count(), 0, `${name} answered with version tables`);
+  }
+});
+
+test('the thread-local table the loader walks is the one the module reports', async () => {
+  // scripts/make-tls-fixtures.py builds tls.dll from a source with seventy callbacks and plain.dll from
+  // one with none, then writes a row only where five readings agree: its own walk, `llvm-readobj
+  // --coff-tls-directory`, pefile's `DIRECTORY_ENTRY_TLS`, the base-relocation list - which enumerates
+  // the array without reading it - and Windows itself running the callbacks and reporting their order.
+  const probe = JSON.parse(await readFile('test/fixtures/tls.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('	');
+    return parts[parts.indexOf(key) + 1];
+  };
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.tls_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the five readings said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('tls_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+    // Every address the file states is given three ways, and the three have to be the same number: a
+    // reader that subtracted the image base twice, or not at all, agrees with itself here only by accident.
+    if (want.length === 0) {
+      continue;
+    }
+    const base = Number(BigInt(cell(want[0], 'base')));
+    for (const row of want.filter((one) => one.startsWith('field	') || one.startsWith('callback	'))) {
+      assert.equal(Number(BigInt(cell(row, 'value'))) - base, Number(BigInt(cell(row, 'rva'))),
+        `${name}: ${row} does not subtract the base once`);
+    }
+    // The count in the totals row is the file's own enumeration, not the number of rows the panel was
+    // allowed to show, so a cut list has to state the whole of it.
+    const listed = want.filter((one) => one.startsWith('callback	')).length;
+    const stated = Number(cell(want[0], 'callbacks'));
+    assert.ok(listed <= stated, `${name}: ${listed} rows for ${stated} callbacks`);
+    if (stated > listed) {
+      const cut = want[want.length - 1];
+      assert.ok(cut.startsWith('cut	'), `${name}: a capped list with no cut row`);
+      assert.equal(cell(cut, 'callbacks'), String(stated), `${name}: the cut row counts something else`);
+    }
+  }
+  // The interesting difference between the two files is what an analyser may not conclude: a DLL built
+  // from a source that never mentions `_Thread_local` still has a table, because its runtime supplies
+  // one - and its two callbacks come back with the higher address first, which is the array's order and
+  // not a sort.
+  report(new Uint8Array(await readFile('test/fixtures/plain.dll')));
+  const thin = Array.from({ length: ex.tls_count() }, (_, index) => text('tls_at', index));
+  const bodies = thin.filter((one) => one.startsWith('callback	'));
+  assert.equal(bodies.length, 2, 'the table the runtime supplies is not there');
+  assert.ok(Number(BigInt(cell(bodies[0], 'rva'))) > Number(BigInt(cell(bodies[1], 'rva'))),
+    'the array came back sorted');
+  assert.ok(bodies.every((one) => cell(one, 'name') === '-'), 'a callback the file exports was named');
+  // An ELF keeps its thread-local bookkeeping in program headers, a COFF object has no data directories
+  // at all, and `res.dll` is a PE32 image - the width no fixture here reaches.
+  for (const name of ['lab.so', 'lab32.so', 'answer.obj', 'res.dll']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.tls_count(), 0, `${name} answered with a PE's TLS directory`);
   }
 });

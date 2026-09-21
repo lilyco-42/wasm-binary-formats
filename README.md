@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -624,6 +624,27 @@ disagreement. A definition's `BASE` flag rides beside the number for the same re
 it exists because the version index is 16 bits in both classes while the tables around it are addressed by
 class-wide words: the two files agree on every version fact and differ only in where their sections lie.
 
+**The thread-local window** (`tls_count` / `tls_at`) is a PE's directory 9, and the callbacks are the reason
+to read it: the loader runs that array before the entry point exists, so those bodies are called by nothing
+in the program and a reader that only lists functions the code jumps to will never show them. Four of the
+record's six fields are addresses, and they are *virtual* - `llvm-readobj --coff-tls-directory` and pefile's
+`DIRECTORY_ENTRY_TLS` both print them with the image base still on - so each row states the number the bytes
+hold, the same number as an RVA, and the file offset that RVA walks to, which is how a reader that subtracted
+the base twice, or not at all, is caught. The index has no offset: it lies in `.bss`, and the file keeps no
+byte for it, so the row says `-1` rather than rounding it into an address that looks real.
+
+`tls.dll` is compiled from a source with seventy callbacks, and its array holds seventy-three - the C runtime
+contributes three that the export table does not know, and those rows answer `-`. Five readings have to agree
+before a row is written, and the last two are not parsers. The base-relocation list enumerates the array
+without reading it, because the linker emits a fixup for every slot it filled with an address and none for the
+terminating zero, so the array's *length* is bounded by a structure that never saw it. And the file is loaded:
+each of the seventy writes its own number into a table as the loader runs it, so the order the array is walked
+in is taken from Windows rather than assumed from section names. `plain.dll` is the other half of the pair - a
+translation unit that never mentions `_Thread_local`, whose directory the runtime supplies anyway, with two
+callbacks that come back in the file's own order and not sorted by address. Nothing claims the 32-bit arm:
+there is no 32-bit Windows toolchain on this host, so `bits` is 64 in every row here, and the PE32 fixtures in
+the directory answer with no rows at all.
+
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -767,66 +788,72 @@ python scripts/make-icon-fixtures.py   # Pillow writes tiny.icns, then decodes i
 python scripts/make-plist-fixtures.py  # plistlib writes the binary plists; tools/plist-sim.py decodes them back
 python scripts/make-qoi-fixtures.py    # Pillow encodes the QOI fixtures and decodes them back
 python scripts/make-jp2-fixtures.py    # Pillow/openjpeg writes the JP2 boxes; the probe walks them back
-temp/venv/Scripts/python.exe scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
-temp/venv/Scripts/python.exe scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
-temp/venv/Scripts/python.exe scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
-temp/venv/Scripts/python.exe scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
-temp/venv/Scripts/python.exe scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
-temp/venv/Scripts/python.exe scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
-temp/venv/Scripts/python.exe scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
-temp/venv/Scripts/python.exe scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
-temp/venv/Scripts/python.exe scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
-temp/venv/Scripts/python.exe scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
-temp/venv/Scripts/python.exe scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
-temp/venv/Scripts/python.exe scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
-temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
-temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
-temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
-temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
-temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
-temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
-temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
-temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
-temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
-temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
-temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
-temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
-temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
-temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
-temp/venv/Scripts/python.exe scripts/make-export-fixtures.py     # lld-link writes test/fixtures/exp.dll with an aliased, a nameless, an empty and a forwarded export; llvm-readobj --coff-exports and objdump -x must both agree with the byte walk before the probe is written
-temp/venv/Scripts/python.exe scripts/make-import-fixtures.py     # csc.exe writes test/fixtures/lab.dll (the only PE this host can make with a real import table); ordinal.dll and noilt.dll are its bytes with one u32 changed, and both readers have to read the patched shape the same way
-temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
-npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
-temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
-temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports test/fixtures/lab.3mf and then re-reads it, zipfile lists the parts and xml.etree.ElementTree walks the mesh; the probe is not written unless the two counts agree across all three readings, and hand.3mf exists to carry the four shapes trimesh will not produce
-temp/venv/Scripts/python.exe scripts/make-xsd-fixtures.py        # authors five fixtures, then gates the probe on `xmlschema`'s compiled component maps and the JDK's Xerces agreeing with ElementTree's tree name by name; neither witness is reachable from CI, so the committed probe is the evidence
-temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
-temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
+python scripts/make-woff2-fixture.py   # fontTools + brotli write tiny.woff2
+python scripts/make-npy-fixtures.py      # numpy writes the .npy files and supplies the sizes
+python scripts/make-h5-fixtures.py         # h5py writes HDF5 twice, old and new superblock
+python scripts/make-avro-fixtures.py        # fastavro writes the containers and counts the records back
+python scripts/make-arrow-fixtures.py      # pyarrow writes both IPC framings and reads every field back
+python scripts/make-parquet-fixtures.py  # pyarrow writes parquet and answers every footer field back
+python scripts/make-onnx-fixtures.py      # onnx writes the models and re-reads every field back
+python scripts/make-heif-fixtures.py        # pillow-heif (libheif) writes HEIF and reports its own size and colour
+python scripts/make-cfb-fixtures.py         # LibreOffice + xlwt write compound files that olefile then re-reads
+python scripts/make-stl-fixtures.py       # meshio writes the meshes and counts the triangles back
+python scripts/make-icc-fixtures.py     # littleCMS (via Pillow) writes the profiles and reads them back
+python scripts/make-bmff-wide-fixture.py  # hand-built 64-bit box; mutagen and ffprobe read it back
+python scripts/make-emf-fixtures.py       # LibreOffice and Windows GDI each write a metafile
+python scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
+python scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
+python scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
+python scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
+python scripts/make-psd-fixtures.py           # psd-tools writes the documents, Pillow reads every one back
+python scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
+python scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
+python scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
+python scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
+python scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
+python scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
+python scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
+python scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
+python scripts/make-export-fixtures.py     # lld-link writes test/fixtures/exp.dll with an aliased, a nameless, an empty and a forwarded export; llvm-readobj --coff-exports and objdump -x must both agree with the byte walk before the probe is written
+python scripts/make-import-fixtures.py     # csc.exe writes test/fixtures/lab.dll (the only PE this host can make with a real import table); ordinal.dll and noilt.dll are its bytes with one u32 changed, and both readers have to read the patched shape the same way
+python scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
+npm install jsonc-parser && python scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
+python scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
+python scripts/make-3mf-fixtures.py      # trimesh exports test/fixtures/lab.3mf and then re-reads it, zipfile lists the parts and xml.etree.ElementTree walks the mesh; the probe is not written unless the two counts agree across all three readings, and hand.3mf exists to carry the four shapes trimesh will not produce
+python scripts/make-xsd-fixtures.py        # authors five fixtures, then gates the probe on `xmlschema`'s compiled component maps and the JDK's Xerces agreeing with ElementTree's tree name by name; neither witness is reachable from CI, so the committed probe is the evidence
+python scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
+python scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
 python scripts/make-version-fixtures.py                                # no new fixture: the version block already in res.dll is parsed as a tree and then re-asked through GetFileVersionInfoW / VerQueryValueW - the probe is not written unless the fixed block's thirteen words, the language pairs and every string match in both directions
-temp/venv/Scripts/python.exe scripts/make-resource-fixtures.py      # csc writes res.dll (icon, manifest, version block) and rc + windres + gcc write rcres.dll (string types and a string name); the probe is not written unless a python walk, `llvm-readobj --coff-resources` and Windows' own resource loader agree on every type, name, language, size - and on the bytes at the file offset the walk derived from each RVA
-temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
+python scripts/make-resource-fixtures.py      # csc writes res.dll (icon, manifest, version block) and rc + windres + gcc write rcres.dll (string types and a string name); the probe is not written unless a python walk, `llvm-readobj --coff-resources` and Windows' own resource loader agree on every type, name, language, size - and on the bytes at the file offset the walk derived from each RVA
+python scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
 test/fixtures/labarm.so already exist, and every program header is read three times - the bytes at e_phoff,
 readelf -lW and llvm-readobj --segments - which must agree on all six numbers and on the type word before
 test/fixtures/segment.probe.json is written; the script also compiles test/fixtures/interp.elf, because an
 interpreter, a thread-local block and a note appear only in an executable
-temp/venv/Scripts/python.exe scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
+python scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
 test/fixtures/lab.so and lab32.so; readelf -rW and objdump -R must agree on every offset, type name, symbol
 and addend before elfreloc.probe.json is written, and the eight type numbers they name are paired per machine
-temp/venv/Scripts/python.exe scripts/make-dynamic-fixtures.py    # clang -shared writes liblab.so,
+python scripts/make-dynamic-fixtures.py    # clang -shared writes liblab.so,
 libuser.so and many.so (seventy stub libraries, needed with --no-as-needed so the list is long enough to be
 cut); readelf -dW and llvm-readobj --dynamic-table must agree with the byte walk on every tag, value and
 bracketed string, and on the word each puts beside it, before dynamic.probe.json is written
-temp/venv/Scripts/python.exe scripts/make-symver-fixtures.py  # clang -shared -Wl,--version-script writes
+python scripts/make-symver-fixtures.py  # clang -shared -Wl,--version-script writes
 libver.so and libver32.so (one object, a two-node LAB_1/LAB_2 script, -Wl,-soname so the BASE record names
 the file and not the build directory) and libuse.so from a caller that needs LAB_2 out of the first; the
 walk, readelf -VW and llvm-readobj --version-info must agree on every index, hash, flag, name and count,
 and DT_VERDEFNUM / DT_VERNEEDNUM must match the chains, before symver.probe.json is written. The same three
 files are then read by scripts/make-dynamic-fixtures.py as well, which is where the five DT_VER* tag names
 earned their words
-temp/venv/Scripts/python.exe scripts/make-debug-fixtures.py       # clang -g -gcodeview and lld-link /debug
+python scripts/make-debug-fixtures.py       # clang -g -gcodeview and lld-link /debug
 /link /debug write dbg.exe (with /pdbaltpath so no local path is recorded, and /timeStamp so the file is
 reproducible); the walk, llvm-readobj --coff-debug-directory and pefile must agree on every number and on the
 CodeView signature, GUID, age and path before debug.probe.json is written
+python scripts/make-tls-fixtures.py                      # gcc -shared -O1 -g0 -Wl,-s writes tls.dll (seventy
+TLS callbacks, each one recording its own number as the loader runs it) and plain.dll (a translation unit that
+never mentions _Thread_local); the walk, llvm-readobj --coff-tls-directory, pefile and the base-relocation list
+must agree on all six fields and on how long the array is, and Windows itself must run the callbacks in the
+order the array lists them, before tls.probe.json is written. Two runs give back the same rows and not the same
+bytes, so nothing hashes these two files
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

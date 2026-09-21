@@ -216,6 +216,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DYNAMIC.with(|slot| slot.borrow_mut().clear());
     SYMVER.with(|slot| slot.borrow_mut().clear());
     DEBUG.with(|slot| slot.borrow_mut().clear());
+    TLS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -363,6 +364,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DEBUG.with(|slot| *slot.borrow_mut() = debug);
     let versions = symver_rows(bytes, &file);
     SYMVER.with(|slot| *slot.borrow_mut() = versions);
+    let storage = tls_rows(bytes, &export_names);
+    TLS.with(|slot| *slot.borrow_mut() = storage);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -740,6 +743,10 @@ struct Pe {
     dirs: usize,
     wide: bool,
     sections: Vec<(u64, u64, u64, String)>,
+    /// The sections that hold memory and no file bytes at all - `.bss` is the standing case, and a PE's
+    /// TLS index lives in one. `at` cannot name a position in them, which is a fact a row has to carry
+    /// rather than round off to an offset of zero.
+    empty: Vec<(u64, u64, String)>,
 }
 
 impl Pe {
@@ -764,6 +771,7 @@ impl Pe {
         };
         let table = opt.checked_add(optsz)?;
         let mut sections = Vec::new();
+        let mut empty = Vec::new();
         for each in 0..nsec.min(192) {
             let step = usize::try_from(each.checked_mul(40).unwrap_or(u64::MAX)).ok()?;
             let at = table.checked_add(step)?;
@@ -774,15 +782,17 @@ impl Pe {
                 word_at(raw, at + 16, true)?,
                 word_at(raw, at + 20, true)?,
             );
+            let label = String::from_utf8_lossy(name).into_owned();
             if rawsize == 0 {
+                empty.push((vaddr, vsize, label));
                 continue;
             }
             // The span an RVA can fall in: a section's virtual size is what it claims to hold, and its
             // raw size is what the file gives it. Either can be the larger one, so the map takes the
             // wider - which is what lets a byte past the declared end still resolve to a section.
-            sections.push((vaddr, vsize.max(rawsize), roff, String::from_utf8_lossy(name).into_owned()));
+            sections.push((vaddr, vsize.max(rawsize), roff, label));
         }
-        Some(Pe { image_base, dirs, wide, sections })
+        Some(Pe { image_base, dirs, wide, sections, empty })
     }
 
     /// Where an RVA lies: a file offset and the section that owns it. `None` is the honest answer for
@@ -795,6 +805,15 @@ impl Pe {
             }
         }
         None
+    }
+
+    /// The section that owns an address the file keeps no bytes for - the other half of `at`, and the
+    /// only answer for an address in a section the loader fills in rather than reads.
+    fn in_empty(&self, rva: u64) -> Option<&str> {
+        self.empty
+            .iter()
+            .find(|(base, span, _)| rva >= *base && rva < base.saturating_add(*span))
+            .map(|(_, _, name)| name.as_str())
     }
 }
 
@@ -810,7 +829,6 @@ impl Pe {
 /// it, and an import slot is named `dll!name` (or `dll#ordinal`, where the file states no
 /// name at all) because that is what a call through the slot reaches.
 fn export_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
-    let mut found_names: Vec<(u64, String)> = Vec::new();
     let pe = match Pe::parse(raw) {
         Some(found) => found,
         None => return (Vec::new(), Vec::new()),
@@ -870,6 +888,41 @@ fn export_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
         })
         .collect();
     let dll = cstr_at(raw, pe.at(name_rva).map(|(where_, _)| where_).unwrap_or(0));
+    // Every name the table carries, not just the ones the rows below are allowed to show: this list is a
+    // lookup, and a file with more exports than a panel lists still has to answer for the address. The
+    // linker's own order is what pairs a name with a body - `tls.dll`'s seventieth name is its eighth
+    // callback, because the name table is sorted by the spelling and not by the address - so the pairs
+    // are put back in ordinal order here, which is the order the rows are in and the one that decides
+    // between two names on one address.
+    let mut listed: Vec<(u32, u64, String)> = Vec::new();
+    for (owner, name_at) in &entries {
+        let step = match usize::try_from(u64::from(*owner).checked_mul(4).unwrap_or(u64::MAX)).ok() {
+            Some(one) => one,
+            None => continue,
+        };
+        let rva = match eat_at.checked_add(step).and_then(|where_| word_at(raw, where_, true)) {
+            Some(value) => value,
+            None => continue,
+        };
+        // A hole, a forwarder and an address in no section are the three kinds of slot that name no body
+        // of this file's, so none of them contributes a name.
+        if rva == 0
+            || (dir_rva <= rva && rva < dir_rva.checked_add(dir_size).unwrap_or(u64::MAX))
+            || pe.at(rva).is_none()
+        {
+            continue;
+        }
+        let text = match pe.at(*name_at) {
+            Some((where_, _)) => clean(&cstr_at(raw, where_)),
+            None => String::new(),
+        };
+        if !text.is_empty() {
+            listed.push((*owner, pe.image_base + rva, text));
+        }
+    }
+    listed.sort_by(|left, right| (left.0, &left.2).cmp(&(right.0, &right.2)));
+    let found_names: Vec<(u64, String)> =
+        listed.into_iter().map(|(_, where_, text)| (where_, text)).collect();
     let mut rows = vec![format!(
         "exports\trva\t{:#x}\tbytes\t{}\toff\t{}\tsection\t{}\tdll\t{}\tbase\t{}\tfunctions\t{}\tnames\t{}",
         dir_rva, dir_size, at, clean(section), clean(&dll), base, functions, names
@@ -941,9 +994,6 @@ fn export_rows(raw: &[u8]) -> (Vec<String>, Vec<(u64, String)>) {
             offset,
             clean(section)
         ));
-        if !name.is_empty() {
-            found_names.push((pe.image_base + rva, name.clone()));
-        }
     }
     (rows, found_names)
 }
@@ -1138,6 +1188,8 @@ thread_local! {
     /// The Information window: a PE's debug directory, and the CodeView block inside it that names a
     /// program database.
     static DEBUG: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The thread-local storage window: a PE's directory 9, and the callbacks the loader runs from it.
+    static TLS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -2320,6 +2372,148 @@ pub extern "C" fn symver_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     SYMVER.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// Directory 9's record: four addresses at the file's own width, then the zero fill and the
+/// characteristics - forty bytes of a 64-bit image, twenty-four of a 32-bit one.
+const TLS_DIRECTORY: usize = 9;
+
+/// Where the file says an address lies, in the three forms that have to be given together: the number
+/// the bytes hold, that number with the image base taken off once, and the byte position it names. The
+/// position is `-1` where no byte answers - for a TLS index, which lives in `.bss` and is allocated by
+/// the loader rather than read from disk - and an address in no section at all says `-` for both.
+fn tls_placed(pe: &Pe, raw: &[u8], value: u64, width: usize) -> Vec<String> {
+    let rva = value.wrapping_sub(pe.image_base);
+    let (offset, name) = match pe.at(rva) {
+        // A section may claim more memory than the file gives it, so the position is only stated where a
+        // read of this field would actually land inside the file.
+        Some((at, name)) if at.saturating_add(width) <= raw.len() => (at.to_string(), name.to_string()),
+        _ => (
+            "-1".to_owned(),
+            pe.in_empty(rva).map_or_else(|| "-".to_owned(), |name| name.to_owned()),
+        ),
+    };
+    vec![
+        format!("value\t0x{:x}", value),
+        format!("rva\t0x{:x}", rva),
+        format!("off\t{offset}"),
+        format!("section\t{name}"),
+    ]
+}
+
+/// IDA's thread-local storage window: what a PE's directory 9 states, and the callbacks the loader runs
+/// before the entry point exists.
+///
+/// The four addresses are virtual rather than relative, which is why every row carries all three
+/// spellings of them: a reader that subtracted the base twice, or not at all, shows up in one of the
+/// columns. The array behind the fourth runs to its terminating zero, and each entry is looked up in the
+/// export table, because a callback is a function and a function with a name is worth naming. Of
+/// `tls.dll`'s seventy-three entries seventy are the file's own and three belong to the C runtime, which
+/// exports nothing - those answer `-`, and they are the reason the list cannot be read off the symbols.
+fn tls_rows(raw: &[u8], exported: &[(u64, String)]) -> Vec<String> {
+    let pe = match Pe::parse(raw) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let at = match pe.dirs.checked_add(TLS_DIRECTORY * 8) {
+        Some(one) => one,
+        None => return Vec::new(),
+    };
+    let (dir_rva, dir_size) = match (word_at(raw, at, true), word_at(raw, at + 4, true)) {
+        (Some(one), Some(two)) => (one, two),
+        _ => return Vec::new(),
+    };
+    // No directory, or one that declares no bytes, is a file that says nothing here - which is also what
+    // an ELF says, since it keeps thread-local bookkeeping in program headers and a dynamic tag instead.
+    if dir_rva == 0 || dir_size == 0 {
+        return Vec::new();
+    }
+    let width = if pe.wide { 8 } else { 4 };
+    let body = 4 * width + 8;
+    let (where_, _) = match pe.at(dir_rva) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    if where_.saturating_add(body) > raw.len() {
+        return Vec::new();
+    }
+    let mut fields = Vec::new();
+    for each in 0..4 {
+        match addr_at(raw, where_ + each * width, pe.wide, true) {
+            Some(one) => fields.push(one),
+            None => return Vec::new(),
+        }
+    }
+    let (zero, character) = match (
+        word_at(raw, where_ + 4 * width, true),
+        word_at(raw, where_ + 4 * width + 4, true),
+    ) {
+        (Some(one), Some(two)) => (one, two),
+        _ => return Vec::new(),
+    };
+    // The loader's own walk: entries until a zero, each one bounded by the bytes the file actually has.
+    let mut callbacks: Vec<u64> = Vec::new();
+    if let Some((start, _)) = pe.at(fields[3].wrapping_sub(pe.image_base)) {
+        while callbacks.len() < 4096 {
+            let one = match start.checked_add(callbacks.len() * width) {
+                Some(at) => match addr_at(raw, at, pe.wide, true) {
+                    Some(0) | None => break,
+                    Some(value) => value.wrapping_sub(pe.image_base),
+                },
+                None => break,
+            };
+            callbacks.push(one);
+        }
+    }
+    let mut rows = vec![format!(
+        "tls\tdir\t{TLS_DIRECTORY}\trva\t0x{:x}\toff\t{where_}\tbytes\t{}\tbits\t{}\tbase\t0x{:x}\tcallbacks\t{}\tzero\t{}\tchar\t0x{:x}",
+        dir_rva, dir_size, if pe.wide { 64 } else { 32 }, pe.image_base, callbacks.len(), zero, character
+    )];
+    for (label, value) in [("start", fields[0]), ("end", fields[1]), ("index", fields[2]), ("callbacks", fields[3])] {
+        let mut row = vec!["field".to_owned(), label.to_owned()];
+        row.extend(tls_placed(&pe, raw, value, width));
+        rows.push(row.join("\t"));
+    }
+    for (index, rva) in callbacks.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        let value = rva.wrapping_add(pe.image_base);
+        let name = exported
+            .iter()
+            .find(|(at, _)| *at == value)
+            .map(|(_, name)| name.as_str())
+            .unwrap_or("-");
+        let mut row = vec!["callback".to_owned(), index.to_string()];
+        row.extend(tls_placed(&pe, raw, value, width));
+        row.push(format!("name\t{name}"));
+        rows.push(row.join("\t"));
+    }
+    if callbacks.len() > MAX_LISTED {
+        rows.push(format!("cut\tcallbacks\t{}\tlisted\t{MAX_LISTED}", callbacks.len()));
+    }
+    rows
+}
+
+/// How many rows the thread-local storage window fills. Nothing here has a directory 9 to read: an ELF
+/// answers with program headers, a COFF object has no data directories, and a DLL built without any
+/// thread-local object still answers, because its runtime supplies the table anyway.
+#[no_mangle]
+pub extern "C" fn tls_count() -> i32 {
+    TLS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then the four addresses the record holds, then the callbacks in the order the
+/// loader walks them. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn tls_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    TLS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })
