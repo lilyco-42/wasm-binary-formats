@@ -430,6 +430,23 @@ no rows at all, and that is the format talking rather than a gap in this one - t
 a PE's, and the fixups of a relocatable object are relocation records, which the engine's COFF reader
 already lists record by record against `objdump -r`.
 
+**The functions window** (`function_count` / `function_at`) is IDA's Functions list, and its one rule is
+that a row exists only because the file's own symbol table says so: one row per symbol whose kind is
+code, at the address the symbol carries, with the size the symbol states, the section that owns it, the
+raw name, and the demangled spelling where the two witnesses agree on one. Every expectation in
+`analysis/tests/functions.rs` is `readelf -sW`'s - value, size, section index and name, read off the same
+table and resolved through `readelf -SW` for the section's name - so the rows are checked against another
+implementation of the same walk rather than against this reader's own output. Twenty code symbols in
+`cxx.o`, forty-eight in `ops.o`, one `entry` in `lab.elf`: those are readelf's counts. Three boundaries
+fall out of insisting on the table. A *relocatable* object's symbol address is an offset inside its
+section while an image's is a load address, so the row prints what the symbol holds and the section
+column beside it says whose frame that is - `_Z4pickIiET_S0_S0_` is at `0x0` in a COMDAT section named
+after itself, and `entry` is at `0x201190`. A COFF symbol carries no length at all, so those rows print
+`size	-` and the totals row prints `sized	0`, because an estimate would sit in the same column as a
+measurement. And a PE's export table stays with `export_at`: an exported function is listed in one window
+rather than twice, which is why `exp.dll`, `lab.dll` and `reloc.dll` each answer `total	0` - none of the
+three has a symbol table to ask.
+
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
 is also the answer to "no ELF or PE image can be produced on this host": 1 152 bytes of ELF64 and 3 072 of
