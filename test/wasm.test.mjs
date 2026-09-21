@@ -982,6 +982,7 @@ test('the audio, stream and package readers answer the same way', () => {
     ['document', 'tiny.docx', 1], ['document', 'tiny.xlsx', 2], ['document', 'tiny.pptx', 3],
     ['document', 'tiny.odt', 4], ['document', 'tiny.ods', 5], ['document', 'tiny.odp', 6],
     ['document', 'tiny.epub', 7], ['document', 'lab-fixture.dotx', 8],
+    ['document', 'lab.3mf', 9], ['document', 'hand.3mf', 9],
   ];
   for (const [shape, file, code] of cases) assertReadable(shape, file, code);
 });
@@ -1014,11 +1015,36 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['stream', 'stream.gz', 'gzip'], ['stream', 'stream.xz', 'xz'], ['stream', 'stream.bz2', 'bzip2'],
     ['stream', 'stream.lz4', 'lz4'], ['stream', 'stream.zst', 'zstd'],
     ['document', 'tiny.docx', 'docx'], ['document', 'tiny.epub', 'epub'], ['document', 'tiny.odp', 'odp'],
-    ['document', 'lab-fixture.dotx', 'dotx'],
+    ['document', 'lab-fixture.dotx', 'dotx'], ['document', 'lab.3mf', '3mf'], ['document', 'hand.3mf', '3mf'],
   ];
   for (const [shape, file, name] of cases) {
     assert.equal(drive(shape, file).name, name, `${file} reported a different family name`);
   }
+});
+
+test('a model package crosses the ABI with the counts two other readers gave it', () => {
+  // scripts/make-3mf-fixtures.py writes lab.3mf with trimesh, reads the archive back with zipfile and
+  // the mesh with xml.etree.ElementTree, and refuses to write this probe unless trimesh's own re-load
+  // of the file it wrote gives the same vertex and triangle counts the rows carry. So what is compared
+  // here is the deployed reader against two implementations that never saw this repo's code.
+  const probe = JSON.parse(readFileSync('test/fixtures/3mf.probe.json', 'utf8'));
+  assert.equal(probe.trimesh_reload.vertices, 8, 'the box trimesh built lost its vertices');
+  assert.equal(probe.trimesh_reload.faces, 12, 'the box trimesh built lost its faces');
+  for (const file of ['lab.3mf', 'hand.3mf']) {
+    const want = probe.files[file].rows;
+    const bytes = new Uint8Array(readFileSync(`test/fixtures/${file}`));
+    assert.equal(bytes.length, probe.files[file].bytes, `${file} is not what the probe read`);
+    const seen = driveBytes('document', bytes);
+    assert.equal(seen.code, 9, `${file} answered a different package code`);
+    assert.equal(seen.name, '3mf', `${file} named itself something else`);
+    assert.deepEqual(seen.rows, want, `${file} printed different rows than ElementTree counted`);
+  }
+  // The part is found by following the package's own pointer, so a pointer at a part that is not there
+  // is a refusal and not a fallback to some other family's answer.
+  const loose = drive('document', 'loose.3mf');
+  assert.deepEqual(probe.files['loose.3mf'].rows, [], 'the probe listed rows for a refused package');
+  assert.equal(loose.code, -2, 'a dangling model pointer was accepted');
+  assert.equal(loose.total, 0, 'a refused package still handed rows out');
 });
 
 test('a WebAssembly module reads back through the container reader', () => {

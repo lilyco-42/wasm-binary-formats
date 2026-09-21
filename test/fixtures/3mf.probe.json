@@ -1,0 +1,90 @@
+{
+ "files": {
+  "hand.3mf": {
+   "bytes": 1699,
+   "model_bytes": 756,
+   "names": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "3D/3dmodel.model"
+   ],
+   "rows": [
+    "document\t3mf\t756",
+    "main_part\t3D/3dmodel.model",
+    "entries\t3",
+    "archive_bytes\t1699",
+    "has_manifest\t1",
+    "rels\tspelled\t3D/3dmodel.model\tpart\t3D/3dmodel.model\tid\trel0",
+    "manifest\tkind\tOverride\tpartname\t/3D/3dmodel.model\textension\t-\ttype\tapplication/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+    "model\tunit\t-\tobjects\t2\tvertices\t5\ttriangles\t3\tbuild\t2\tmetadata\t1",
+    "object\tid\t2\tname\t-\ttype\tsupport\tvertices\t2\ttriangles\t1",
+    "object\tid\t3\tname\t-\ttype\t-\tvertices\t3\ttriangles\t2"
+   ],
+   "stored": {
+    "3D/3dmodel.model": 0,
+    "[Content_Types].xml": 0,
+    "_rels/.rels": 0
+   },
+   "tree": {
+    "build": 2,
+    "metadata": 1,
+    "objects": 2,
+    "triangles": 3,
+    "vertices": 5
+   }
+  },
+  "lab.3mf": {
+   "bytes": 1283,
+   "model_bytes": 2004,
+   "names": [
+    "3D/3dmodel.model",
+    "_rels/.rels",
+    "[Content_Types].xml"
+   ],
+   "rows": [
+    "document\t3mf\t2004",
+    "main_part\t3D/3dmodel.model",
+    "entries\t3",
+    "archive_bytes\t1283",
+    "has_manifest\t1",
+    "rels\tspelled\t/3D/3dmodel.model\tpart\t3D/3dmodel.model\tid\trel0",
+    "manifest\tkind\tDefault\tpartname\t-\textension\tmodel\ttype\tapplication/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+    "model\tunit\tmillimeter\tobjects\t1\tvertices\t8\ttriangles\t12\tbuild\t1\tmetadata\t0",
+    "object\tid\t1\tname\tgeometry_0\ttype\tmodel\tvertices\t8\ttriangles\t12"
+   ],
+   "stored": {
+    "3D/3dmodel.model": 8,
+    "[Content_Types].xml": 8,
+    "_rels/.rels": 8
+   },
+   "tree": {
+    "build": 1,
+    "metadata": 0,
+    "objects": 1,
+    "triangles": 12,
+    "vertices": 8
+   }
+  },
+  "loose.3mf": {
+   "bytes": 1040,
+   "names": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "3D/3dmodel.model"
+   ],
+   "refused": "the relationship names 3D/gone.model, which the archive does not hold",
+   "rows": [],
+   "stored": {
+    "3D/3dmodel.model": 8,
+    "[Content_Types].xml": 8,
+    "_rels/.rels": 8
+   }
+  }
+ },
+ "model_content_type": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+ "model_rel_type": "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel",
+ "trimesh_reload": {
+  "faces": 12,
+  "vertices": 8
+ }
+}

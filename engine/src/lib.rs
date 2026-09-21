@@ -404,8 +404,10 @@ pub extern "C" fn audio_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
     }
 }
 
-/// Office document packages (OOXML, OpenDocument, EPUB): 0 none, 1 docx, 2 xlsx, 3 pptx,
-/// 4 odt, 5 ods, 6 odp, 7 epub, 8 dotx; -1 not a zip, -2 a zip that is not one of these packages.
+/// Office document packages (OOXML, OpenDocument, EPUB, 3MF): 0 none, 1 docx, 2 xlsx, 3 pptx,
+/// 4 odt, 5 ods, 6 odp, 7 epub, 8 dotx, 9 3mf; -1 not a zip, -2 a zip that is not one of these
+/// packages. A zip whose model relationship names a part the archive does not hold is a -2 with that
+/// said in the error, not a package of some other family.
 #[no_mangle]
 pub extern "C" fn parse_document(ptr: *const u8, len: i32) -> i32 {
     if ptr.is_null() || len <= 0 {
@@ -432,7 +434,9 @@ pub extern "C" fn document_count() -> i32 {
 }
 
 /// One `name<TAB>value` row: document, then main_part, mimetype or rootfile, plus entries,
-/// archive_bytes and has_manifest.
+/// archive_bytes and has_manifest. A model package adds the relationship it followed (`rels`), the
+/// content type covering the part (`manifest`), the model's own unit and counts (`model`) and one row
+/// per object, with a `cut` row when there are more objects than the list holds.
 #[no_mangle]
 pub extern "C" fn document_field(index: i32, buf: *mut u8, cap: i32) -> i32 {
     match documents::at(index) {

@@ -8061,15 +8061,18 @@ fn xml_local(name: &str) -> &str {
 }
 
 /// One element of the tree, with the text directly inside it and the elements under that.
-struct Node {
-    name: String,
-    attrs: Vec<(String, String)>,
-    text: String,
-    kids: Vec<Node>,
+///
+/// The shape is shared with the other XML-backed label, 3MF, so the accessors are crate-visible: the
+/// two readers walk the same tree the same way and a second XML parser is not what a new label needs.
+pub(crate) struct Node {
+    pub(crate) name: String,
+    pub(crate) attrs: Vec<(String, String)>,
+    pub(crate) text: String,
+    pub(crate) kids: Vec<Node>,
 }
 
 impl Node {
-    fn attr(&self, key: &str) -> Option<&str> {
+    pub(crate) fn attr(&self, key: &str) -> Option<&str> {
         self.attrs
             .iter()
             .find(|(one, _)| one == key)
@@ -8077,15 +8080,22 @@ impl Node {
     }
 
     /// The text of a direct child, with the whitespace a formatted document puts around it taken off.
-    fn value(&self, name: &str) -> Option<&str> {
+    pub(crate) fn value(&self, name: &str) -> Option<&str> {
         self.kids
             .iter()
             .find(|kid| kid.name == name)
             .map(|kid| kid.text.trim())
     }
 
-    fn held(&self, name: &str) -> usize {
+    pub(crate) fn held(&self, name: &str) -> usize {
         self.kids.iter().filter(|kid| kid.name == name).count()
+    }
+
+    /// Every element called `name` below this one, at any depth, this element included if it matches.
+    /// A mesh keeps its points two levels down (`object > mesh > vertices > vertex`), so counting what
+    /// a child holds is not the same question as counting what the subtree holds.
+    pub(crate) fn under(&self, name: &str) -> usize {
+        usize::from(self.name == name) + self.kids.iter().map(|kid| kid.under(name)).sum::<usize>()
     }
 
     /// Every point of the tree, in document order: a waypoint is a child of the root, a track point is
@@ -8260,6 +8270,31 @@ impl<'a> Xml<'a> {
     }
 }
 
+/// A whole XML document: whatever sits around a single root element, and nothing after it.
+///
+/// The prolog, comments and processing instructions between tags are skipped; a second root, text
+/// past the closing tag, a `<![CDATA[` or a `<!DOCTYPE` all refuse the document, because each is a
+/// construct whose reading this walk does not have. The node and depth caps are the walker's, so both
+/// XML-backed labels stop at the same size of file rather than at two different ones.
+pub(crate) fn xml_document(bytes: &[u8]) -> Option<Node> {
+    if bytes.len() < 4 || bytes.len() > 32_000_000 || std::str::from_utf8(bytes).is_err() {
+        return None;
+    }
+    let mut scan = Xml {
+        raw: bytes,
+        at: 0,
+        nodes: 0,
+        failed: false,
+    };
+    scan.between()?;
+    let root = scan.element(0)?;
+    scan.between()?;
+    if scan.failed || scan.at != bytes.len() {
+        return None;
+    }
+    Some(root)
+}
+
 /// A latitude or a longitude, in the only spelling this lab has a witness for: an optional sign,
 /// digits, an optional fraction. `NaN`, `INF` and an exponent are all legal XML-schema doubles, and
 /// none of them is in a file that `gpxpy` wrote or that `ElementTree` read back here, so they are
@@ -8283,19 +8318,11 @@ fn xml_number(text: &str) -> Option<f64> {
 /// the document lists them. Names are the decoded text the file carries; coordinates are the file's own
 /// spelling of each attribute, so nothing here is a float that came back through a formatter.
 fn read_gpx(bytes: &[u8]) -> Option<Vec<String>> {
-    if bytes.len() < 32 || bytes.len() > 32_000_000 || std::str::from_utf8(bytes).is_err() {
+    if bytes.len() < 32 {
         return None;
     }
-    let mut scan = Xml {
-        raw: bytes,
-        at: 0,
-        nodes: 0,
-        failed: false,
-    };
-    scan.between()?;
-    let root = scan.element(0)?;
-    scan.between()?;
-    if scan.failed || scan.at != bytes.len() || root.name != "gpx" {
+    let root = xml_document(bytes)?;
+    if root.name != "gpx" {
         return None;
     }
     // A GPX root says which version it is, and that is the only claim the reader insists on: the

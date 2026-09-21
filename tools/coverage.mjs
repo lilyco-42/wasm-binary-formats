@@ -46,6 +46,12 @@ const SELF = {
   icc: ['fields'], emf: ['fields'], postscript: ['fields'], coff: ['fields'], crt: ['fields'], psd: ['fields'], vcard: ['fields'], torrent: ['fields'], pgp: ['fields'], pdb: ['container'], jsonc: ['fields'], gpx: ['fields'],
   docx: ['container'], xlsx: ['container'], pptx: ['container'], dotx: ['container'],
   odt: ['container'], ods: ['container'], odp: ['container'], epub: ['container'],
+  // A model package is credited at `fields` rather than `container` because the part that *is* the
+  // format is read: the unit the file states and each object's vertex and triangle counts come out of
+  // the model XML itself, cross-checked against ElementTree by scripts/make-3mf-fixtures.py. Geometry,
+  // relations, materials and the build transforms are not read, and a model past the walker's element
+  // cap is refused rather than half listed.
+  '3mf': ['fields'],
 };
 
 const ALIAS = {
