@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出 / 导入 / C++ 名字 / 基址重定位）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。导入表也是 PE 的：按名字要的和按序号要的是两种写法，序号那种压根没有名字可读；文件没给查找表时，名字只能从地址表里读，行里会写明是哪一个。这里只说文件开口要了什么，不去解析也不去加载任何东西。符号表里 `_Z` 开头的 C++ 名字会解成人能读的样子，但只认两个互不相干的解码器（binutils 的 `c++filt` 和 LLVM 的 `llvm-cxxfilt`）写法一致的那些：两边不一致的那个名字就在行里写明没解码，不挑一个拼上。构造函数的 `C1`/`C2`、析构的 `D1`/`D2` 展开成同一个名字，所以原始拼写留在行里；非模板函数的返回类型根本不在名字里，页面也不替它编一个。运算符名照两个解码器一致的写法给（`pl` 是 `operator+`，`dl`/`da` 是标量与数组两种 `operator delete`）；`operator<` 这种答案里带尖括号的名字不会被当成模板 —— 是不是模板认的是名字里有没有 `I…E`，不是答案长什么样。基址重定位（目录 5）只有 PE 有：一页一块的表，说加载器要把哪些地址改写 —— 有了它，`.data` 里那个字才算指针而不是数字；行里给地址、类型号、这两个读者在同一份文件里一起见过的类型名，再给这个地址落在文件哪儿、属于哪个节。块长说不通（比自己还小、不对齐、超出目录）就停在哪儿，并写下为什么，不顺着猜下去。ELF 和 Mach-O 不在这里列修补：它们的修补是重定位记录，那是另一套格式。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出 / 导入 / C++ 名字 / 基址重定位 / 函数）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。导入表也是 PE 的：按名字要的和按序号要的是两种写法，序号那种压根没有名字可读；文件没给查找表时，名字只能从地址表里读，行里会写明是哪一个。这里只说文件开口要了什么，不去解析也不去加载任何东西。符号表里 `_Z` 开头的 C++ 名字会解成人能读的样子，但只认两个互不相干的解码器（binutils 的 `c++filt` 和 LLVM 的 `llvm-cxxfilt`）写法一致的那些：两边不一致的那个名字就在行里写明没解码，不挑一个拼上。构造函数的 `C1`/`C2`、析构的 `D1`/`D2` 展开成同一个名字，所以原始拼写留在行里；非模板函数的返回类型根本不在名字里，页面也不替它编一个。运算符名照两个解码器一致的写法给（`pl` 是 `operator+`，`dl`/`da` 是标量与数组两种 `operator delete`）；`operator<` 这种答案里带尖括号的名字不会被当成模板 —— 是不是模板认的是名字里有没有 `I…E`，不是答案长什么样。基址重定位（目录 5）只有 PE 有：一页一块的表，说加载器要把哪些地址改写 —— 有了它，`.data` 里那个字才算指针而不是数字；行里给地址、类型号、这两个读者在同一份文件里一起见过的类型名，再给这个地址落在文件哪儿、属于哪个节。块长说不通（比自己还小、不对齐、超出目录）就停在哪儿，并写下为什么，不顺着猜下去。ELF 和 Mach-O 不在这里列修补：它们的修补是重定位记录，那是另一套格式。函数那一栏只列符号表自己说是代码的符号：地址按符号原样给（.o 里是节内偏移、镜像里是加载地址），长度只在符号自己带的时候写，COFF 符号不带长度就写未写，绝不替它估；PE 的导出表另有「导出」一栏，这里不再数一遍，所以一个只有导出表的镜像答 0 个函数。',
   },
   {
     id: 'disasm',
@@ -404,6 +404,44 @@ function appendLists(box, state) {
     }).join('\n');
     box.appendChild(title);
     box.appendChild(table);
+  }
+  const bodies = functionList(state.mod);
+  if (bodies && bodies.length > 1) {
+    const head = bodies[0].split('\t');
+    const title = document.createElement('p');
+    title.textContent = `函数（符号表里 ${field(head, 'total')} 个代码符号，${field(head, 'sized')} 个自带长度，`
+      + `${field(head, 'demangled')} 个有两个解码器一致的 C++ 读法。地址是符号自己写的那一个 —— .o 里是节内偏移、`
+      + '镜像里是加载地址；COFF 符号不带长度，那种行就只写“长度未写”，不替它估：';
+    const table = document.createElement('pre');
+    table.textContent = bodies.slice(1).map((row) => {
+      const cell = row.split('\t');
+      if (cell[0] === 'cut') return `（函数比列出来的多，共 ${cell[2]} 个，到这里为止）`;
+      const size = field(cell, 'size');
+      const raw = field(cell, 'sym');
+      const spelled = field(cell, 'name');
+      return `  ${cell[1]}  ${size === '-' ? '长度未写' : `${size} 字节`}  ${field(cell, 'section')}`
+        + `  ${spelled === '-' || !spelled ? raw : `${spelled}   （${raw}）`}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+  }
+  /// The Functions window of the loaded module, or null when it does not have one (an older cached
+  /// build). Nothing is decoded here: a row is one symbol the file's own table says is code.
+  function functionList(mod) {
+    if (!mod || typeof mod.function_count !== 'function' || typeof mod.function_at !== 'function') {
+      return null;
+    }
+    const total = mod.function_count();
+    if (total <= 0) return [];
+    const rows = [];
+    for (let index = 0; index < total; index += 1) {
+      const room = 1024;
+      const buffer = mod.alloc(room);
+      const written = mod.function_at(index, buffer, room);
+      rows.push(written < 0 ? '' : cString(mod, buffer));
+      mod.dealloc(buffer, room);
+    }
+    return rows;
   }
   const fixups = relocList(state.mod);
   const halted = field((fixups && fixups[0]) ? fixups[0].split('\t') : [], 'stopped');
