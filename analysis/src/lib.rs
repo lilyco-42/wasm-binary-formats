@@ -209,6 +209,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DEMANGLED.with(|slot| slot.borrow_mut().clear());
     RELOCS.with(|slot| slot.borrow_mut().clear());
     FUNCTIONS.with(|slot| slot.borrow_mut().clear());
+    NAMED.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -222,6 +223,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let mut named: Vec<(u64, String)> = Vec::new();
     let mut mangled: Vec<String> = Vec::new();
     let mut funcs: Vec<(u64, u64, String, String)> = Vec::new();
+    let mut window: Vec<(u64, String, String, String)> = Vec::new();
     let mut types: Vec<String> = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
@@ -282,6 +284,21 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         Some((symbol.address(), symbol.size(), where_, raw))
     }
 
+    // A name the file attaches to an address. Undefined symbols are left out - an import's value is a
+    // slot in someone else's image, not a place this file names - and a section or file symbol stays in,
+    // because it does carry an address and a reader asking "what is called at 0x1000" wants the whole
+    // list, kinds and all.
+    fn name_entry<'data, T: ObjectSymbol<'data>>(symbol: &T, from: &'static str) -> Option<(u64, String, String, String)> {
+        if symbol.is_undefined() || symbol.section_index().is_none() {
+            return None;
+        }
+        let raw = clean(symbol.name().unwrap_or(""));
+        if raw.trim().is_empty() {
+            return None;
+        }
+        Some((symbol.address(), raw, label(&symbol.kind()), from.to_owned()))
+    }
+
     for (index, symbol) in file.symbols().enumerate() {
         symbols += 1;
         if index < MAX_LISTED {
@@ -292,6 +309,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         named.extend(name_pair(&symbol));
         mangled.extend(mangled_name(&symbol));
         funcs.extend(function_pair(&file, &symbol));
+        window.extend(name_entry(&symbol, "symtab"));
     }
     for (index, symbol) in file.dynamic_symbols().enumerate() {
         imported += 1;
@@ -301,6 +319,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         named.extend(name_pair(&symbol));
         mangled.extend(mangled_name(&symbol));
         funcs.extend(function_pair(&file, &symbol));
+        window.extend(name_entry(&symbol, "dynsym"));
     }
     if symbols > MAX_LISTED {
         rows.push(format!("cut\tsymbols\t{symbols}"));
@@ -319,6 +338,13 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     RELOCS.with(|slot| *slot.borrow_mut() = fixups);
     let functions = function_rows(&funcs);
     FUNCTIONS.with(|slot| *slot.borrow_mut() = functions);
+    for (address, name) in export_names.clone() {
+        window.push((address, name, "-".to_owned(), "export".to_owned()));
+    }
+    window.sort_by(|left, right| (left.0, &left.1).cmp(&(right.0, &right.1)));
+    window.dedup_by(|later, earlier| later.0 == earlier.0 && later.1 == earlier.1);
+    let listed = named_rows(&window);
+    NAMED.with(|slot| *slot.borrow_mut() = listed);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -2012,7 +2038,61 @@ pub extern "C" fn dealloc(ptr: *mut u8, len: i32) {
 thread_local! {
     /// The Functions window: the addresses the file's own symbol tables call functions.
     static FUNCTIONS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The Names window: every name the file attaches to an address, from either symbol table or from
+    /// the export directory, with the address kept beside it rather than folded away.
+    static NAMED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
+
+/// One row of the Names window. `from` says which table the name came from and `kind` says what the file
+/// called it - a name the export table carries states no kind at all, so it answers `-` rather than
+/// borrowing the one its address happens to fall inside.
+fn named_rows(entries: &[(u64, String, String, String)]) -> Vec<String> {
+    let spelled = entries
+        .iter()
+        .filter(|(_, raw, _, _)| demangle::demangle(raw).is_some())
+        .count();
+    let unique = entries.iter().map(|(at, _, _, _)| *at).collect::<std::collections::HashSet<_>>().len();
+    let mut out = vec![format!(
+        "names\ttotal\t{}\taddresses\t{unique}\tdemangled\t{spelled}",
+        entries.len()
+    )];
+    for (listed, (address, raw, kind, from)) in entries.iter().enumerate() {
+        if listed >= MAX_LISTED {
+            break;
+        }
+        let read = match demangle::demangle(raw) {
+            Some(text) => clean(&text),
+            None => "-".to_owned(),
+        };
+        out.push(format!(
+            "name\t0x{address:x}\tfrom\t{from}\tkind\t{kind}\tname\t{raw}\tread\t{read}"
+        ));
+    }
+    if entries.len() > MAX_LISTED {
+        out.push(format!("cut\tnames\t{}", entries.len()));
+    }
+    out
+}
+
+/// How many rows the Names window has.
+#[no_mangle]
+pub extern "C" fn named_count() -> i32 {
+    NAMED.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the address, which table the name came from, what kind the file gave it, the name as the
+/// table spells it, and the C++ reading where two demanglers agree on one. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn named_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    NAMED.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
 
 /// One entry of the Functions window: address, the size the symbol carries (an object file's symbols do
 /// have them, so this is not the disassembler's estimate), the section the name lies in, and the name in

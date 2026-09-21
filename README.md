@@ -475,6 +475,19 @@ measurement. And a PE's export table stays with `export_at`: an exported functio
 rather than twice, which is why `exp.dll`, `lab.dll` and `reloc.dll` each answer `total	0` - none of the
 three has a symbol table to ask.
 
+**The names window** (`named_count` / `named_at`) is the same tables read the other way round: IDA's
+Names list, one row per name with the address the file gave it, which table it came from (`symtab`,
+`dynsym` or `export`) and what kind the file says it is. It is deliberately *not* the address index, which
+answers "what is at this address" and has to pick one name per address: `exp.dll` exports `shipped`,
+`alias` and `answer` at one address and `lld-link` wrote three records for them, so the window lists three
+rows and its totals row says `total 4 addresses 2` rather than hiding two of them. The addresses come from
+`nm -P` for the objects and from the export table for the DLL, and a COFF object's section symbols stay in
+the list with `kind section` because they are names the file attaches to address zero, which is what it
+says. C++ names carry both spellings, the table's bytes in `name` and the two-witness reading in `read`,
+so the row that the demanglers disagree on is still listed - with `read -` - rather than dropped from a
+window that is supposed to be complete.
+
+
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
 is also the answer to "no ELF or PE image can be produced on this host": 1 152 bytes of ELF64 and 3 072 of
