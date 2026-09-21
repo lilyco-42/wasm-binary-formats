@@ -351,7 +351,7 @@ test('the imports a loader will fill in come through as the readers spell them',
   }
   // The difference between the three files is one field each, and the rows show it: the same name read
   // out of the other table, and an ordinal with no name to read at all.
-  assert.match(probe['noilt.dll'].rows[1], /\tilt\t0x0\tnames\tiat\b/);
+  assert.match(probe['noilt.dll'].rows[1], /\tilt\t0x0\tiat\t0x2000\tnames\tiat\b/);
   assert.match(probe['ordinal.dll'].rows[2], /^thunk\tmscoree\.dll\t-\tordinal\t12\tslot\t0x2000$/);
   assert.ok(!probe['ordinal.dll'].rows[2].includes('_CorDllMain'), 'an ordinal import has no name');
   report(new Uint8Array(await readFile('test/fixtures/exp.dll')));
