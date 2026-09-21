@@ -264,30 +264,31 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | state | binary labels | share |
 |---|---|---|
 | own Rust reader, named header fields decoded | 48 | 21.9% |
-| own Rust reader, container framing only | 26 | 11.9% |
+| own Rust reader, container framing only | 27 | 12.3% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **104** | 47.5% |
-| **covered, any level** | **115** | 52.5% |
+| **no parser at all - real gap** | **103** | 47.0% |
+| **covered, any level** | **116** | 53.0% |
 
-Top binary gap groups by count: unknown 53, archive 11, image 9, application 9, document 7,
+Top binary gap groups by count: unknown 53, archive 10, image 9, application 9, document 7,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
 Draw document) and then refuses the store with `SfxBaseModel::impl_store ... 0x81a`, and nothing on
 this host opens as an Impress document, so no ppt can be produced to read at all - an older note here
 blamed a 640 KB padding size, which this round could not reproduce because nothing was written.
-Then `chm`, `sevenzip`, `bzip3`, `arc`/`arj`,
+Then `chm`, `bzip3`, `arc`/`arj`,
 `dmg`/`wim`/`vhd`/`squashfs`/`hfs`/`udf`, the bare `ebml` label, and `otf` -
-`otf` because no CFF charstring writer runs here. `woff2`, `coff` and `crt` were on that list as the row
-before: the first for a reason that turned out to be about the interpreter on PATH rather than about
-the machine, the second because no Kaitai spec covers it, and the third because the earlier sweep for
+`otf` because no CFF charstring writer runs here. `woff2`, `coff`, `crt` and `sevenzip` were on that list
+as the row before: the first for a reason that turned out to be about the interpreter on PATH rather than
+about the machine, the second because no Kaitai spec covers it, the third because the earlier sweep for
 "cheap specs to generate" keyed on label names and so never matched `crt` to the `asn1_der` spec that
-does exist upstream - see below.
+does exist upstream, and `sevenzip` because `py7zr` turned out to be installed as both a writer and a
+reader for it here - see below.
 
-So the honest answer to the objective is **no, not yet**: 115 of 219 binary labels have a parser
-that runs here (48 field-level and 26 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 104 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 116 of 219 binary labels have a parser
+that runs here (48 field-level and 27 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 103 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -301,7 +302,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 115 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 116 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references and basic blocks / function boundaries for x86-64, AArch64 and Thumb bytes |
 
@@ -402,6 +403,7 @@ temp/venv/Scripts/python.exe scripts/make-emf-fixtures.py       # LibreOffice an
 temp/venv/Scripts/python.exe scripts/make-ps-fixtures.py         # LibreOffice and ImageMagick each write PostScript
 temp/venv/Scripts/python.exe scripts/make-coff-fixtures.py        # clang -c writes the objects, objdump reads them back
 temp/venv/Scripts/python.exe scripts/make-der-fixtures.py         # openssl signs the certificates and lists every object in them
+temp/venv/Scripts/python.exe scripts/make-7z-fixtures.py          # py7zr writes both header shapes and checks the archive's two CRCs
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -510,8 +512,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **115 covered** (48 field-level and 26
-container-level from this repo's own readers, 41 generated and mostly load-gated), **104 with no
+Coverage is scored against magika's 219 binary labels: **116 covered** (48 field-level and 27
+container-level from this repo's own readers, 41 generated and mostly load-gated), **103 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -791,6 +793,26 @@ does not re-derive them:
   rather than a size borrowed from a curve table, and the validity strings are printed as DER holds
   them (`260101000000Z`) because parsing a `UTCTime` needs a two-digit-year rule that nobody here has
   vouched for. Two fixtures, RSA and EC, because one sample of a shape is one shape.
+* 7z (+1 container-level label, 116 covered, 103 gaps) is the third label the sweep mis-filed as
+  unreachable: `py7zr 1.1.3` is installed here as both producer and witness, and it writes the two shapes
+  the format has - `encoded.7z` with its header compressed, and `plain.7z` from
+  `set_encoded_header_mode(False)` with the property tree in the open. What the reader reports is the
+  envelope: version, where the header block is, how long it is, which of the two shapes it starts out to
+  be, and the two CRCs the archive states about itself recomputed over the bytes they cover. That last
+  pair is the useful part, because it works on every 7z whoever wrote it - it is the check that says a
+  download finished and a file was not edited - and it depends on one offset nobody should guess at:
+  `next_header_offset` counts from the end of the 32-byte start header, not from byte zero, which is how
+  py7zr's own `SignatureHeader._read` treats it. The CRC itself is the reflected `0xEDB88320` form, and
+  the implementation was shadowed in Python against `zlib.crc32` over a thousand random lengths before a
+  single CI cycle was spent on it.
+  What is *not* claimed is the file list, and the report says which of the two cases a file is rather
+  than quietly producing nothing. In the plain shape the names are readable in principle but sit behind a
+  `MainStreamsInfo` whose contents are raw numbers rather than property ids, so skipping it needs the
+  folder-and-coder grammar; in the encoded shape they are behind a compressed stream this module has no
+  decoder for - and the note does not name the codec, because the codec id lives inside the stream the
+  note is about. So this one is credited exactly where `cab` is, and a truncation that removes the header
+  block reads as `kind unreadable` plus a CRC row that says `unreachable` instead of printing a checksum
+  over bytes that are gone.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

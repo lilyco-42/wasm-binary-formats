@@ -330,6 +330,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['preview.eps', 46], ['plain.ps', 46],
     ['answer.obj', 47], ['i686.obj', 47],
     ['rsa.crt', 48], ['ec.crt', 48],
+    ['encoded.7z', 49], ['plain.7z', 49],
   ];
   for (const [file, code] of cases) assertReadable('container', file, code);
 });
@@ -674,6 +675,62 @@ test('an X.509 certificate keeps its tree and its names through the wasm ABI', (
   assert.equal(wild.code, 48);
   assert.equal(wild.rows[0], 'der\t857\tbroken\t2\ttlvs\t58\tdepth\t5\tend\tno', wild.rows.join(' | '));
   assert.equal(wild.rows[wild.rows.length - 1], 'stopped\tbroken\t2');
+});
+
+test('a 7z archive is checked against its own two CRCs, in both header shapes', () => {
+  // py7zr 1.1.3 wrote both files and listed the member back out of each, and `make-7z-fixtures.py`
+  // refuses to write its probe unless the start header's CRC over bytes 12..32 and the header block's
+  // CRC over the bytes the offset points at both recompute - so the two numbers below are the archive's
+  // own claims about its own bytes, not a reader's opinion.
+  const encoded = assertReadable('container', 'encoded.7z', 49);
+  assert.equal(encoded.name, 'sevenzip');
+  assert.deepEqual(encoded.rows, [
+    '7z\t215\tbroken\t0\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tencoded',
+    'crc\tstart\tc104601b\tok\theader\tee42b910\tok',
+    'note\tthe header is itself a compressed stream, so only the envelope is read',
+    'walked\tend',
+  ]);
+
+  // The other shape, from the same producer with its header-mode flag off: the property tree is in the
+  // open, and the report says what reaching the names inside it would take instead of guessing at them.
+  const plain = assertReadable('container', 'plain.7z', 49);
+  assert.equal(plain.rows[0], '7z\t191\tbroken\t0\tversion\t0.4\tpacked\t80\theader\tat\t112\tlen\t79\tkind\tplain');
+  assert.equal(plain.rows[1], 'crc\tstart\t3d002d1f\tok\theader\tca020180\tok');
+  assert.equal(plain.rows[2], 'note\tthe header is a property tree, and reaching its names needs the streams-info walk');
+  assert.equal(plain.rows[3], 'walked\tend');
+
+  // A file that cannot hold the header it promises is still a 7z, and says so without printing a CRC
+  // for bytes that are not there.
+  const bytes = new Uint8Array(readFileSync('test/fixtures/encoded.7z'));
+  const cut = driveBytes('container', bytes.subarray(0, bytes.length - 24));
+  assert.equal(cut.code, 49);
+  assert.deepEqual(cut.rows, [
+    '7z\t191\tbroken\t1\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tunreadable',
+    'crc\tstart\tc104601b\tok\theader\tee42b910\tunreachable',
+    'note\tthe header block is past the end of the file, so its CRC cannot be checked',
+    'stopped\tbroken\t1',
+  ]);
+
+  // The offset comes from the file and points 32 bytes past itself, so the arithmetic is the part a
+  // forged value can break: an offset of eight gigabytes must read as unreachable, not as a panic and
+  // not as a window into memory the buffer never had.
+  const far = new Uint8Array(bytes);
+  new DataView(far.buffer).setUint32(12, 0xffffffff, true);
+  new DataView(far.buffer).setUint32(16, 1, true);
+  const wild = driveBytes('container', far);
+  assert.equal(wild.code, 49);
+  assert.match(wild.rows[0], /\tbroken\t2\t/, `a far offset did not count as broken: ${wild.rows[0]}`);
+  assert.ok(wild.rows[0].endsWith('\tkind\tunreadable'), wild.rows[0]);
+  assert.ok(wild.rows[1].endsWith('\theader\tee42b910\tunreachable'), wild.rows[1]);
+  assert.equal(wild.rows[wild.rows.length - 1], 'stopped\tbroken\t2');
+
+  // Six bytes of magic are not yet a header: below thirty-two bytes there is no CRC to check, so the
+  // envelope stays silent rather than claiming an archive it cannot see.
+  assert.notEqual(driveBytes('container', bytes.subarray(0, 31)).code, 49);
+  const stub = driveBytes('container', new Uint8Array(bytes.subarray(0, 32)));
+  assert.equal(stub.code, 49);
+  assert.equal(stub.rows[0], '7z\t32\tbroken\t1\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tunreadable',
+    stub.rows.join(' | '));
 });
 
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {

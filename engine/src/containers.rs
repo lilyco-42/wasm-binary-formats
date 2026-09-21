@@ -141,6 +141,7 @@ pub fn name() -> &'static str {
         FORMAT_PS => "postscript",
         FORMAT_COFF => "coff",
         FORMAT_DER => "der",
+        FORMAT_SEVENZIP => "sevenzip",
         _ => "unknown",
     }
 }
@@ -6604,6 +6605,134 @@ fn read_der(bytes: &[u8]) -> Option<Vec<String>> {
     Some(rows)
 }
 
+// -------------------------------------------------------------------------------- 7z / sevenzip
+pub const FORMAT_SEVENZIP: i32 = 49;
+
+/// 7-Zip's signature. The two bytes after it are the archive's own format version, so the magic is six
+/// bytes and the start header that holds the CRCs is thirty-two.
+const SEVENZIP_MAGIC: [u8; 6] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
+/// Every offset in a 7z file counts from the end of the start header, not from byte zero of the file.
+const SEVENZIP_START_LEN: u64 = 32;
+/// The two property ids a header block can start with, and the whole reason this reader asks which one
+/// it is before it claims anything: `plain` means the property tree is in the open, `encoded` means it
+/// sits inside a compressed stream this module has no decoder for. Both shapes carry the same envelope.
+const SEVENZIP_K_HEADER: u8 = 0x01;
+const SEVENZIP_K_ENCODED_HEADER: u8 = 0x17;
+
+/// CRC-32 in the form the two 7z checksums use - reflected, polynomial `0xEDB88320`, initialized and
+/// finally xored with all ones - which is what `zlib.crc32` returns and therefore what the fixture
+/// script's numbers are. The table is built per call rather than cached: a file has two of these calls
+/// in it, and a module-level table would be state shared between re-entrant parses.
+fn crc32(raw: &[u8]) -> u32 {
+    let mut table = [0u32; 256];
+    for (value, entry) in table.iter_mut().enumerate() {
+        let mut accum = value as u32;
+        for _ in 0..8 {
+            accum = if accum & 1 != 0 {
+                0xEDB8_8320 ^ (accum >> 1)
+            } else {
+                accum >> 1
+            };
+        }
+        *entry = accum;
+    }
+    let mut crc = 0xFFFF_FFFFu32;
+    for byte in raw {
+        crc = table[usize::from((crc ^ u32::from(*byte)) & 0xFF)] ^ (crc >> 8);
+    }
+    crc ^ 0xFFFF_FFFF
+}
+
+fn sevenzip_u32(bytes: &[u8], at: usize) -> Option<u32> {
+    let window = bytes.get(at..at.checked_add(4)?)?;
+    Some(u32::from_le_bytes([
+        window[0], window[1], window[2], window[3],
+    ]))
+}
+
+fn sevenzip_u64(bytes: &[u8], at: usize) -> Option<u64> {
+    let window = bytes.get(at..at.checked_add(8)?)?;
+    Some(u64::from_le_bytes([
+        window[0], window[1], window[2], window[3], window[4], window[5], window[6], window[7],
+    ]))
+}
+
+/// The envelope, and nothing but the envelope: version, where the header block is, how long it is, and
+/// whether the two CRCs the archive states about itself match the bytes they cover. That last pair is
+/// why this is worth a reader at all - it is the check that says a download finished and a file was not
+/// edited, and it works on every 7z regardless of which codec its header uses. What is deliberately not
+/// here: file names and sizes. In `plain.7z` they sit behind a `MainStreamsInfo` whose contents are raw
+/// numbers rather than property ids, so skipping it needs the folder and coder grammar; in `encoded.7z`
+/// they sit behind a compressed stream. Guessing at either would put invented names in a report.
+fn read_7z(bytes: &[u8]) -> Option<Vec<String>> {
+    if bytes.len() < SEVENZIP_START_LEN as usize || bytes[..6] != SEVENZIP_MAGIC {
+        return None;
+    }
+    let major = bytes[6];
+    let minor = bytes[7];
+    let start_crc = sevenzip_u32(bytes, 8)?;
+    let packed = sevenzip_u64(bytes, 12)?;
+    let length = sevenzip_u64(bytes, 20)?;
+    let header_crc = sevenzip_u32(bytes, 28)?;
+    let start_state = if crc32(bytes.get(12..32)?) == start_crc {
+        "ok"
+    } else {
+        "bad"
+    };
+    let mut broken = usize::from(start_state == "bad");
+    // Both halves of the span come out of the file, so it is built in u64 and only trusted once it is
+    // known to lie inside the bytes that exist; a forged offset then reads as unreachable, not as a
+    // panic and not as a CRC over a window that was never there.
+    let at = packed.checked_add(SEVENZIP_START_LEN);
+    let stop = at.and_then(|from| from.checked_add(length));
+    let block = match (at, stop) {
+        (Some(from), Some(to)) if to <= bytes.len() as u64 => {
+            // Safe as-cast: `to` has just been compared with the length, and `from` is no larger.
+            bytes.get(from as usize..to as usize)
+        }
+        _ => None,
+    };
+    let kind = match block.and_then(|raw| raw.first().copied()) {
+        Some(SEVENZIP_K_HEADER) => "plain",
+        Some(SEVENZIP_K_ENCODED_HEADER) => "encoded",
+        Some(_) => "unknown",
+        None if block.is_none() => "unreadable",
+        None => "empty",
+    };
+    let header_state = match block {
+        Some(raw) if crc32(raw) == header_crc => "ok",
+        Some(_) => "bad",
+        None => "unreachable",
+    };
+    broken += usize::from(header_state != "ok");
+    let mut rows = vec![
+        format!(
+            "7z\t{}\tbroken\t{broken}\tversion\t{major}.{minor}\tpacked\t{packed}\theader\tat\t{where_}\tlen\t{length}\tkind\t{kind}",
+            bytes.len(),
+            where_ = at.unwrap_or(u64::MAX),
+        ),
+        format!(
+            "crc\tstart\t{start_crc:08x}\t{start_state}\theader\t{header_crc:08x}\t{header_state}"
+        ),
+    ];
+    rows.push(
+        match kind {
+            "plain" => "note\tthe header is a property tree, and reaching its names needs the streams-info walk",
+            "encoded" => "note\tthe header is itself a compressed stream, so only the envelope is read",
+            "unknown" => "note\tthe header starts with neither kHeader nor kEncodedHeader",
+            "empty" => "note\tthe header block holds no bytes",
+            _ => "note\tthe header block is past the end of the file, so its CRC cannot be checked",
+        }
+        .to_owned(),
+    );
+    rows.push(if broken == 0 {
+        "walked\tend".to_owned()
+    } else {
+        format!("stopped\tbroken\t{broken}")
+    });
+    Some(rows)
+}
+
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
 pub fn parse(bytes: &[u8]) -> i32 {
@@ -6712,6 +6841,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_ps(bytes) {
         return accept(FORMAT_PS, lines);
     }
+    // Before COFF, which decides from a machine id it has no magic around: these six bytes are a
+    // signature, so the file that carries one gets read as the archive it claims to be.
+    if let Some(lines) = read_7z(bytes) {
+        return accept(FORMAT_SEVENZIP, lines);
+    }
     if let Some(lines) = read_coff(bytes) {
         return accept(FORMAT_COFF, lines);
     }
@@ -6727,7 +6861,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, COFF object, X.509 certificate or binary STL",
+        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

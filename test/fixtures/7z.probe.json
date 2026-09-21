@@ -1,0 +1,68 @@
+{
+ "encoded-cut": {
+  "rows": [
+   "7z\t191\tbroken\t1\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tunreadable",
+   "crc\tstart\tc104601b\tok\theader\tee42b910\tunreachable",
+   "stopped\tbroken\t1"
+  ]
+ },
+ "encoded.7z": {
+  "bytes": 215,
+  "py7zr": [
+   [
+    "answer.txt",
+    80
+   ]
+  ],
+  "rows": [
+   "7z\t215\tbroken\t0\tversion\t0.4\tpacked\t163\theader\tat\t195\tlen\t20\tkind\tencoded",
+   "crc\tstart\tc104601b\tok\theader\tee42b910\tok",
+   "note\tthe header is itself a compressed stream, so only the envelope is read",
+   "walked\tend"
+  ]
+ },
+ "plain.7z": {
+  "bytes": 191,
+  "py7zr": [
+   [
+    "answer.txt",
+    80
+   ]
+  ],
+  "rows": [
+   "7z\t191\tbroken\t0\tversion\t0.4\tpacked\t80\theader\tat\t112\tlen\t79\tkind\tplain",
+   "crc\tstart\t3d002d1f\tok\theader\tca020180\tok",
+   "note\tthe header is a property tree, and reaching its names needs the streams-info walk",
+   "walked\tend"
+  ]
+ },
+ "property_names": {
+  "0x0": "End",
+  "0x1": "Header",
+  "0x10": "Anti",
+  "0x11": "Name",
+  "0x12": "CTime",
+  "0x13": "ATime",
+  "0x14": "WTime",
+  "0x15": "Attribs",
+  "0x16": "Comments",
+  "0x17": "EncodedHeader",
+  "0x18": "StartPos",
+  "0x19": "Dummy",
+  "0x2": "ArchiveProperties",
+  "0x3": "AdditionalStreamsInfo",
+  "0x4": "MainStreamsInfo",
+  "0x5": "FilesInfo",
+  "0x6": "PackInfo",
+  "0x7": "UnpackInfo",
+  "0x8": "SubStreamsInfo",
+  "0x9": "Size",
+  "0xa": "CRC",
+  "0xb": "Folder",
+  "0xc": "CodersUnpackSize",
+  "0xd": "NumUnpackStream",
+  "0xe": "EmptyStream",
+  "0xf": "EmptyFile"
+ },
+ "uint64_codec": "ok"
+}

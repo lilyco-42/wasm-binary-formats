@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 48,
-    "selfContainer": 26,
+    "selfContainer": 27,
     "binarySpecAvailable": 0,
-    "gaps": 104,
+    "gaps": 103,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -21,7 +21,7 @@
     "gapByGroup": {
       "unknown": 53,
       "image": 9,
-      "archive": 11,
+      "archive": 10,
       "code": 5,
       "document": 7,
       "executable": 4,
@@ -3644,8 +3644,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "sgml",
