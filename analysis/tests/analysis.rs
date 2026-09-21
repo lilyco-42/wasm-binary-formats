@@ -288,17 +288,21 @@ fn a_object_file_and_a_lie_about_a_table_both_leave_a_map_the_page_can_still_pai
     assert!(analyse(&bytes).is_some());
     assert_eq!(regions().len(), 0, "an object file has no segment map to draw");
 
-    // A section-header count that cannot be true must be clipped and say so, not run the map off the end.
+    // A section-header count that cannot be true is clipped to the file and says so, rather than leaving
+    // the map with a range running off the end - and the entries themselves stop being read at the first
+    // one that is not there, so a truncated table still shows the header, the segments and the real
+    // sections. That is what makes the tiling hold for a file that lies about its own size.
     let mut lies = fixture("lab.elf");
-    let shnum_at = 60;
-    lies[shnum_at] = 0xff;
-    lies[shnum_at + 1] = 0xff;
+    lies[60] = 0xff;
+    lies[61] = 0xff;
     assert!(analyse(&lies).is_some());
     let lines = regions();
     assert!(tiles(1064, &lines), "a lying count must not break the tiling: {lines:#?}");
     assert!(
-        !lines.iter().any(|row| row.contains("beyond end of file")),
-        "the clipped claim should have been dropped as an overlap: {lines:#?}"
+        lines
+            .iter()
+            .any(|row| row.starts_with("region\t616\t448\ttables\tsection headers\tbeyond end of file")),
+        "the table claim should have been clipped to the file: {lines:#?}"
     );
 }
 

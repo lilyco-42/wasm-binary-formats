@@ -305,37 +305,84 @@ fn elf_spans(raw: &[u8]) -> Option<(Vec<Span>, Vec<(u64, u64)>)> {
     spans.extend(span(phoff, phentsize.checked_mul(phnum)?, "tables", "program headers", ""));
     spans.extend(span(shoff, shentsize.checked_mul(shnum)?, "tables", "section headers", ""));
     let mut loaded = Vec::new();
-    for index in 0..phnum.min(64) {
-        let at = phoff.checked_add(index.checked_mul(phentsize)?)? as usize;
-        if word_at(raw, at, little)? != PT_LOAD {
+    let mut index = 0u64;
+    while index < phnum.min(64) {
+        // Each entry is read or the walk stops: a file whose program headers run off its own end still
+        // has a header, a section table and gaps worth showing, and voiding the map for that would hide
+        // them behind one bad count.
+        let at = match phoff.checked_add(index.checked_mul(phentsize)) {
+            Some(at) => match usize::try_from(at) {
+                Ok(value) => value,
+                Err(_) => break,
+            },
+            None => break,
+        };
+        index += 1;
+        if word_at(raw, at, little).unwrap_or(0) != PT_LOAD {
             continue;
         }
-        let (offset, filesz) = if wide {
-            (addr_at(raw, at + 8, true, little)?, addr_at(raw, at + 32, true, little)?)
+        let pair = if wide {
+            match (addr_at(raw, at + 8, true, little), addr_at(raw, at + 32, true, little)) {
+                (Some(one), Some(other)) => (one, other),
+                _ => break,
+            }
         } else {
-            (word_at(raw, at + 4, little)?, word_at(raw, at + 16, little)?)
+            match (word_at(raw, at + 4, little), word_at(raw, at + 16, little)) {
+                (Some(one), Some(other)) => (one, other),
+                _ => break,
+            }
         };
-        loaded.push((offset, offset.checked_add(filesz)?));
+        match pair.0.checked_add(pair.1) {
+            Some(stop) => loaded.push((pair.0, stop)),
+            None => break,
+        }
     }
-    for index in 0..shnum.min(256) {
-        let at = shoff.checked_add(index.checked_mul(shentsize)?)? as usize;
-        let name_off = word_at(raw, at, little)? as usize;
-        let sh_type = word_at(raw, at + 4, little)?;
-        let sh_flags = addr_at(raw, at + 8, wide, little)?;
-        let (sh_addr, sh_off, sh_size) = if wide {
-            (
-                addr_at(raw, at + 16, true, little)?,
-                addr_at(raw, at + 24, true, little)?,
-                addr_at(raw, at + 32, true, little)?,
-            )
-        } else {
-            (
-                word_at(raw, at + 12, little)?,
-                word_at(raw, at + 16, little)?,
-                word_at(raw, at + 20, little)?,
-            )
+    let mut index = 0u64;
+    while index < shnum.min(256) {
+        let at = match shoff.checked_add(index.checked_mul(shentsize)) {
+            Some(at) => match usize::try_from(at) {
+                Ok(value) => value,
+                Err(_) => break,
+            },
+            None => break,
         };
-        let name = cstr_at(raw, strtab_at.checked_add(name_off as u64)? as usize);
+        index += 1;
+        let name_off = match word_at(raw, at, little) {
+            Some(value) => value as usize,
+            None => break,
+        };
+        let sh_type = match word_at(raw, at + 4, little) {
+            Some(value) => value,
+            None => break,
+        };
+        let sh_flags = match addr_at(raw, at + 8, wide, little) {
+            Some(value) => value,
+            None => break,
+        };
+        let fields = if wide {
+            match (
+                addr_at(raw, at + 16, true, little),
+                addr_at(raw, at + 24, true, little),
+                addr_at(raw, at + 32, true, little),
+            ) {
+                (Some(one), Some(other), Some(third)) => (one, other, third),
+                _ => break,
+            }
+        } else {
+            match (
+                word_at(raw, at + 12, little),
+                word_at(raw, at + 16, little),
+                word_at(raw, at + 20, little),
+            ) {
+                (Some(one), Some(other), Some(third)) => (one, other, third),
+                _ => break,
+            }
+        };
+        let (sh_addr, sh_off, sh_size) = fields;
+        let name = match strtab_at.checked_add(name_off as u64) {
+            Some(where_at) => cstr_at(raw, where_at as usize),
+            None => cstr_at(raw, 0),
+        };
         if sh_type == SHT_NULL || sh_type == SHT_NOBITS || sh_size == 0 {
             continue;
         }
@@ -401,19 +448,34 @@ fn pe_spans(raw: &[u8]) -> Option<Vec<Span>> {
     if symtab != 0 && nsyms != 0 {
         spans.extend(span(symtab, nsyms.checked_mul(18)?, "meta", "coff symbols", "not loaded"));
     }
-    for index in 0..nsec.min(192) {
-        let at = table.checked_add(usize::try_from(index.checked_mul(40)?).ok()?)?;
-        let bytes = raw.get(at..at.checked_add(8)?)?;
+    let mut index = 0u64;
+    while index < nsec.min(192) {
+        let at = match table.checked_add(usize::try_from(index.checked_mul(40)).unwrap_or(usize::MAX)) {
+            Some(at) => at,
+            None => break,
+        };
+        index += 1;
+        let bytes = match raw.get(at..at.checked_add(8)?) {
+            Some(value) => value,
+            None => break,
+        };
         let trimmed = match bytes.iter().position(|byte| *byte == 0) {
             Some(end) => &bytes[..end],
             None => bytes,
         };
         let name = String::from_utf8_lossy(trimmed).into_owned();
-        let vsize = word_at(raw, at + 8, true)?;
-        let vaddr = word_at(raw, at + 12, true)?;
-        let rawsize = word_at(raw, at + 16, true)?;
-        let roff = word_at(raw, at + 20, true)?;
-        let chars = word_at(raw, at + 36, true)?;
+        let (vsize, vaddr, rawsize, roff, chars) = match (
+            word_at(raw, at + 8, true),
+            word_at(raw, at + 12, true),
+            word_at(raw, at + 16, true),
+            word_at(raw, at + 20, true),
+            word_at(raw, at + 36, true),
+        ) {
+            (Some(one), Some(two), Some(three), Some(four), Some(five)) => {
+                (one, two, three, four, five)
+            }
+            _ => break,
+        };
         if rawsize == 0 {
             continue;
         }
@@ -491,9 +553,22 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
     let mut cursor = 0u64;
     let mut unloaded = 0u64;
     let mut idle_mapped = 0u64;
+    let total = raw.len() as u64;
+    let annotate = |note: &str, extra: &str| {
+        if note.is_empty() {
+            extra.to_owned()
+        } else {
+            format!("{} {}", note, extra)
+        }
+    };
     for each in spans {
         let mut start = each.start;
         let mut length = each.length;
+        if start >= total {
+            // A table that points off the end of the file claims nothing, so it does not get a colour
+            // either: the overlay row below covers what is left and the map still tiles the file.
+            break;
+        }
         if start < cursor {
             let drop = cursor - start;
             if drop >= length {
@@ -524,23 +599,14 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
             Some(stop) => stop,
             None => break,
         };
-        // A table that states a span reaching past the end of the file is clipped and says so, rather than
-        // leaving the map with a range the colour has to be invented for.
-        let total = raw.len() as u64;
+        // A table that states a span reaching past the end of the file is clipped and says so, rather
+        // than leaving the map with a range whose colour would have to be invented.
         let (length, note) = if stop > total {
-            (
-                total - start,
-                format!("{} beyond end of file", each.note),
-            )
+            (total - start, annotate(&each.note, "beyond end of file"))
+        } else if start != each.start {
+            (length, annotate(&each.note, "overlaps"))
         } else {
-            (
-                length,
-                if start != each.start {
-                    format!("{} overlaps", each.note)
-                } else {
-                    each.note
-                },
-            )
+            (length, each.note)
         };
         if length == 0 {
             continue;
@@ -552,7 +618,9 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
             name: each.name,
             note,
         });
-        cursor = cursor.max(start.checked_add(length)?);
+        // `length` is either the file's own span, which was just checked to end inside the file, or the
+        // clipped remainder - so this addition cannot overflow in either branch.
+        cursor = cursor.max(start + length);
     }
     if cursor < raw.len() as u64 {
         let tail = raw.len() as u64 - cursor;
