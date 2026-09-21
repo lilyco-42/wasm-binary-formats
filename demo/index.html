@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。',
   },
   {
     id: 'disasm',
@@ -487,21 +487,31 @@ function toolLine(spec, state) {
     + `${Math.round(state.ms)} ms 内实例化 · 自检 ${state.selftest}${names ? ` · ${names}…` : ''}`;
 }
 
+/* A module that has been fetched and instantiated stays instantiated. The row is a request to analyse
+ * the file that is open now, not a request to download the engine again, so the second click is a
+ * re-run: no fetch, no second copy in memory. */
+const loadedModules = new Map();
+
 async function loadModule(spec, button, line, out) {
   button.disabled = true;
-  button.textContent = '取…';
-  const state = {};
+  const again = loadedModules.get(spec.id);
+  button.textContent = again ? '再看…' : '取…';
+  const state = again ? { ...again } : {};
   toolState.set(spec.id, state);
   try {
-    const response = await fetch(spec.file, { cache: 'no-cache' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const started = performance.now();
-    const mod = await instantiate(bytes);
-    state.bytes = bytes.length;
-    state.ms = performance.now() - started;
-    state.exports = Object.keys(mod).sort();
-    state.selftest = typeof mod.self_test === 'function' ? mod.self_test() : '无';
+    let mod = again ? again.mod : null;
+    if (!mod) {
+      const response = await fetch(spec.file, { cache: 'no-cache' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const started = performance.now();
+      mod = await instantiate(bytes);
+      state.bytes = bytes.length;
+      state.ms = performance.now() - started;
+      state.exports = Object.keys(mod).sort();
+      state.selftest = typeof mod.self_test === 'function' ? mod.self_test() : '无';
+      loadedModules.set(spec.id, { ...state, mod });
+    }
     if (spec.id === 'analysis') {
       // Kept so the analyser can be asked again about whichever file is open later - the disassembler
       // row needs its section table, the name pass needs its index, and neither should answer from a
@@ -526,7 +536,8 @@ async function loadModule(spec, button, line, out) {
     line.textContent = `${spec.title} —— ${toolLine(spec, state)} 再试一次？`;
     return;
   }
-  button.textContent = '已加载';
+  button.textContent = '再看一次';
+  button.disabled = false;
   line.textContent = `${spec.title} —— ${toolLine(spec, state)}`;
   out.textContent = state.report;
   if (spec.id === 'analysis') paintRegions(state);
