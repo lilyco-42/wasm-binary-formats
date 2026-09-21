@@ -73,7 +73,8 @@ test('the analysis module stands on its own exports', () => {
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
     'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
     'demangle_count', 'demangle_at', 'reloc_count', 'reloc_at',
-    'function_count', 'function_at', 'named_count', 'named_at', 'abi_version', 'self_test']) {
+    'function_count', 'function_at', 'named_count', 'named_at', 'segment_count', 'segment_at',
+    'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -155,6 +156,7 @@ test('the base module the page always downloads carries none of this', async () 
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
     'export_count', 'export_at', 'import_count', 'import_at', 'demangle_count', 'demangle_at',
     'reloc_count', 'reloc_at', 'function_count', 'function_at', 'named_count', 'named_at',
+    'segment_count', 'segment_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }

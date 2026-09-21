@@ -1,0 +1,137 @@
+{
+ "files": {
+  "lab.elf": {
+   "bytes": 1152,
+   "flags": [
+    4,
+    4,
+    5,
+    6
+   ],
+   "kinds": [
+    6,
+    1,
+    1,
+    1685382481
+   ],
+   "rows": [
+    "segments\ttotal\t4\tload\t2\twritable\t1\texec\t1\tmapped\t615\tbits\t64",
+    "segment\t0\ttype\t6\tname\tPHDR\toff\t64\tvaddr\t0x200040\tpaddr\t0x200040\tfilesz\t224\tmemsz\t224\tflags\tr--\talign\t8",
+    "segment\t1\ttype\t1\tname\tLOAD\toff\t0\tvaddr\t0x200000\tpaddr\t0x200000\tfilesz\t385\tmemsz\t385\tflags\tr--\talign\t4096",
+    "segment\t2\ttype\t1\tname\tLOAD\toff\t400\tvaddr\t0x201190\tpaddr\t0x201190\tfilesz\t6\tmemsz\t6\tflags\tr-x\talign\t4096",
+    "segment\t3\ttype\t1685382481\tname\tGNU_STACK\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t0\tmemsz\t0\tflags\trw-\talign\t0"
+   ]
+  },
+  "lab.so": {
+   "bytes": 3840,
+   "flags": [
+    4,
+    4,
+    5,
+    6,
+    6,
+    6,
+    4,
+    4,
+    6
+   ],
+   "kinds": [
+    6,
+    1,
+    1,
+    1,
+    1,
+    2,
+    1685382482,
+    1685382480,
+    1685382481
+   ],
+   "rows": [
+    "segments\ttotal\t9\tload\t4\twritable\t4\texec\t1\tmapped\t7596\tbits\t64",
+    "segment\t0\ttype\t6\tname\tPHDR\toff\t64\tvaddr\t0x40\tpaddr\t0x40\tfilesz\t504\tmemsz\t504\tflags\tr--\talign\t8",
+    "segment\t1\ttype\t1\tname\tLOAD\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t1260\tmemsz\t1260\tflags\tr--\talign\t4096",
+    "segment\t2\ttype\t1\tname\tLOAD\toff\t1264\tvaddr\t0x14f0\tpaddr\t0x14f0\tfilesz\t176\tmemsz\t176\tflags\tr-x\talign\t4096",
+    "segment\t3\ttype\t1\tname\tLOAD\toff\t1440\tvaddr\t0x25a0\tpaddr\t0x25a0\tfilesz\t264\tmemsz\t2656\tflags\trw-\talign\t4096",
+    "segment\t4\ttype\t1\tname\tLOAD\toff\t1712\tvaddr\t0x36b0\tpaddr\t0x36b0\tfilesz\t88\tmemsz\t92\tflags\trw-\talign\t4096",
+    "segment\t5\ttype\t2\tname\tDYNAMIC\toff\t1440\tvaddr\t0x25a0\tpaddr\t0x25a0\tfilesz\t224\tmemsz\t224\tflags\trw-\talign\t8",
+    "segment\t6\ttype\t1685382482\tname\tGNU_RELRO\toff\t1440\tvaddr\t0x25a0\tpaddr\t0x25a0\tfilesz\t264\tmemsz\t2656\tflags\tr--\talign\t1",
+    "segment\t7\ttype\t1685382480\tname\tGNU_EH_FRAME\toff\t1136\tvaddr\t0x470\tpaddr\t0x470\tfilesz\t28\tmemsz\t28\tflags\tr--\talign\t4",
+    "segment\t8\ttype\t1685382481\tname\tGNU_STACK\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t0\tmemsz\t0\tflags\trw-\talign\t0"
+   ]
+  },
+  "lab32.so": {
+   "bytes": 2676,
+   "flags": [
+    4,
+    4,
+    5,
+    6,
+    6,
+    6,
+    4,
+    4,
+    6
+   ],
+   "kinds": [
+    6,
+    1,
+    1,
+    1,
+    1,
+    2,
+    1685382482,
+    1685382480,
+    1685382481
+   ],
+   "rows": [
+    "segments\ttotal\t9\tload\t4\twritable\t4\texec\t1\tmapped\t7652\tbits\t32",
+    "segment\t0\ttype\t6\tname\tPHDR\toff\t52\tvaddr\t0x34\tpaddr\t0x34\tfilesz\t288\tmemsz\t288\tflags\tr--\talign\t4",
+    "segment\t1\ttype\t1\tname\tLOAD\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t808\tmemsz\t808\tflags\tr--\talign\t4096",
+    "segment\t2\ttype\t1\tname\tLOAD\toff\t816\tvaddr\t0x1330\tpaddr\t0x1330\tfilesz\t192\tmemsz\t192\tflags\tr-x\talign\t4096",
+    "segment\t3\ttype\t1\tname\tLOAD\toff\t1008\tvaddr\t0x23f0\tpaddr\t0x23f0\tfilesz\t132\tmemsz\t3088\tflags\trw-\talign\t4096",
+    "segment\t4\ttype\t1\tname\tLOAD\toff\t1140\tvaddr\t0x3474\tpaddr\t0x3474\tfilesz\t44\tmemsz\t48\tflags\trw-\talign\t4096",
+    "segment\t5\ttype\t2\tname\tDYNAMIC\toff\t1008\tvaddr\t0x23f0\tpaddr\t0x23f0\tfilesz\t112\tmemsz\t112\tflags\trw-\talign\t4",
+    "segment\t6\ttype\t1685382482\tname\tGNU_RELRO\toff\t1008\tvaddr\t0x23f0\tpaddr\t0x23f0\tfilesz\t132\tmemsz\t3088\tflags\tr--\talign\t1",
+    "segment\t7\ttype\t1685382480\tname\tGNU_EH_FRAME\toff\t688\tvaddr\t0x2b0\tpaddr\t0x2b0\tfilesz\t28\tmemsz\t28\tflags\tr--\talign\t4",
+    "segment\t8\ttype\t1685382481\tname\tGNU_STACK\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t0\tmemsz\t0\tflags\trw-\talign\t0"
+   ]
+  },
+  "labarm.so": {
+   "bytes": 3992,
+   "flags": [
+    4,
+    4,
+    5,
+    6,
+    6,
+    6,
+    4,
+    4,
+    6
+   ],
+   "kinds": [
+    6,
+    1,
+    1,
+    1,
+    1,
+    2,
+    1685382482,
+    1685382480,
+    1685382481
+   ],
+   "rows": [
+    "segments\ttotal\t9\tload\t4\twritable\t4\texec\t1\tmapped\t7560\tbits\t64",
+    "segment\t0\ttype\t6\tname\tPHDR\toff\t64\tvaddr\t0x40\tpaddr\t0x40\tfilesz\t504\tmemsz\t504\tflags\tr--\talign\t8",
+    "segment\t1\ttype\t1\tname\tLOAD\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t1252\tmemsz\t1252\tflags\tr--\talign\t65536",
+    "segment\t2\ttype\t1\tname\tLOAD\toff\t1252\tvaddr\t0x104e4\tpaddr\t0x104e4\tfilesz\t220\tmemsz\t220\tflags\tr-x\talign\t65536",
+    "segment\t3\ttype\t1\tname\tLOAD\toff\t1472\tvaddr\t0x205c0\tpaddr\t0x205c0\tfilesz\t264\tmemsz\t2624\tflags\trw-\talign\t65536",
+    "segment\t4\ttype\t1\tname\tLOAD\toff\t1736\tvaddr\t0x306c8\tpaddr\t0x306c8\tfilesz\t80\tmemsz\t84\tflags\trw-\talign\t65536",
+    "segment\t5\ttype\t2\tname\tDYNAMIC\toff\t1472\tvaddr\t0x205c0\tpaddr\t0x205c0\tfilesz\t224\tmemsz\t224\tflags\trw-\talign\t8",
+    "segment\t6\ttype\t1685382482\tname\tGNU_RELRO\toff\t1472\tvaddr\t0x205c0\tpaddr\t0x205c0\tfilesz\t264\tmemsz\t2624\tflags\tr--\talign\t1",
+    "segment\t7\ttype\t1685382480\tname\tGNU_EH_FRAME\toff\t1136\tvaddr\t0x470\tpaddr\t0x470\tfilesz\t28\tmemsz\t28\tflags\tr--\talign\t4",
+    "segment\t8\ttype\t1685382481\tname\tGNU_STACK\toff\t0\tvaddr\t0x0\tpaddr\t0x0\tfilesz\t0\tmemsz\t0\tflags\trw-\talign\t0"
+   ]
+  }
+ }
+}

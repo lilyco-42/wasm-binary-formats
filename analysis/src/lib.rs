@@ -210,6 +210,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     RELOCS.with(|slot| slot.borrow_mut().clear());
     FUNCTIONS.with(|slot| slot.borrow_mut().clear());
     NAMED.with(|slot| slot.borrow_mut().clear());
+    SEGMENTS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -345,6 +346,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     window.dedup_by(|later, earlier| later.0 == earlier.0 && later.1 == earlier.1);
     let listed = named_rows(&window);
     NAMED.with(|slot| *slot.borrow_mut() = listed);
+    let segments = segment_rows(bytes);
+    SEGMENTS.with(|slot| *slot.borrow_mut() = segments);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1105,6 +1108,166 @@ fn where_lies(pe: &Pe, rva: u64) -> (i64, String) {
         Some((where_, name)) => (i64::try_from(where_).unwrap_or(-1), clean(name)),
         None => (-1, "unmapped".to_owned()),
     }
+}
+
+thread_local! {
+    /// The Segments window: the program headers an ELF hands its loader.
+    static SEGMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The segment types two readers named in the files here, by number. Six words, because six appear in
+/// `lab.elf`, `lab.so`, `lab32.so` and `labarm.so` - `readelf` and `llvm-readobj --segments` agree on each
+/// one, LLVM's being readelf's with `PT_` in front. `PT_INTERP`, `PT_NOTE` and `PT_TLS` are absent from
+/// every file this lab can build, so their numbers print as numbers: a name copied from documentation
+/// would be a claim no fixture on this host has checked.
+fn segment_word(kind: u32) -> Option<&'static str> {
+    Some(match kind {
+        1 => "LOAD",
+        2 => "DYNAMIC",
+        6 => "PHDR",
+        0x6474_E550 => "GNU_EH_FRAME",
+        0x6474_E551 => "GNU_STACK",
+        0x6474_E552 => "GNU_RELRO",
+        _ => return None,
+    })
+}
+
+/// The program headers, read out of the file.
+///
+/// `e_phentsize` is what the header says it is, not a constant, so a file with roomy records is walked at
+/// its own stride. The fields are not consecutive words: in a 32-bit record `p_flags` sits between
+/// `p_memsz` and `p_align`, where a 64-bit record puts it second, and reading the two the same way reports
+/// a permission word as an alignment. The encoding comes from `e_ident`'s own byte, which has nothing to
+/// do with the class - a 32-bit little-endian file is the ordinary case.
+fn segment_rows(raw: &[u8]) -> Vec<String> {
+    if raw.len() < 64 || raw.get(..4) != Some(b"\x7fELF") {
+        return Vec::new();
+    }
+    let is64 = raw.get(4) == Some(&2);
+    let little = raw.get(5) == Some(&1);
+    let word = |at: usize, wide: bool| -> Option<u64> {
+        if wide {
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(raw.get(at..at.checked_add(8)?)?);
+            Some(if little { u64::from_le_bytes(buf) } else { u64::from_be_bytes(buf) })
+        } else {
+            let mut buf = [0u8; 4];
+            buf.copy_from_slice(raw.get(at..at.checked_add(4)?)?);
+            Some(u64::from(if little { u32::from_le_bytes(buf) } else { u32::from_be_bytes(buf) }))
+        }
+    };
+    let half = |at: usize| -> Option<u64> {
+        let mut buf = [0u8; 2];
+        buf.copy_from_slice(raw.get(at..at.checked_add(2)?)?);
+        Some(u64::from(if little { u16::from_le_bytes(buf) } else { u16::from_be_bytes(buf) }))
+    };
+    let (Some(at_ph), Some(entry), Some(count)) = (
+        word(if is64 { 0x20 } else { 0x1c }, is64),
+        half(if is64 { 0x36 } else { 0x2a }),
+        half(if is64 { 0x38 } else { 0x2c }),
+    ) else {
+        return Vec::new();
+    };
+    let smallest = if is64 { 56 } else { 32 };
+    let Some(stride) = usize::try_from(entry).ok() else {
+        return Vec::new();
+    };
+    if stride < smallest {
+        return vec!["segments\ttotal\t0\tstopped\tentry size".to_owned()];
+    }
+    let places: [usize; 6] = if is64 {
+        [8, 16, 24, 32, 40, 48]
+    } else {
+        [4, 8, 12, 16, 20, 28]
+    };
+    let flag_place = if is64 { 4 } else { 24 };
+    let mut out: Vec<String> = Vec::new();
+    let mut loads = 0usize;
+    let mut writable = 0usize;
+    let mut execed = 0usize;
+    let mut mapped = 0u64;
+    let mut listed = 0usize;
+    let total = usize::try_from(count).unwrap_or(0);
+    for index in 0..total {
+        let Some(start) = at_ph.checked_add(u64::try_from(index).unwrap_or(0)
+                                            * u64::try_from(stride).unwrap_or(0)) else {
+            break;
+        };
+        let Some(at) = usize::try_from(start).ok() else { break };
+        let Some(kind) = word(at, false) else { break };
+        let Some(bits) = word(at + flag_place, false) else { break };
+        let mut fields = Vec::with_capacity(6);
+        let mut broke = false;
+        for place in places {
+            match word(at + place, is64) {
+                Some(one) => fields.push(one),
+                None => {
+                    broke = true;
+                    break;
+                }
+            }
+        }
+        if broke {
+            break;
+        }
+        if kind == 1 {
+            loads += 1;
+        }
+        if bits & 2 != 0 {
+            writable += 1;
+        }
+        if bits & 1 != 0 {
+            execed += 1;
+        }
+        mapped = mapped.saturating_add(fields[4]);
+        if listed >= MAX_LISTED {
+            continue;
+        }
+        listed += 1;
+        let flags = format!("{}{}{}",
+                            if bits & 4 != 0 { "r" } else { "-" },
+                            if bits & 2 != 0 { "w" } else { "-" },
+                            if bits & 1 != 0 { "x" } else { "-" });
+        out.push(format!(
+            "segment\t{index}\ttype\t{kind}\tname\t{}\toff\t{}\tvaddr\t0x{:x}\tpaddr\t0x{:x}\tfilesz\t{}\tmemsz\t{}\tflags\t{}\talign\t{}",
+            segment_word(kind as u32).unwrap_or("-"),
+            fields[0], fields[1], fields[2], fields[3], fields[4], flags, fields[5],
+        ));
+    }
+    let mut head = format!(
+        "segments\ttotal\t{total}\tload\t{loads}\twritable\t{writable}\texec\t{execed}\tmapped\t{mapped}\tbits\t{}",
+        if is64 { 64 } else { 32 }
+    );
+    if total > listed {
+        head.push_str("\tstopped\tshort");
+    }
+    let mut rows = vec![head];
+    rows.append(&mut out);
+    if total > MAX_LISTED {
+        rows.push(format!("cut\tsegments\t{total}"));
+    }
+    rows
+}
+
+/// How many rows the Segments window has. A PE and a COFF object answer with no rows at all: the program
+/// header table is an ELF's, and those formats say what to map in their own way - sections and a directory.
+#[no_mangle]
+pub extern "C" fn segment_count() -> i32 {
+    SEGMENTS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the record's index, its type number and - where two readers named that number in a file here
+/// - the word, then the offsets, both addresses, both sizes, the permission letters and the alignment,
+/// all as the header states them. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn segment_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    SEGMENTS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
 }
 
 /// One relocation record's field, at the width the file's own class uses.

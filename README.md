@@ -487,6 +487,26 @@ says. C++ names carry both spellings, the table's bytes in `name` and the two-wi
 so the row that the demanglers disagree on is still listed - with `read -` - rather than dropped from a
 window that is supposed to be complete.
 
+**The segments window** (`segment_count` / `segment_at`) is the loader's list rather than the linker's: an
+ELF's program headers, one row per record, with the type number and the word two readers used for it, the
+file offset and length, both addresses, the address space the record occupies, the permission letters and
+the alignment. Three sources had to agree before `segment.probe.json` was written - the bytes at `e_phoff`
+themselves, `readelf -lW` and `llvm-readobj --segments` - on all six numbers of every record and on the
+type word, where LLVM's is allowed to be readelf's with `PT_` in front and nothing else differs. objdump
+was tried first and dropped: it prints `2**0` for an alignment the file leaves at zero and wraps one record
+over two lines, so agreeing with it would have been agreeing about its formatting.
+
+Two field-position traps are the reason four files are in this set. A 32-bit program header puts `p_flags`
+between `p_memsz` and `p_align`, where the 64-bit record puts it second, and the data encoding is a byte of
+`e_ident`, not a consequence of the class - read either the same way for both and `lab32.so`'s first
+segment reports its permission word as its file offset. The six type words the reader prints (`LOAD`,
+`DYNAMIC`, `PHDR` and the three `GNU_` kinds) are the six that appear in these files under two readers;
+`PT_INTERP`, `PT_NOTE` and `PT_TLS` are not, so their numbers print as numbers. A `GNU_RELRO` sharing an
+address with a `LOAD` is the file's own overlap and is left in both rows, and `mapped` is the sum of
+`p_memsz`, which is more than the bytes on disk wherever a segment ends in a `NOBITS` tail. A PE and a COFF
+object answer with no rows, because translating their sections into headers they do not have would be this
+reader's invention.
+
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -664,6 +684,10 @@ temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test
 temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports test/fixtures/lab.3mf and then re-reads it, zipfile lists the parts and xml.etree.ElementTree walks the mesh; the probe is not written unless the two counts agree across all three readings, and hand.3mf exists to carry the four shapes trimesh will not produce
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
+temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
+test/fixtures/labarm.so already exist, and every program header is read three times - the bytes at e_phoff,
+readelf -lW and llvm-readobj --segments - which must agree on all six numbers and on the type word before
+test/fixtures/segment.probe.json is written
 temp/venv/Scripts/python.exe scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
 test/fixtures/lab.so and lab32.so; readelf -rW and objdump -R must agree on every offset, type name, symbol
 and addend before elfreloc.probe.json is written, and the eight type numbers they name are paired per machine
