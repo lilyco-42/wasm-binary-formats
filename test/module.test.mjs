@@ -756,7 +756,10 @@ test('the notes both listings read are the ones the module reports', async () =>
     for (let index = 0; index < want.length; index += 1) {
       assert.equal(got[index], want[index], `${name} row ${index}`);
     }
-    if (want.length > 0) routes.add(cell(want[0], 'walked'));
+    if (want.length === 0) {
+      continue;
+    }
+    routes.add(cell(want[0], 'walked'));
     // The rows a file carries are the notes it carries: one row per note, plus one per record inside a
     // property note, and the totals row counts the notes rather than the rows.
     const notes = want.filter((one) => one.startsWith('note	')).length;
