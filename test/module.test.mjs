@@ -816,6 +816,10 @@ test('the Mach-O map, symbol homes and relocations two readers named are the one
     const parts = row.split('\t');
     return parts[parts.indexOf(key) + 1];
   };
+  const field = (parts, key) => {
+    const at = parts.indexOf(key);
+    return at >= 0 ? parts[at + 1] : undefined;
+  };
   const colours = new Set();
   const machines = new Set();
   let scattered = 0;
