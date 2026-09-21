@@ -154,6 +154,7 @@ pub fn name() -> &'static str {
         FORMAT_VCARD => "vcard",
         FORMAT_TORRENT => "torrent",
         FORMAT_PGP => "pgp",
+        FORMAT_PDB => "pdb",
         _ => "unknown",
     }
 }
@@ -7713,6 +7714,9 @@ fn read_torrent(bytes: &[u8]) -> Option<Vec<String>> {
 
 // ------------------------------------------------------------------------ PGP / OpenPGP packet framing
 pub const FORMAT_PGP: i32 = 54;
+/// MSF 7.00: the container a linker writes as a `.pdb`, which is where a Windows binary's types live
+/// once it is linked rather than in the object.
+pub const FORMAT_PDB: i32 = 55;
 
 /// Packets listed before the report says it stopped: a keyring export can hold thousands of them.
 const PGP_MAX_PACKETS: usize = 24;
@@ -7982,6 +7986,187 @@ fn pgp_is_key(tag: u8) -> bool {
     matches!(tag, 6 | 14)
 }
 
+// ----------------------------------------------------------------- MSF 7.00, the container of a .pdb
+const PDB_MAGIC: &[u8] = b"Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
+/// Streams listed before the report says it stopped; the count is still the file's own.
+const PDB_MAX_STREAMS: usize = 64;
+/// More streams than any PDB this lab has produced. Refusing is better than allocating on a number
+/// a damaged directory invented, which is the only thing standing between a huge count and a huge
+/// table once the size check below passes.
+const PDB_ABSURD: usize = 65536;
+/// The indices MSF reserves. `llvm-pdbutil` prints these names by position, which is the only reason
+/// this reader may attach them; a stream past index 4 is listed by number alone.
+const PDB_KNOWN: [&str; 5] = ["old-msf-directory", "pdb", "tpi", "dbi", "ipi"];
+
+fn pdb_u32(raw: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(raw.get(at..at + 4)?.try_into().ok()?))
+}
+
+/// The offset a page number addresses, or `None` when the file does not hold that page.
+fn pdb_page(raw: &[u8], page: usize, index: usize) -> Option<usize> {
+    let at = index.checked_mul(page)?;
+    if at.checked_add(page)? > raw.len() {
+        return None;
+    }
+    Some(at)
+}
+
+fn pdb_hex(raw: &[u8]) -> String {
+    raw.iter().map(|each| format!("{each:02x}")).collect()
+}
+
+/// The MSF 7.00 container a linker writes as a `.pdb`: the superblock, the stream directory it
+/// points at, and the two header streams whose fields `llvm-pdbutil` names.
+///
+/// Every number here is the file's own claim, checked against that witness by
+/// `scripts/make-pdb-fixtures.py`: page size, block count, per-stream sizes and block lists, the
+/// PDB stream's version, signature and age, and the TPI stream's declared record bytes. Two things
+/// are deliberately not claimed. The feature word is printed as a word, because llvm's
+/// `Has Types / Has IDs / Has Debug Info` answers turn out to be about which streams the directory
+/// holds - which is what the `has` rows say - and not names for its bits. And the GUID is the
+/// sixteen bytes as they lie in the stream, because its first word repeats the signature and
+/// reformatted it would be an endianness claim.
+fn read_pdb(bytes: &[u8]) -> Option<Vec<String>> {
+    if !bytes.starts_with(PDB_MAGIC) {
+        return None;
+    }
+    let page = usize::try_from(pdb_u32(bytes, 32)?).ok()?;
+    // Everything after this is arithmetic in pages, so a size the file cannot mean has to stop here:
+    // powers of two are what linkers write, and 64 is the smallest one MSF uses.
+    if page < 64 || page % 64 != 0 || page > bytes.len() {
+        return None;
+    }
+    let blocks = pdb_u32(bytes, 40)?;
+    let free = pdb_u32(bytes, 36)?;
+    let dir_bytes = usize::try_from(pdb_u32(bytes, 44)?).ok()?;
+    let want = dir_bytes.checked_add(page - 1)? / page;
+    if dir_bytes < 8 || want == 0 || want > PDB_ABSURD {
+        return None;
+    }
+    let mut pages: Vec<usize> = Vec::new();
+    for slot in [48usize, 56] {
+        if let Some(value) = pdb_u32(bytes, slot) {
+            if value > 0 {
+                pages.push(usize::try_from(value).ok()?);
+            }
+        }
+    }
+    if pages.len() < want {
+        // A directory too wide for the superblock's two inline slots lists its pages at the page
+        // offset 52 names - first page of the list, no count in front of it.
+        let list = usize::try_from(pdb_u32(bytes, 52)?).ok()?;
+        let at = pdb_page(bytes, page, list)?;
+        for n in pages.len()..want {
+            let each = usize::try_from(pdb_u32(bytes, at + 4 * n)?).ok()?;
+            if each == 0 {
+                return None;
+            }
+            pages.push(each);
+        }
+    }
+    pages.truncate(want);
+    let mut dir: Vec<u8> = Vec::with_capacity(dir_bytes);
+    for each in &pages {
+        let at = pdb_page(bytes, page, *each)?;
+        dir.extend_from_slice(bytes.get(at..at + page)?);
+    }
+    dir.truncate(dir_bytes);
+    let count = usize::try_from(pdb_u32(&dir, 0)?).ok()?;
+    if count == 0 || count > PDB_ABSURD || 4_usize.checked_add(4_usize.checked_mul(count)?)? > dir_bytes {
+        return None;
+    }
+    let joined = pages
+        .iter()
+        .map(|each| each.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let mut rows = vec![format!(
+        "container\tpdb\t7.00\tblock\t{page}\tpages\t{blocks}\tfree\t{free}\tstreams\t{count}\tdir\t{dir_bytes}@{joined}"
+    )];
+    let mut sizes: Vec<usize> = Vec::with_capacity(count);
+    let mut tables: Vec<Vec<usize>> = Vec::with_capacity(count);
+    let mut cursor = 4_usize.checked_add(4_usize.checked_mul(count)?)?;
+    for index in 0..count {
+        let size = usize::try_from(pdb_u32(&dir, 4 + 4 * index)?).ok()?;
+        let used = size.checked_add(page - 1)? / page;
+        if cursor.checked_add(4_usize.checked_mul(used)?)? > dir_bytes {
+            return None;
+        }
+        let mut found = Vec::with_capacity(used);
+        for n in 0..used {
+            found.push(usize::try_from(pdb_u32(&dir, cursor + 4 * n)?).ok()?);
+        }
+        cursor += 4 * used;
+        if index < PDB_MAX_STREAMS {
+            let named = PDB_KNOWN
+                .get(index)
+                .map_or(String::new(), |each| format!("\tname\t{each}"));
+            rows.push(format!("stream\t{index}\tsize\t{size}\tblocks\t{used}{named}"));
+        }
+        sizes.push(size);
+        tables.push(found);
+    }
+    if count > PDB_MAX_STREAMS {
+        rows.push(format!("cut\tstreams\t{count}"));
+    }
+    for (index, name) in [(1usize, "pdb"), (2, "tpi"), (3, "dbi"), (4, "ipi")] {
+        let filled = sizes.get(index).map_or(0, |each| *each) > 0;
+        rows.push(format!(
+            "has\t{name}\t{}",
+            if filled { "yes" } else { "no" }
+        ));
+    }
+    // A stream is only readable when the file holds every page its directory names; a PDB copied
+    // without its tail still says what it contains, so the table above stands and the bodies say
+    // they could not be reached.
+    let gather = |index: usize| -> Option<Vec<u8>> {
+        let size = *sizes.get(index)?;
+        let mut out: Vec<u8> = Vec::with_capacity(size);
+        for each in tables.get(index)? {
+            let at = pdb_page(bytes, page, *each)?;
+            out.extend_from_slice(bytes.get(at..at + page)?);
+            if out.len() >= size {
+                break;
+            }
+        }
+        out.truncate(size);
+        Some(out)
+    };
+    match gather(1) {
+        Some(body) if body.len() >= 32 => {
+            rows.push(format!(
+                "header\tpdb\tversion\t{}\tsignature\t{}\tage\t{}",
+                u32::from_le_bytes(body[0..4].try_into().ok()?),
+                u32::from_le_bytes(body[4..8].try_into().ok()?),
+                u32::from_le_bytes(body[8..12].try_into().ok()?)
+            ));
+            rows.push(format!("guid\t{}", pdb_hex(body.get(12..28)?)));
+            rows.push(format!(
+                "features\t0x{:x}",
+                u32::from_le_bytes(body[28..32].try_into().ok()?)
+            ));
+        }
+        _ => rows.push("header\tpdb\tunreadable".to_owned()),
+    }
+    match gather(2) {
+        Some(body) if body.len() >= 20 => {
+            let version = u32::from_le_bytes(body[0..4].try_into().ok()?);
+            let header = usize::try_from(u32::from_le_bytes(body[4..8].try_into().ok()?)).ok()?;
+            let first = u32::from_le_bytes(body[8..12].try_into().ok()?);
+            let last = u32::from_le_bytes(body[12..16].try_into().ok()?);
+            let total = usize::try_from(u32::from_le_bytes(body[16..20].try_into().ok()?)).ok()?;
+            rows.push(format!(
+                "tpi\tversion\t{version}\theader\t{header}\ttypes\t0x{first:x}..0x{last:x}\tbytes\t{total}"
+            ));
+            if header.checked_add(total)? > body.len() {
+                rows.push(format!("tpi\trecords\tpast\tstream\t{}", body.len()));
+            }
+        }
+        _ => rows.push("tpi\tunreadable".to_owned()),
+    }
+    Some(rows)
+}
+
 /// An OpenPGP transfer: the packet framing, plus the body fields whose spelling the witness confirms.
 /// Nothing is decrypted or decompressed, and the report names the packets it stopped in front of instead
 /// of skipping them silently.
@@ -8166,8 +8351,11 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_pgp(bytes) {
         return accept(FORMAT_PGP, lines);
     }
+    if let Some(lines) = read_pdb(bytes) {
+        return accept(FORMAT_PDB, lines);
+    }
     reject(
-        "not a vCard, torrent, OpenPGP packet stream, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, OpenPGP packet stream, MSF 7.00 program database, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

@@ -268,7 +268,7 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
 | **no parser at all - real gap** | **97** | 44.3% |
-| **covered, any level** | **122** | 55.7% |
+| **covered, any level** | **123** | 56.2% |
 
 Top binary gap groups by count: unknown 52, archive 10, image 8, application 7, document 6,
 code 5, executable 4, inode 3, text 1.
@@ -287,8 +287,8 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 122 of 219 binary labels have a parser
-that runs here (53 field-level and 28 container-level from our own Rust engine, 41 generated from
+So the honest answer to the objective is **no, not yet**: 123 of 219 binary labels have a parser
+that runs here (53 field-level and 29 container-level from our own Rust engine, 41 generated from
 Kaitai specs and load-gated in CI), 97 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 122 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 123 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, and the CodeView type records a `.debug$T` section carries |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -617,7 +617,7 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **122 covered** (53 field-level and 28
+Coverage is scored against magika's 219 binary labels: **123 covered** (53 field-level and 29
 container-level from this repo's own readers, 41 generated and mostly load-gated), **97 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
@@ -997,6 +997,17 @@ does not re-derive them:
   check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
   file's size and not the torrent's, so named values are read at the key they were reached under, and
   the shape row says `single` or `multi` from which of the two the file actually has.
+* MSF 7.00 (+1 container-level label, 123 covered, 96 gaps) is the `.pdb` a linker writes, and it is the
+  file the types actually live in once a binary is linked. The page size, block count and free-page map come
+  from the superblock; the stream table comes from the pages it names - two inline, the rest through the list
+  page - and each stream's size and block list are reported as the directory gives them, with the four reserved
+  indices (`old-msf-directory`, `pdb`, `tpi`, `dbi`, `ipi`) named by position because `llvm-pdbutil` labels
+  them that way and the fixture script checks the labels agree. The PDB stream's version, signature and age and
+  the TPI header's declared record bytes are checked against that witness too. Two refusals carry the weight:
+  the feature word is printed as a word, because llvm's `Has Types / Has IDs / Has Debug Info` answers turned
+  out to be about which streams the directory holds - which is what the `has` rows say - and not names for its
+  bits, which the first draft assumed and the witness rejected; and the GUID is the sixteen bytes as they lie,
+  because its first word repeats the signature and any reformatting would be an endianness claim.
 * OpenPGP (+1 field-level label, 122 covered, 97 gaps) is the fourth format here with no magic: a
   transfer is a run of packets and each one states its own payload length, so the acceptance rule is
   again "the lengths tile the file". An unstated length is allowed only on the packet that carries a stream

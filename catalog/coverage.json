@@ -8,9 +8,9 @@
     "specAvailable": 0,
     "binaryGenerated": 41,
     "selfFields": 53,
-    "selfContainer": 28,
+    "selfContainer": 29,
     "binarySpecAvailable": 0,
-    "gaps": 97,
+    "gaps": 96,
     "implementedHere": [
       "parse:pe-header",
       "parse:dex-header",
@@ -26,7 +26,7 @@
       "document": 6,
       "executable": 4,
       "text": 1,
-      "application": 8,
+      "application": 7,
       "inode": 3,
       "undefined": 1
     }
@@ -2996,8 +2996,8 @@
       ],
       "kaitaiSpecs": [],
       "generatedHere": false,
-      "selfLevel": "",
-      "status": "gap"
+      "selfLevel": "container",
+      "status": "self-container"
     },
     {
       "label": "pdf",
