@@ -1,0 +1,154 @@
+{
+ "broken.jsonc": {
+  "bytes": 30,
+  "comments": [
+   "block"
+  ],
+  "errors": [
+   {
+    "error": 11,
+    "length": 16,
+    "offset": 14
+   },
+   {
+    "error": 3,
+    "length": 0,
+    "offset": 30
+   },
+   {
+    "error": 4,
+    "length": 0,
+    "offset": 30
+   },
+   {
+    "error": 7,
+    "length": 0,
+    "offset": 30
+   }
+  ],
+  "parse": {
+   "a": 1
+  },
+  "rows": [],
+  "scanErrors": [
+   "UnexpectedEndOfComment"
+  ],
+  "strict": "no"
+ },
+ "lab.jsonc": {
+  "bytes": 649,
+  "comments": [
+   "line",
+   "line",
+   "line",
+   "block"
+  ],
+  "errors": [
+   {
+    "error": 3,
+    "length": 1,
+    "offset": 425
+   },
+   {
+    "error": 4,
+    "length": 1,
+    "offset": 425
+   },
+   {
+    "error": 4,
+    "length": 1,
+    "offset": 463
+   },
+   {
+    "error": 3,
+    "length": 1,
+    "offset": 644
+   },
+   {
+    "error": 4,
+    "length": 1,
+    "offset": 644
+   },
+   {
+    "error": 3,
+    "length": 1,
+    "offset": 647
+   },
+   {
+    "error": 4,
+    "length": 1,
+    "offset": 647
+   }
+  ],
+  "parse": {
+   "docs.homepage": "https://example.test/docs",
+   "editor.formatOnSave": true,
+   "editor.rulers": [
+    80,
+    100,
+    120
+   ],
+   "editor.tabSize": 4,
+   "files.exclude": {
+    "**/*.log": false,
+    "**/tmp": true
+   },
+   "search.exclude": [
+    "out",
+    "dist"
+   ],
+   "window.title": "${activeEditorShort}${separator}my workspace",
+   "workbench.colorCustomizations": {
+    "editor.background": "#1e1e1e"
+   }
+  },
+  "rows": [
+   "jsonc\tmembers\t8\tline\t3\tblock\t1\tstrict\tno\tdepth\t2\tbytes\t649",
+   "key\teditor.formatOnSave\t1\tboolean\ttrue",
+   "key\teditor.tabSize\t1\tnumber\t4",
+   "key\twindow.title\t1\tstring\t\"${activeEditorShort}${separator}my workspace\"",
+   "key\tdocs.homepage\t1\tstring\t\"https://example.test/docs\"",
+   "key\tfiles.exclude\t1\tobject\t2",
+   "key\tfiles.exclude.**/tmp\t2\tboolean\ttrue",
+   "key\tfiles.exclude.**/*.log\t2\tboolean\tfalse",
+   "key\tsearch.exclude\t1\tarray\t2",
+   "key\tsearch.exclude[0]\t2\tstring\t\"out\"",
+   "key\tsearch.exclude[1]\t2\tstring\t\"dist\"",
+   "key\teditor.rulers\t1\tarray\t3",
+   "key\teditor.rulers[0]\t2\tnumber\t80",
+   "key\teditor.rulers[1]\t2\tnumber\t100",
+   "key\teditor.rulers[2]\t2\tnumber\t120",
+   "key\tworkbench.colorCustomizations\t1\tobject\t1",
+   "key\tworkbench.colorCustomizations.editor.background\t2\tstring\t\"#1e1e1e\""
+  ],
+  "scanErrors": [],
+  "strict": "no"
+ },
+ "trailing.jsonc": {
+  "bytes": 51,
+  "comments": [],
+  "errors": [
+   {
+    "error": 3,
+    "length": 1,
+    "offset": 49
+   },
+   {
+    "error": 4,
+    "length": 1,
+    "offset": 49
+   }
+  ],
+  "parse": {
+   "count": 3,
+   "name": "trailing-comma-only"
+  },
+  "rows": [
+   "jsonc\tmembers\t2\tline\t0\tblock\t0\tstrict\tno\tdepth\t1\tbytes\t51",
+   "key\tname\t1\tstring\t\"trailing-comma-only\"",
+   "key\tcount\t1\tnumber\t3"
+  ],
+  "scanErrors": [],
+  "strict": "no"
+ }
+}

@@ -1,0 +1,20 @@
+// Editor settings for this workspace.
+// The second line is a comment too, and a block comment follows.
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 4,
+  "window.title": "${activeEditorShort}${separator}my workspace",
+  "docs.homepage": "https://example.test/docs",
+  // A URL is not a comment marker: "https://example.test/x" lives inside a string.
+  "files.exclude": {
+    "**/tmp": true,
+    "**/*.log": false,
+  },
+  "search.exclude": ["out", "dist",],
+  /* a block comment
+     across lines, with a brace { inside it */
+  "editor.rulers": [80, 100, 120],
+  "workbench.colorCustomizations": {
+    "editor.background": "#1e1e1e",
+  },
+}
