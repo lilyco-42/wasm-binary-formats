@@ -214,6 +214,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     RESOURCES.with(|slot| slot.borrow_mut().clear());
     VERSION.with(|slot| slot.borrow_mut().clear());
     DYNAMIC.with(|slot| slot.borrow_mut().clear());
+    SYMVER.with(|slot| slot.borrow_mut().clear());
     DEBUG.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
@@ -360,6 +361,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     DYNAMIC.with(|slot| *slot.borrow_mut() = dynamic);
     let debug = debug_rows(bytes);
     DEBUG.with(|slot| *slot.borrow_mut() = debug);
+    let versions = symver_rows(bytes, &file);
+    SYMVER.with(|slot| *slot.borrow_mut() = versions);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1130,6 +1133,8 @@ thread_local! {
     static VERSION: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// The Dynamic window: the list an ELF hands its loader, entries and the names between them.
     static DYNAMIC: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// Which version index each dynamic symbol carries, and what the tables around it name.
+    static SYMVER: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// The Information window: a PE's debug directory, and the CodeView block inside it that names a
     /// program database.
     static DEBUG: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -2077,6 +2082,239 @@ pub extern "C" fn debug_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     DEBUG.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// The three version tables' section names, and the string table they all index. `.gnu.version` is a
+/// plain array of 16-bit indices, one per dynamic symbol; the other two are chains of records that end
+/// where their own `v*_next` word says.
+const VERSYM_SECTION: &str = ".gnu.version";
+const VERDEF_SECTION: &str = ".gnu.version_d";
+const VERNEED_SECTION: &str = ".gnu.version_r";
+const DYNSTR_SECTION: &str = ".dynstr";
+
+/// Where a named section's bytes lie in the file, as its own header states them.
+fn section_place(file: &object::File<'_>, name: &str) -> Option<(usize, usize)> {
+    let section = file.sections().find(|one| one.name().unwrap_or("") == name)?;
+    let (at, size) = section.file_range()?;
+    Some((usize::try_from(at).ok()?, usize::try_from(size).ok()?))
+}
+
+/// A name inside `.dynstr`, and nothing where the table does not reach: an offset past its end is left
+/// unresolved rather than answered with the bytes that happen to follow.
+fn version_name(raw: &[u8], strings: Option<(usize, usize)>, at: u64) -> Option<String> {
+    let (base, size) = strings?;
+    let offset = usize::try_from(at).ok()?;
+    if offset >= size {
+        return None;
+    }
+    let window = raw.get(base + offset..)?;
+    let end = window.iter().position(|byte| *byte == 0)?;
+    Some(clean(&String::from_utf8_lossy(&window[..end])))
+}
+
+/// IDA's view of symbol versioning: which version index each dynamic symbol carries, which versions this
+/// file defines, and which versions it needs from elsewhere. None of it is readable from a plain symbol
+/// name - `lab_second` in `libuse.so` and `lab_second` in `libver.so` are different symbols - so a
+/// reader that skips these three tables cannot say which one a call reaches.
+///
+/// The record order is where a reader falls. `Verdef` is twenty bytes - four u16s (version, flags,
+/// index, count), then the hash, then the offset of the name chain, then the stride to the next record -
+/// and `Verneed` is sixteen: u16 version, u16 count, u32 file name, u32 to the aux chain, u32 next. The
+/// version index a *need* carries is `vna_other`, a u16 six bytes into its record that has nothing to do
+/// with the record's position, so reading one word late turns `2` into a name offset.
+///
+/// A symbol row claims nothing of its own: the index is looked up in this file's definitions, then in
+/// what it needs, and prints as `-` where neither reaches - which is the honest answer for indices 0 and
+/// 1, since binutils calls those `*local*` and `*global*` while LLVM gives them no version word at all.
+fn symver_rows(raw: &[u8], file: &object::File<'_>) -> Vec<String> {
+    if raw.len() < 64 || raw.get(..4) != Some(b"\x7fELF") {
+        return Vec::new();
+    }
+    let little = raw.get(5) == Some(&1);
+    let strings = section_place(file, DYNSTR_SECTION);
+    let versym = section_place(file, VERSYM_SECTION);
+    let verdef = section_place(file, VERDEF_SECTION);
+    let verneed = section_place(file, VERNEED_SECTION);
+    let mut symbols: Vec<u64> = Vec::new();
+    if let Some((at, size)) = versym {
+        for each in 0..size / 2 {
+            match half_at(raw, at + each * 2, little) {
+                Some(one) => symbols.push(one),
+                None => break,
+            }
+        }
+    }
+    let mut defs: Vec<(u64, u64, u64, u64, u64, Option<String>)> = Vec::new();
+    if let Some((at, size)) = verdef {
+        let stop = at.checked_add(size).unwrap_or(0);
+        let mut one = at;
+        while one + 20 <= stop {
+            let (Some(version), Some(flags), Some(index), Some(count)) = (
+                half_at(raw, one, little),
+                half_at(raw, one + 2, little),
+                half_at(raw, one + 4, little),
+                half_at(raw, one + 6, little),
+            ) else {
+                break;
+            };
+            let (Some(hash), Some(aux)) = (
+                word_at(raw, one + 8, little),
+                word_at(raw, one + 12, little),
+            ) else {
+                break;
+            };
+            let name = usize::try_from(aux)
+                .ok()
+                .and_then(|where_| word_at(raw, one + where_, little))
+                .and_then(|at| version_name(raw, strings, at));
+            defs.push((index, hash, flags, count, version, name));
+            let next = word_at(raw, one + 16, little).unwrap_or(0);
+            let Ok(step) = usize::try_from(next) else { break };
+            if step == 0 {
+                break;
+            }
+            one += step;
+        }
+    }
+    let mut needs: Vec<(u64, u64, Option<String>, Option<String>, u64, bool)> = Vec::new();
+    if let Some((at, size)) = verneed {
+        let stop = at.checked_add(size).unwrap_or(0);
+        let mut one = at;
+        while one + 16 <= stop {
+            let (Some(version), Some(count), Some(file_at), Some(aux)) = (
+                half_at(raw, one, little),
+                half_at(raw, one + 2, little),
+                word_at(raw, one + 4, little),
+                word_at(raw, one + 8, little),
+            ) else {
+                break;
+            };
+            let owner = version_name(raw, strings, file_at);
+            if let Ok(start) = usize::try_from(aux) {
+                let mut here = one + start;
+                for _ in 0..count.max(1) {
+                    let (Some(hash), Some(flags), Some(index), Some(name_at), Some(next)) = (
+                        word_at(raw, here, little),
+                        half_at(raw, here + 4, little),
+                        half_at(raw, here + 6, little),
+                        word_at(raw, here + 8, little),
+                        word_at(raw, here + 12, little),
+                    ) else {
+                        break;
+                    };
+                    // A need's flag bit means something else again (`VER_FLG_NODEFLIB`) and the only
+                    // value these files carry is zero, which both readers write as none, so anything
+                    // else is left unnamed rather than answered with the definition table's word.
+                    needs.push((index, hash, version_name(raw, strings, name_at), owner.clone(),
+                                version, flags == 0));
+                    let Ok(step) = usize::try_from(next) else { break };
+                    if step == 0 {
+                        break;
+                    }
+                    here += step;
+                }
+            }
+            let next = word_at(raw, one + 12, little).unwrap_or(0);
+            let Ok(step) = usize::try_from(next) else { break };
+            if step == 0 {
+                break;
+            }
+            one += step;
+        }
+    }
+    if symbols.is_empty() && defs.is_empty() && needs.is_empty() {
+        return Vec::new();
+    }
+    // What an index reaches in this file. Definitions win over needs, since a file that both defines and
+    // needs the same index is saying which one its own symbols refer to.
+    let mut reached: Vec<(u64, String)> = Vec::new();
+    for (index, _hash, name, _file, _version, _flagged) in &needs {
+        let reached_here = reached.iter().any(|one| one.0 == *index);
+        if !reached_here {
+            if let Some(one) = name {
+                reached.push((*index, one.clone()));
+            }
+        }
+    }
+    for (index, _hash, _flags, _count, _version, name) in &defs {
+        reached.retain(|one| one.0 != *index);
+        if let Some(one) = name {
+            reached.push((*index, one.clone()));
+        }
+    }
+    let place = |one: Option<(usize, usize)>| one.map_or(-1isize, |(at, _)| at as isize);
+    let mut rows = vec![format!(
+        "symver\tsymbols\t{}\tdefs\t{}\tneeds\t{}\tversym\t{}\tverdef\t{}\tverneed\t{}\tbits\t{}",
+        symbols.len(),
+        defs.len(),
+        needs.len(),
+        place(versym),
+        place(verdef),
+        place(verneed),
+        if raw.get(4) == Some(&2) { 64 } else { 32 },
+    )];
+    for (index, one) in symbols.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        let plain = one & 0x7FFF;
+        let name = reached
+            .iter()
+            .find(|(at, _)| *at == plain)
+            .map(|(_, name)| name.as_str())
+            .unwrap_or("-");
+        rows.push(format!(
+            "symbol\t{index}\tvalue\t0x{one:x}\tindex\t{plain}\tname\t{name}\thidden\t{}",
+            if one & 0x8000 != 0 { "yes" } else { "no" },
+        ));
+    }
+    for (index, (at, hash, flags, count, version, name)) in defs.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        rows.push(format!(
+            "def\t{index}\tindex\t{at}\thash\t{hash}\tflags\t{}\tname\t{}\tcnt\t{count}\tversion\t{version}",
+            if *flags == 1 { "BASE" } else { "none" },
+            name.clone().unwrap_or_else(|| "-".to_owned()),
+        ));
+    }
+    for (index, (at, hash, name, file, version, flagged)) in needs.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        rows.push(format!(
+            "need\t{index}\tfile\t{}\tname\t{}\thash\t{hash}\tindex\t{at}\tflags\t{}\tversion\t{version}",
+            file.clone().unwrap_or_else(|| "-".to_owned()),
+            name.clone().unwrap_or_else(|| "-".to_owned()),
+            if *flagged { "none" } else { "-" },
+        ));
+    }
+    for (label, length) in [("symbols", symbols.len()), ("defs", defs.len()), ("needs", needs.len())] {
+        if length > MAX_LISTED {
+            rows.push(format!("cut\t{label}\t{length}\tlisted\t{MAX_LISTED}"));
+        }
+    }
+    rows
+}
+
+/// How many rows the version tables fill. A PIE linked without a version script has none of the three
+/// sections, and a PE has no such convention at all, so both answer with nothing.
+#[no_mangle]
+pub extern "C" fn symver_count() -> i32 {
+    SYMVER.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then the index each dynamic symbol carries, then the versions this file defines,
+/// then the ones it needs from elsewhere. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn symver_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    SYMVER.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

@@ -78,6 +78,7 @@ test('the analysis module stands on its own exports', () => {
     'version_count', 'version_at',
     'dynamic_count', 'dynamic_at',
     'debug_count', 'debug_at',
+    'symver_count', 'symver_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -165,6 +166,7 @@ test('the base module the page always downloads carries none of this', async () 
     'version_count', 'version_at',
     'dynamic_count', 'dynamic_at',
     'debug_count', 'debug_at',
+    'symver_count', 'symver_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -616,5 +618,57 @@ test('the debug directory both readers parsed is the one the module reports', as
   for (const name of ['answer.obj', 'lab.elf', 'nodbg.exe']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.debug_count(), 0, `${name} answered with a debug directory`);
+  }
+});
+
+test('the version tables both listings read are the ones the module reports', async () => {
+  // scripts/make-symver-fixtures.py links libver.so and libver32.so from one object and one two-node
+  // version script, then links libuse.so against the first so that the needs side is a real link
+  // rather than an edited byte. A row reaches the probe only when the byte walk, `readelf -VW` and
+  // `llvm-readobj --version-info` agree on every index, hash, flag, name and count, and when
+  // DT_VERDEFNUM and DT_VERNEEDNUM match the chains actually walked.
+  const probe = JSON.parse(await readFile('test/fixtures/symver.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('	');
+    return parts[parts.indexOf(key) + 1];
+  };
+  const classes = new Set();
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.symver_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the two readers said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('symver_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+    if (want.length > 0) classes.add(cell(want[0], 'bits'));
+  }
+  // Both classes have to be among the files, or the 32-bit one proves nothing about the widths.
+  assert.ok(classes.has('32') && classes.has('64'), `classes seen: ${Array.from(classes).join(', ')}`);
+  // A symbol index that names something has to be named by one of the tables in the same file, and the
+  // two reserved indices name nothing - binutils calls them *local* and *global*, LLVM says nothing.
+  for (const name of ['libver.so', 'libuse.so']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const rows = Array.from({ length: ex.symver_count() }, (_, index) => text('symver_at', index));
+    const tables = new Map();
+    for (const row of rows.filter((one) => one.startsWith('def	') || one.startsWith('need	'))) {
+      tables.set(cell(row, 'index'), cell(row, 'name'));
+    }
+    for (const row of rows.filter((one) => one.startsWith('symbol	'))) {
+      const index = cell(row, 'index');
+      const reached = cell(row, 'name');
+      if (reached === '-') {
+        assert.ok(!tables.has(index) || index === '0' || index === '1', `${name}: ${row} names nothing anyway`);
+        continue;
+      }
+      assert.equal(tables.get(index), reached, `${name}: ${row} invents a name`);
+    }
+  }
+  // Nothing here is a version table: a shared object built without a version script, a static
+  // executable, and a PE, which has no such convention at all.
+  for (const name of ['lab.so', 'lab.elf', 'res.dll']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.symver_count(), 0, `${name} answered with version tables`);
   }
 });

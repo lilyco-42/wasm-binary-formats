@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -601,7 +601,25 @@ reader's convention either: LLVM prints the digits bracketed, pefile prints them
 written only if both equal the bytes under the rule the two of them use. It is also why lld's placeholder
 GUID still reads `LLD PDB.` in ASCII at the end. `lab.exe` supplies the other path shape - a GUID and an
 empty name, which is what a link with no PDB leaves - and `cv.obj` supplies the refusal: a COFF object has
-`.debug$S` *sections* and no directory to point at them, so the answer is nothing, and both readers say so.
+.debug$S` *sections* and no directory to point at them, so the answer is nothing, and both readers say so.
+
+**The versioning window** (`symver_count` / `symver_at`) is the last layer of a name. A dynamic symbol
+carries a 16-bit version index beside its name, `.gnu.version_d` says which versions the file defines and
+`.gnu.version_r` which it needs from where, and `lab_second` in the defining file and `lab_second` in the
+caller are different symbols until those tables are read. The three tables are found by section name and
+their names come out of `.dynstr`; a `Verdef` is twenty bytes and a `Verneed` sixteen, with the index a
+*need* carries sitting in `vna_other`, a u16 six bytes into its aux record that has nothing to do with
+where the record lies - which is the field a reader gets wrong by one word, and the reason the row's hash
+is recomputed rather than copied. `readelf` prints no hash at all, `llvm-readobj` prints its own, and the
+fixture script computes the SysV ELF hash of the name, so the number in a row is checked against a
+derivation and a listing rather than transcribed from either.
+
+Indices 0 and 1 print as `-`, and that is the whole extent of what is claimed about them: binutils calls
+them `*local*` and `*global*`, LLVM gives them no version word, so the row keeps the number and drops the
+disagreement. A definition's `BASE` flag rides beside the number for the same reason the resource types do
+- both readers name it, in different spellings. `libver32.so` is the same producer built for `i386`, and
+it exists because the version index is 16 bits in both classes while the tables around it are addressed by
+class-wide words: the two files agree on every version fact and differ only in where their sections lie.
 
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
@@ -795,6 +813,11 @@ temp/venv/Scripts/python.exe scripts/make-dynamic-fixtures.py    # clang -shared
 libuser.so and many.so (seventy stub libraries, needed with --no-as-needed so the list is long enough to be
 cut); readelf -dW and llvm-readobj --dynamic-table must agree with the byte walk on every tag, value and
 bracketed string, and on the word each puts beside it, before dynamic.probe.json is written
+temp/venv/Scripts/python.exe scripts/make-symver-fixtures.py  # clang -shared -Wl,--version-script writes
+libver.so and libver32.so (one object, a two-node LAB_1/LAB_2 script, -Wl,-soname so the BASE record names
+the file and not the build directory) and libuse.so from a caller that needs LAB_2 out of the first; the
+walk, readelf -VW and llvm-readobj --version-info must agree on every index, hash, flag, name and count,
+and DT_VERDEFNUM / DT_VERNEEDNUM must match the chains, before symver.probe.json is written
 temp/venv/Scripts/python.exe scripts/make-debug-fixtures.py       # clang -g -gcodeview and lld-link /debug
 /link /debug write dbg.exe (with /pdbaltpath so no local path is recorded, and /timeStamp so the file is
 reproducible); the walk, llvm-readobj --coff-debug-directory and pefile must agree on every number and on the

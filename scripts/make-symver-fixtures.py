@@ -427,6 +427,12 @@ def flag_word(value):
     return "BASE" if value == 1 else "none"
 
 
+def need_flag_word(value):
+    """A need's own flag bit means something else again - `VER_FLG_NODEFLIB` - and the only value these
+    files carry is zero, which both readers write as none. Anything else is left unnamed."""
+    return "none" if value == 0 else "-"
+
+
 def rows(elf, symbols, defs, needs):
     def spot(section, tag):
         found = elf.table(section, tag)
@@ -463,7 +469,7 @@ def rows(elf, symbols, defs, needs):
                               "name\t%s" % said(one["name"]),
                               "hash\t%d" % one["hash"],
                               "index\t%d" % one["index"],
-                              "flags\t%s" % flag_word(one["flags"]),
+                              "flags\t%s" % need_flag_word(one["flags"]),
                               "version\t%d" % one["version"]]))
     for label, length in (("symbols", len(symbols)), ("defs", len(defs)), ("needs", len(needs))):
         if length > MAX_LISTED:
