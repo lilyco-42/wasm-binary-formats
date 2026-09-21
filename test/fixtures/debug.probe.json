@@ -1,0 +1,27 @@
+{
+ "cv.obj": {
+  "entries": 0,
+  "note": "not a PE image",
+  "rows": []
+ },
+ "dbg.exe": {
+  "entries": 1,
+  "rows": [
+   "debug\tentries\t1\tsize\t28\tdir\t6\trva\t0x2000\toff\t1536\tcv\t1",
+   "entry\t0\ttype\t2\tname\tCodeView\ttime\t0x6553f100\tmajor\t0\tminor\t0\tbytes\t32\trva\t0x201c\tbody\t1564\tptr\t1564",
+   "cv\t0\tsig\tRSDS\tguid\ta1d8524f1b36dd224c4c44205044422e\tage\t1\tpath\tdbg.pdb"
+  ]
+ },
+ "lab.exe": {
+  "entries": 1,
+  "rows": [
+   "debug\tentries\t1\tsize\t28\tdir\t6\trva\t0x3000\toff\t2048\tcv\t1",
+   "entry\t0\ttype\t2\tname\tCodeView\ttime\t0x6ab0d696\tmajor\t0\tminor\t0\tbytes\t25\trva\t0x301c\tbody\t2076\tptr\t2076",
+   "cv\t0\tsig\tRSDS\tguid\te3a7032c6f9473764c4c44205044422e\tage\t1\tpath\t"
+  ]
+ },
+ "nodbg.exe": {
+  "entries": 0,
+  "rows": []
+ }
+}

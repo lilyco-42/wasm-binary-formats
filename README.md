@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -575,6 +575,31 @@ string table - which is exactly the kind of thing a witness settles and a summar
 static executable, a PE (which names its imports through a data directory instead) and a COFF object all
 answer with no rows.
 
+**The Information window** (`debug_count` / `debug_at`) is how a binary names the program database it was
+linked against - the question IDA answers before it will load one, since a `.pdb` is only the right one if
+its signature, its GUID and its age match what the image states. Data directory six is a table of 28-byte
+records, and the record order is where a reader goes wrong: the two version words sit *between* the time
+stamp and the type, so taking four words and then two reads an age as a type number. Each record points at
+a body by RVA, so as in the Resources window the address is walked through the section table before it
+names a byte, and the row prints both the derived offset and the `PointerToRawData` the entry states for
+itself rather than letting one stand in for the other. A body is taken apart only when it starts with
+`RSDS`, which is the one shape two readers here parse field for field; any other four-byte signature is
+reported as a signature and nothing more, including the older `NB10` block, which no tool on this host
+writes and no second reader was asked to agree about.
+
+Three things this round settled by being checked rather than remembered. `/pdbaltpath` is what keeps the
+linking machine's absolute path out of a committed fixture, and it is also the realistic shape, since the
+name in the entry is the one a symbol service looks up. `/timeStamp` has to be pinned, because the linker
+stamps the header and the entry from the clock and a probe written yesterday would fail today; the one
+thing it cannot pin is the PDB GUID, which lld randomises per link, so the script links the same object
+twice and requires the two files to match everywhere but those sixteen bytes. And the GUID's 32 hex digits
+are *not* the file's byte order - three little-endian integers then eight bytes - which is not this
+reader's convention either: LLVM prints the digits bracketed, pefile prints them plain, and the probe is
+written only if both equal the bytes under the rule the two of them use. It is also why lld's placeholder
+GUID still reads `LLD PDB.` in ASCII at the end. `lab.exe` supplies the other path shape - a GUID and an
+empty name, which is what a link with no PDB leaves - and `cv.obj` supplies the refusal: a COFF object has
+`.debug$S` *sections* and no directory to point at them, so the answer is nothing, and both readers say so.
+
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -767,6 +792,10 @@ temp/venv/Scripts/python.exe scripts/make-dynamic-fixtures.py    # clang -shared
 libuser.so and many.so (seventy stub libraries, needed with --no-as-needed so the list is long enough to be
 cut); readelf -dW and llvm-readobj --dynamic-table must agree with the byte walk on every tag, value and
 bracketed string, and on the word each puts beside it, before dynamic.probe.json is written
+temp/venv/Scripts/python.exe scripts/make-debug-fixtures.py       # clang -g -gcodeview and lld-link /debug
+/link /debug write dbg.exe (with /pdbaltpath so no local path is recorded, and /timeStamp so the file is
+reproducible); the walk, llvm-readobj --coff-debug-directory and pefile must agree on every number and on the
+CodeView signature, GUID, age and path before debug.probe.json is written
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

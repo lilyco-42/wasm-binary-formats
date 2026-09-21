@@ -77,6 +77,7 @@ test('the analysis module stands on its own exports', () => {
     'resource_count', 'resource_at',
     'version_count', 'version_at',
     'dynamic_count', 'dynamic_at',
+    'debug_count', 'debug_at',
     'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
@@ -163,6 +164,7 @@ test('the base module the page always downloads carries none of this', async () 
     'resource_count', 'resource_at',
     'version_count', 'version_at',
     'dynamic_count', 'dynamic_at',
+    'debug_count', 'debug_at',
     'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
@@ -569,5 +571,50 @@ test('the entries an ELF hands its loader are what readelf and llvm-readobj list
   for (const name of ['res.dll', 'answer.obj']) {
     report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
     assert.equal(ex.dynamic_count(), 0, `${name} answered with a dynamic section`);
+  }
+});
+
+test('the debug directory both readers parsed is the one the module reports', async () => {
+  // scripts/make-debug-fixtures.py links dbg.exe with clang -g -gcodeview and lld-link /debug, then
+  // asks `llvm-readobj --coff-debug-directory` and pefile about it. An entry reaches the probe only if
+  // the byte walk, LLVM and pefile agree on its type number, time stamp, version pair, size and both
+  // locations - and, for a body that starts RSDS, on the signature, the GUID, the age and the path.
+  // Nothing is guessed about the GUID's byte order either: the row holds the digits both readers spell.
+  const probe = JSON.parse(await readFile('test/fixtures/debug.probe.json', 'utf8'));
+  const cell = (row, key) => {
+    const parts = row.split('	');
+    return parts[parts.indexOf(key) + 1];
+  };
+  for (const name of Object.keys(probe).sort()) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    const want = probe[name].rows;
+    const total = ex.debug_count();
+    assert.equal(total, want.length, `${name}: ${total} rows, the two readers said ${want.length}`);
+    const got = Array.from({ length: total }, (_, index) => text('debug_at', index));
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(got[index], want[index], `${name} row ${index}`);
+    }
+  }
+  // Two shapes of CodeView path have to be present for this to mean anything: a name, and the empty
+  // string a link leaves when no PDB was ever asked for.
+  const all = Object.values(probe).flatMap((one) => one.rows).filter((row) => row.startsWith('cv	'));
+  assert.ok(all.some((row) => row.endsWith('	path	')), 'no empty-path case in the probe');
+  assert.ok(all.some((row) => /	path	\S/.test(row)), 'no named-path case in the probe');
+  // The offset the reader derived from the entry's RVA is where the signature has to actually be, and
+  // it is printed beside the offset the entry states for itself - which is the pairing a symbol lookup
+  // lives or dies by, so it is checked against the bytes rather than taken on trust.
+  const bytes = new Uint8Array(await readFile('test/fixtures/dbg.exe'));
+  report(bytes);
+  const rows = Array.from({ length: ex.debug_count() }, (_, index) => text('debug_at', index));
+  const entry = rows.find((row) => row.startsWith('entry	'));
+  const shape = rows.find((row) => row.startsWith('cv	'));
+  const at = Number(cell(entry, 'body'));
+  assert.equal(at, Number(cell(entry, 'ptr')), `${entry} puts the body in two different places`);
+  const head = String.fromCharCode(...bytes.subarray(at, at + 4));
+  assert.equal(head, cell(shape, 'sig'), `${shape} is not at offset ${at}`);
+  // A COFF object carries .debug$S sections and no directory, and an ELF has no such thing at all.
+  for (const name of ['answer.obj', 'lab.elf', 'nodbg.exe']) {
+    report(new Uint8Array(await readFile(`test/fixtures/${name}`)));
+    assert.equal(ex.debug_count(), 0, `${name} answered with a debug directory`);
   }
 });

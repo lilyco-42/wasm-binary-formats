@@ -214,6 +214,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     RESOURCES.with(|slot| slot.borrow_mut().clear());
     VERSION.with(|slot| slot.borrow_mut().clear());
     DYNAMIC.with(|slot| slot.borrow_mut().clear());
+    DEBUG.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -357,6 +358,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     VERSION.with(|slot| *slot.borrow_mut() = version);
     let dynamic = dynamic_rows(bytes);
     DYNAMIC.with(|slot| *slot.borrow_mut() = dynamic);
+    let debug = debug_rows(bytes);
+    DEBUG.with(|slot| *slot.borrow_mut() = debug);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1127,6 +1130,9 @@ thread_local! {
     static VERSION: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// The Dynamic window: the list an ELF hands its loader, entries and the names between them.
     static DYNAMIC: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The Information window: a PE's debug directory, and the CodeView block inside it that names a
+    /// program database.
+    static DEBUG: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The segment types two readers named in the files here, by number. Nine words, because nine appear
@@ -1915,6 +1921,162 @@ pub extern "C" fn dynamic_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     DYNAMIC.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// Which data directory holds the debug table, and how wide one of its records is.
+const DEBUG_DIRECTORY: usize = 6;
+const DEBUG_ENTRY_BYTES: usize = 28;
+/// The body shape two readers parsed field for field in the files here.
+const CODEVIEW_SIGNATURE: &[u8; 4] = b"RSDS";
+
+/// The debug type numbers two readers named in the files here - one, because that is the only kind any
+/// tool on this host writes. LLVM calls it `CodeView` and pefile `IMAGE_DEBUG_TYPE_CODEVIEW`, so the
+/// kind is said twice and the spelling once, exactly as with the resource types: the number stays in the
+/// row and the word only rides beside it.
+fn debug_word(kind: u64) -> Option<&'static str> {
+    Some(match kind {
+        2 => "CodeView",
+        _ => return None,
+    })
+}
+
+/// The 16 GUID bytes as both readers spell them: three little-endian integers and then eight bytes, so
+/// the digits are not the file's order. LLVM brackets them and pefile prints the same 32 digits plain,
+/// and `make-debug-fixtures.py` refuses to write a probe unless both equal the bytes here.
+fn debug_guid(body: &[u8]) -> String {
+    let (one, two, three) = (
+        u32::from_le_bytes(body[4..8].try_into().unwrap_or([0; 4])),
+        u16::from_le_bytes(body[8..10].try_into().unwrap_or([0; 2])),
+        u16::from_le_bytes(body[10..12].try_into().unwrap_or([0; 2])),
+    );
+    let tail: String = body[12..20].iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("{one:08x}{two:04x}{three:04x}{tail}")
+}
+
+/// The path a CodeView body ends with, bounded by the body's own length: a block whose name runs past
+/// the bytes the entry claims is reported as none rather than read on into whatever follows.
+fn debug_path(body: &[u8], from: usize) -> Option<String> {
+    let window = body.get(from..)?;
+    let end = window.iter().position(|byte| *byte == 0)?;
+    Some(clean(&String::from_utf8_lossy(&window[..end])))
+}
+
+/// IDA's Information window: the debug directory, and the CodeView block that names the program
+/// database an image was linked with.
+///
+/// Twenty-eight bytes per record, read in the order the format states them - the two version words sit
+/// between the time stamp and the type, so a reader that takes four words and then two finds a type
+/// where the age is. Each record points at a body by RVA, and as in the Resources window that address
+/// is walked through the section table before it names a byte: `body` is `-1` where no section covers
+/// it, and the entry's own `PointerToRawData` is printed beside it rather than trusted.
+fn debug_rows(raw: &[u8]) -> Vec<String> {
+    let Some(pe) = Pe::parse(raw) else { return Vec::new() };
+    let Some(at) = pe.dirs.checked_add(DEBUG_DIRECTORY * 8) else { return Vec::new() };
+    let (Some(rva), Some(size)) = (word_at(raw, at, true), word_at(raw, at + 4, true)) else {
+        return Vec::new();
+    };
+    if size == 0 {
+        return Vec::new();
+    }
+    let Some((base, _)) = pe.at(rva) else { return Vec::new() };
+    // Bound the table by the file as well as by what the directory claims: a record that runs off the
+    // end is not read, and the rows that came before it still stand.
+    let whole = usize::try_from(size).unwrap_or(0) / DEBUG_ENTRY_BYTES;
+    let room = (raw.len() - base.min(raw.len())) / DEBUG_ENTRY_BYTES;
+    let items: Vec<[u64; 8]> = (0..whole.min(room))
+        .filter_map(|each| {
+            let at = base + each * DEBUG_ENTRY_BYTES;
+            Some([
+                word_at(raw, at, true)?,
+                word_at(raw, at + 4, true)?,
+                half_at(raw, at + 8, true)?,
+                half_at(raw, at + 10, true)?,
+                word_at(raw, at + 12, true)?,
+                word_at(raw, at + 16, true)?,
+                word_at(raw, at + 20, true)?,
+                word_at(raw, at + 24, true)?,
+            ])
+        })
+        .collect();
+    if items.is_empty() {
+        return Vec::new();
+    }
+    let mut rows: Vec<String> = Vec::new();
+    let mut parsed = 0usize;
+    for (index, one) in items.iter().enumerate() {
+        let body = pe.at(one[6]).map(|(found, _name)| found);
+        let block = match body {
+            Some(at) => {
+                let length = usize::try_from(one[5]).unwrap_or(0);
+                raw.get(at..at.saturating_add(length)).filter(|_| length > 0)
+            }
+            None => None,
+        };
+        if block.is_some() {
+            parsed += 1;
+        }
+        if index >= MAX_LISTED {
+            continue;
+        }
+        rows.push(format!(
+            "entry\t{index}\ttype\t{}\tname\t{}\ttime\t0x{:x}\tmajor\t{}\tminor\t{}\tbytes\t{}\trva\t0x{:x}\tbody\t{}\tptr\t{}",
+            one[4],
+            debug_word(one[4]).unwrap_or("-"),
+            one[1],
+            one[2],
+            one[3],
+            one[5],
+            one[6],
+            body.map_or_else(|| "-1".to_owned(), |found| found.to_string()),
+            one[7],
+        ));
+        let Some(found) = block else { continue };
+        let Some(head) = found.get(..4) else { continue };
+        let spelled = if head.iter().all(|byte| (0x20..0x7f).contains(byte)) {
+            String::from_utf8_lossy(head).into_owned()
+        } else {
+            format!("0x{}", u32::from_le_bytes(head.try_into().unwrap_or([0; 4])))
+        };
+        let mut one_row = format!("cv\t{index}\tsig\t{spelled}");
+        if head == CODEVIEW_SIGNATURE && found.len() >= 24 {
+            let age = u32::from_le_bytes(found[20..24].try_into().unwrap_or([0; 4]));
+            one_row.push_str(&format!("\tguid\t{}", debug_guid(found)));
+            one_row.push_str(&format!("\tage\t{age}"));
+            one_row.push_str(&format!("\tpath\t{}", debug_path(found, 24).unwrap_or_else(|| "-".to_owned())));
+        }
+        rows.push(one_row);
+    }
+    let mut out = vec![format!(
+        "debug\tentries\t{}\tsize\t{size}\tdir\t{DEBUG_DIRECTORY}\trva\t0x{rva:x}\toff\t{base}\tcv\t{parsed}",
+        items.len(),
+    )];
+    out.append(&mut rows);
+    if items.len() > MAX_LISTED {
+        out.push(format!("cut\tentries\t{}\tlisted\t{MAX_LISTED}", items.len()));
+    }
+    out
+}
+
+/// How many rows the debug directory fills. A COFF object carries `.debug$S` *sections* and no
+/// directory at all - only an image has data directories - and an image with an empty table answers
+/// with nothing, the same as one with none.
+#[no_mangle]
+pub extern "C" fn debug_count() -> i32 {
+    DEBUG.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: the totals, then a line per entry with its type number and the word two readers gave it,
+/// both locations and the size, and for a CodeView entry the signature, GUID, age and path. Row zero is
+/// the totals.
+#[no_mangle]
+pub extern "C" fn debug_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    DEBUG.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })
