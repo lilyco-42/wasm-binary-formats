@@ -6743,6 +6743,9 @@ pub const FORMAT_PSD: i32 = 50;
 /// The four bytes every Photoshop document starts with; the 26-byte header after them is fixed-size and
 /// big-endian throughout, which is the opposite of everything else in this file.
 const PSD_MAGIC: [u8; 4] = [0x38, 0x42, 0x50, 0x53];
+/// What each image-resource block starts with. One byte different from the file's own signature, and a
+/// walk that confuses the two finds no resources in any document.
+const PSD_RESOURCE_MAGIC: [u8; 4] = [0x38, 0x42, 0x49, 0x4D];
 const PSD_LISTED_RESOURCES: usize = 24;
 /// Colour mode names as `psd_tools.constants.ColorMode` spells them - the library that wrote the
 /// fixtures - with the numbers it uses beside them. The gaps at 5 and 6 are the library's too.
@@ -6832,11 +6835,17 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let mut broken = usize::from(version != 1) + usize::from(reserved != "000000000000");
-    let mut rows = vec![format!(
-        "psd\t{}\tbroken\t{broken}\tversion\t{version}\treserved\t{reserved}\t{width}x{height}\tchannels\t{channels}\tdepth\t{depth}\tmode\t{mode}({})",
-        bytes.len(),
-        psd_name(&PSD_MODES, mode),
-    )];
+    // The header row carries the broken count, and that count is not final until the walk is over, so the
+    // row is formatted at every exit rather than first: a file that fails further down must not report
+    // itself healthy on the one line that is supposed to say how broken it is.
+    let header = |broken: usize| -> String {
+        format!(
+            "psd\t{}\tbroken\t{broken}\tversion\t{version}\treserved\t{reserved}\t{width}x{height}\tchannels\t{channels}\tdepth\t{depth}\tmode\t{mode}({})",
+            bytes.len(),
+            psd_name(&PSD_MODES, mode),
+        )
+    };
+    let mut rows: Vec<String> = Vec::new();
     if version != 1 {
         // A version-2 document puts 64 bits where this walk reads 32, so nothing below is somewhere it can
         // be reached by arithmetic. It is still a Photoshop file, and it says which one.
@@ -6844,11 +6853,12 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
             "note\ta version-{version} document states its section lengths differently, so the walk stops here"
         ));
         rows.push(format!("stopped\tbroken\t{broken}"));
+        rows.insert(0, header(broken));
         return Some(rows);
     }
-    // Each section's start is the previous start plus the previous length, so the chain stops at the first
-    // length field the file cannot hold and names it, rather than reading a length from bytes that are not
-    // there. The 30 is the layer section's body: the 4-byte length at 26 has just been read.
+    // Each section's *length field* sits where the previous body ends: 26 is the layer length, its body
+    // starts at 30, and the resource length field follows that body. The chain stops at the first field
+    // the file cannot hold and names it, rather than reading a length out of bytes that are not there.
     let mut spans: Vec<(&'static str, u64, Option<u64>)> = Vec::new();
     let mut stop: Option<&'static str> = None;
     let mut resource_at = 0u64;
@@ -6866,10 +6876,10 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
             spans.push(("layers", 30, Some(length)));
             // Saturating rather than checked: a position past the end of the file is not an error to
             // handle, it is simply a length field that cannot be read, and the next `psd_u32` says so.
-            resource_at = 34u64.saturating_add(length);
+            resource_at = 30u64.saturating_add(length);
             match psd_u32(bytes, resource_at) {
                 None => {
-                    spans.push(("resources", resource_at + 4, None));
+                    spans.push(("resources", resource_at, None));
                     stop = Some("resource section length");
                     fits = false;
                 }
@@ -6880,7 +6890,7 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
                     let colour_at = resource_at.saturating_add(4).saturating_add(length);
                     match psd_u32(bytes, colour_at) {
                         None => {
-                            spans.push(("colour", colour_at + 4, None));
+                            spans.push(("colour", colour_at, None));
                             stop = Some("colour mode length");
                             fits = false;
                         }
@@ -6904,6 +6914,7 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
     ));
     if let Some(reason) = stop {
         rows.push(format!("stopped\tbroken\t{broken}\t{reason}\tdoes not fit in the file"));
+        rows.insert(0, header(broken));
         return Some(rows);
     }
     // The compression field is read before any resource row, because a file that cannot reach it stops
@@ -6915,6 +6926,7 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
             rows.push(format!(
                 "stopped\tbroken\t{broken}\timage data\tdoes not fit in the file"
             ));
+            rows.insert(0, header(broken));
             return Some(rows);
         }
     };
@@ -6931,10 +6943,12 @@ fn read_psd(bytes: &[u8]) -> Option<Vec<String>> {
     } else {
         format!("stopped\tbroken\t{broken}")
     });
+    rows.insert(0, header(broken));
     Some(rows)
 }
 
-/// One section of the `section` row: `at+len`, or `at+?` when the length itself was outside the file, or
+/// One section of the `section` row: body+length when the length could be read; the position of the length
+/// field with `+?` when it could not, since that is the last thing in the file worth pointing at; and
 /// `unreadable` when the walk never reached that far.
 fn psd_span(spans: &[(&'static str, u64, Option<u64>)], name: &str) -> String {
     match spans.iter().find(|(each, _, _)| *each == name) {
@@ -6973,7 +6987,7 @@ fn psd_resources(
             *broken += 1;
             break;
         };
-        if head != PSD_MAGIC.as_slice() {
+        if head != PSD_RESOURCE_MAGIC.as_slice() {
             *broken += 1;
             break;
         }
