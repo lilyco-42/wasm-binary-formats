@@ -304,13 +304,15 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 127 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point, the notes an ELF leaves for itself in its PT_NOTE segments, and the hash tables it looks names up in |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, the demangled reading of the C++ names in those tables, the base relocations a loader is told to apply, the resource tree an image carries and the version block inside it, and the program headers and dynamic list an ELF hands its loader, and the debug directory that names a PE's program database, and the version index each dynamic symbol carries, and the thread-local table whose callbacks a loader runs before the entry point, the notes an ELF leaves for itself in its PT_NOTE segments, the hash tables it looks names up in, and the load-command chain of a Mach-O file - the sections its segments state, the one-based `n_sect` each symbol resolves through, and the relocations an object hangs on each section |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
 different question from the section list: not *what is where* but *what names these bytes*. Every range
 comes from a table the file itself points at - ELF's program-header and section-header tables, PE's
-`SizeOfHeaders`, its section table and its certificate directory - and what falls between them is
+`SizeOfHeaders`, its section table and its certificate directory, a Mach-O's header with its chain of load
+commands plus the section, symbol, string, indirect-symbol and per-section relocation records those
+commands name - and what falls between them is
 classified as what it is: padding inside a segment the loader does map, or bytes no table and no segment
 reaches at all. The colours say the difference, and the page says the limit out loud: green means nothing
 in the file's own structure points there, which is not a promise that editing it is safe: a checksum, a
