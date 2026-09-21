@@ -1,0 +1,15 @@
+BEGIN:VCARD
+VERSION:3.0
+ADR:;;1 Main St;Springfield;IL;00000;US
+EMAIL;TYPE=INTERNET:lab@example.invalid
+EMAIL:lab-alternate@example.invalid
+FN:Lab Fixture
+N:Fixture\, Jr.;Lab;;;
+NOTE:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ xxxxxxxx
+TEL;TYPE=CELL:+15550001111
+X-LAB-TAG:kept
+END:VCARD

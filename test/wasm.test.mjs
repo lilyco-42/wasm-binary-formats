@@ -309,7 +309,7 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10], ['wide.mov', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
-    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['tiny.icns', 30],
+    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['lab.vcard', 52], ['tiny.icns', 30],
     ['tiny.bplist', 31], ['keyed.bplist', 31],
     ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
     ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
@@ -792,6 +792,30 @@ test('a Photoshop document is read to the limit of what it states about itself',
   assert.equal(psbRows.rows[psbRows.rows.length - 1], 'stopped\tbroken\t1');
 });
 
+test('a vCard counts properties after unfolding them, not physical lines', () => {
+  // vobject wrote both fixtures and read them back (`test/fixtures/vcard.probe.json` holds both
+  // readings), so 8 and 9 properties are another implementation's count, and fourteen physical lines
+  // with four of them folded is what the bytes themselves say.
+  const card = assertReadable('container', 'lab.vcard', 52);
+  assert.equal(card.name, 'vcard');
+  assert.equal(card.rows[0], 'vcard\t4.0\tprops\t8\tnames\t8\tlines\t14\tfolded\t4\tcomponents\t1');
+  assert.equal(card.rows[1], 'endings\tcrlf\t14\tlf\t0\tlogical\t10\tlast_newline\tyes');
+  assert.equal(card.rows[3], 'end\tyes\tbroken\t0\tescapes\t1');
+  assert.ok(card.rows.includes('prop\tN\tcount\t1\tparts\t5\tparams\t-'),
+    `the escaped comma must stay inside its field: ${card.rows.join(' | ')}`);
+  assert.ok(card.rows.includes('prop\tADR\tcount\t1\tparts\t7\tparams\t-'),
+    `ADR has seven sub-values: ${card.rows.join(' | ')}`);
+
+  const twice = assertReadable('container', 'lab3.vcard', 52);
+  assert.equal(twice.rows[0], 'vcard\t3.0\tprops\t9\tnames\t8\tlines\t15\tfolded\t4\tcomponents\t1');
+  assert.ok(twice.rows.includes('prop\tEMAIL\tcount\t2\tparts\t1\tparams\tTYPE'), twice.rows.join(' | '));
+
+  // A calendar shares the line grammar and is refused: `ics` is not one of the labels this repo scores
+  // against, so the reader does not get to widen its own name from a similar-looking BEGIN.
+  const calendar = new TextEncoder().encode('BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n');
+  assert.ok(driveBytes('container', calendar).code <= 0, 'a calendar was read as a card');
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -836,7 +860,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'lab.vcard', 'vcard'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],

@@ -144,6 +144,7 @@ pub fn name() -> &'static str {
         FORMAT_SEVENZIP => "sevenzip",
         FORMAT_PSD => "psd",
         FORMAT_OTF => "otf",
+        FORMAT_VCARD => "vcard",
         _ => "unknown",
     }
 }
@@ -7167,11 +7168,277 @@ fn psd_image_data(
 
 /// -1 buffer too small to hold any header, -2 no supported container recognised.
 /// Otherwise the FORMAT_* code, matching what `kind()` reports.
+// ------------------------------------------------------------------- VCARD / electronic business card
+pub const FORMAT_VCARD: i32 = 52;
+
+/// Logical lines walked. The panel caps what it prints, but this reader will not build an unbounded
+/// row list out of a 32 MB text file: past here it stops and says that it stopped.
+const VCARD_MAX_LINES: usize = 20_000;
+
+/// Property names the report lists, in alphabetical order, which is also the order the witness library
+/// hands them back in.
+const VCARD_MAX_NAMES: usize = 24;
+
+/// Where a property's name-and-parameters end and its value begins: the first colon that is not inside a
+/// quoted parameter value, because `EMAIL;TYPE="a;b":x@example.invalid` is one property, not two.
+fn vcard_split(line: &str) -> Option<(&str, Vec<&str>, &str)> {
+    let mut quoted = false;
+    let mut colon = None;
+    for (at, ch) in line.char_indices() {
+        match ch {
+            '"' => quoted = !quoted,
+            ':' if !quoted => {
+                colon = Some(at);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let at = colon?;
+    let mut pieces = line[..at].split(';');
+    let name = pieces.next().filter(|each| !each.is_empty())?;
+    Some((name, pieces.collect(), &line[at + 1..]))
+}
+
+/// How many sub-values a separated value holds, counting only the semicolons that are not escaped. The
+/// escaped comma in `N:Fixture\, Jr.;Lab;;;` is the reason this cannot be a plain count: the comma is
+/// part of the family name, and a semicolon written `\;` is part of a field.
+fn vcard_parts(value: &str) -> usize {
+    let mut parts = 1usize;
+    let mut escaped = false;
+    for ch in value.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            ';' => parts += 1,
+            _ => {}
+        }
+    }
+    parts
+}
+
+/// One card, as far as its own lines say. The counters are a struct rather than locals so that
+/// `record` - which is called from inside the line loop - can own the whole line's bookkeeping without
+/// the loop having to hand seventeen mutable things to it.
+#[derive(Default)]
+struct Vcard {
+    // (NAME, times seen, most sub-values in one of them, parameter keys)
+    names: Vec<(String, usize, usize, Vec<String>)>,
+    props: usize,
+    logical: usize,
+    physical: usize,
+    crlf: usize,
+    lf: usize,
+    folded: usize,
+    broken: usize,
+    escapes: usize,
+    components: usize,
+    depth: usize,
+    version: String,
+    version_second: bool,
+    ended: bool,
+    terminated: bool,
+    truncated: bool,
+}
+
+impl Vcard {
+    /// One logical line, folds already joined into it.
+    fn record(&mut self, line: &str) {
+        self.logical += 1;
+        if self.logical > VCARD_MAX_LINES {
+            self.truncated = true;
+            return;
+        }
+        let Some((name, params, value)) = vcard_split(line) else {
+            // No colon at all: nothing to name, nothing to count, and the row below says it happened.
+            self.broken += 1;
+            return;
+        };
+        let upper = name.to_ascii_uppercase();
+        self.escapes += value.bytes().filter(|each| *each == b'\\').count();
+        self.ended = false;
+        match upper.as_str() {
+            "BEGIN" => {
+                self.depth += 1;
+                self.components += 1;
+                return;
+            }
+            "END" => {
+                self.depth = self.depth.saturating_sub(1);
+                self.ended = self.depth == 0;
+                return;
+            }
+            _ => {}
+        }
+        if self.depth == 0 {
+            // The file's own END already closed the component, so this property belongs to no card.
+            self.broken += 1;
+        }
+        self.props += 1;
+        if self.logical == 2 && upper == "VERSION" {
+            self.version = value.trim().to_string();
+            self.version_second = true;
+        }
+        let keys: Vec<String> = params
+            .iter()
+            .filter_map(|each| each.split_once('='))
+            .map(|(key, _)| key.to_ascii_uppercase())
+            .collect();
+        let parts = vcard_parts(value);
+        match self.names.iter().position(|entry| entry.0 == upper) {
+            Some(index) => {
+                let entry = &mut self.names[index];
+                entry.1 += 1;
+                entry.2 = entry.2.max(parts);
+                for key in keys {
+                    if !entry.3.contains(&key) {
+                        entry.3.push(key);
+                    }
+                }
+            }
+            None => self.names.push((upper, 1, parts, keys)),
+        }
+    }
+
+    fn rows(&self) -> Vec<String> {
+        let version = if self.version.is_empty() {
+            "-".to_string()
+        } else {
+            self.version.clone()
+        };
+        let mut rows = vec![
+            format!(
+                "vcard\t{version}\tprops\t{}\tnames\t{}\tlines\t{}\tfolded\t{}\tcomponents\t{}",
+                self.props,
+                self.names.len(),
+                self.physical,
+                self.folded,
+                self.components
+            ),
+            format!(
+                "endings\tcrlf\t{}\tlf\t{}\tlogical\t{}\tlast_newline\t{}",
+                self.crlf,
+                self.lf,
+                self.logical,
+                if self.terminated { "yes" } else { "no" }
+            ),
+            format!(
+                "version\t{version}\tsecond\t{}",
+                if self.version_second { "yes" } else { "no" }
+            ),
+            format!(
+                "end\t{}\tbroken\t{}\tescapes\t{}",
+                if self.ended { "yes" } else { "no" },
+                self.broken,
+                self.escapes
+            ),
+        ];
+        let listed = self.names.len().min(VCARD_MAX_NAMES);
+        for (name, count, parts, keys) in self.names.iter().take(listed) {
+            let params = if keys.is_empty() {
+                "-".to_string()
+            } else {
+                let mut sorted = keys.clone();
+                sorted.sort();
+                sorted.join(",")
+            };
+            rows.push(format!(
+                "prop\t{name}\tcount\t{count}\tparts\t{parts}\tparams\t{params}"
+            ));
+        }
+        if self.names.len() > listed {
+            rows.push(format!("cut\tnames\t{}", self.names.len() - listed));
+        }
+        if self.truncated {
+            rows.push(format!("stopped\tlines\t{VCARD_MAX_LINES}"));
+        }
+        rows
+    }
+}
+
+/// A vCard: `BEGIN:VCARD`, `NAME;PARAM=value:value` lines, values folded by a following line that
+/// starts with a space or a tab, and `END:VCARD`. Nothing here decodes a value - the report counts
+/// names, parameters, sub-values and escapes - which is why the level recorded for `vcard` in
+/// `tools/coverage.mjs` is `fields` over the *lines*, not the address book.
+fn read_vcard(bytes: &[u8]) -> Option<Vec<String>> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let trimmed = text.strip_prefix('\u{feff}').unwrap_or(text);
+    // `BEGIN:VCARD` and `begin:vcard` are both legal and nothing else is this format. A VCALENDAR
+    // component shares the grammar, but it is a different label and no fixture here carries one, so it
+    // is left to the round that produces one rather than recognised from a name.
+    if !trimmed
+        .as_bytes()
+        .get(..11)
+        .is_some_and(|head| head.eq_ignore_ascii_case(b"BEGIN:VCARD"))
+    {
+        return None;
+    }
+    // ... and the token has to end there: `BEGIN:VCARDX` is the start of some other component, not a
+    // card that happens to have an odd name. A file that stops at the token is treated as terminated.
+    let after = trimmed.as_bytes().get(11).copied().unwrap_or(b'\n');
+    if after != b'\r' && after != b'\n' {
+        return None;
+    }
+    let mut card = Vcard::default();
+    let mut pending = String::new();
+    for piece in trimmed.split_inclusive('\n') {
+        card.physical += 1;
+        let body = if let Some(rest) = piece.strip_suffix("\r\n") {
+            card.crlf += 1;
+            card.terminated = true;
+            rest
+        } else if let Some(rest) = piece.strip_suffix('\n') {
+            card.lf += 1;
+            card.terminated = true;
+            rest
+        } else {
+            card.terminated = false;
+            piece
+        };
+        if body.is_empty() {
+            // The format has no blank lines, inside a card or between two of them.
+            card.broken += 1;
+            continue;
+        }
+        if body.starts_with(' ') || body.starts_with('\t') {
+            if pending.is_empty() {
+                // A fold with nothing to continue is not a continuation.
+                card.broken += 1;
+                continue;
+            }
+            card.folded += 1;
+            pending.push_str(&body[1..]);
+            continue;
+        }
+        if !pending.is_empty() {
+            card.record(&pending);
+            if card.truncated {
+                break;
+            }
+        }
+        pending.clear();
+        pending.push_str(body);
+    }
+    if !card.truncated && !pending.is_empty() {
+        card.record(&pending);
+    }
+    card.names.sort_by(|left, right| left.0.cmp(&right.0));
+    Some(card.rows())
+}
 pub fn parse(bytes: &[u8]) -> i32 {
     // Eight bytes is the shortest header any reader below can use (a Netpbm bitmap is seven), and
     // each reader bounds-checks itself, so there is nothing to gain by rejecting earlier.
     if bytes.len() < 8 {
         return reject("too small to identify a container", -1);
+    }
+    // First, and not merely early: a card is plain text, so the one reader here that recognises a file
+    // by arithmetic over its length rather than by a signature - binary STL - could otherwise satisfy
+    // its own count on a card's bytes and answer with a triangle list.
+    if let Some(lines) = read_vcard(bytes) {
+        return accept(FORMAT_VCARD, lines);
     }
     if let Some(lines) = read_tar(bytes) {
         return accept(FORMAT_TAR, lines);
@@ -7300,7 +7567,7 @@ pub fn parse(bytes: &[u8]) -> i32 {
         return accept(FORMAT_STL, lines);
     }
     reject(
-        "not a tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

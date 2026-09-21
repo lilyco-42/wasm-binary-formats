@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 50 | 22.8% |
+| own Rust reader, named header fields decoded | 51 | 23.3% |
 | own Rust reader, container framing only | 28 | 12.8% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **100** | 45.7% |
-| **covered, any level** | **119** | 54.3% |
+| **no parser at all - real gap** | **99** | 45.2% |
+| **covered, any level** | **120** | 54.8% |
 
-Top binary gap groups by count: unknown 53, archive 10, image 8, application 9, document 6,
+Top binary gap groups by count: unknown 52, archive 10, image 8, application 9, document 6,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 119 of 219 binary labels have a parser
-that runs here (50 field-level and 28 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 100 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 120 of 219 binary labels have a parser
+that runs here (51 field-level and 28 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 99 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 119 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 120 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -459,6 +459,8 @@ temp/venv/Scripts/python.exe scripts/make-psd-fixtures.py           # psd-tools 
 temp/venv/Scripts/python.exe scripts/make-cfg-fixture.py            # clang -c writes the branchy object, objdump lists it back
 temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffice converts a real docx, both manifests are re-read
 temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
+temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
+python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
 node --test test/wasm.test.mjs engine/target/wasm32-unknown-unknown/release/apk_lens.wasm
 cargo test --manifest-path analysis/Cargo.toml   # host tests for the on-demand analysis module
@@ -567,8 +569,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **119 covered** (50 field-level and 28
-container-level from this repo's own readers, 41 generated and mostly load-gated), **100 with no
+Coverage is scored against magika's 219 binary labels: **120 covered** (51 field-level and 28
+container-level from this repo's own readers, 41 generated and mostly load-gated), **99 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -919,6 +921,21 @@ does not re-derive them:
   shares no code with fontTools: it reports the family, an advance of 24 px for a 600-unit width in a
   1000-em font at 40 px, and metrics (32, 8) for the 800/-200 `hhea` pair - so the fixture is refused
   unless a program from another project reads the numbers the bytes state.
+* vCard (+1 field-level label, 120 covered, 99 gaps) is the first reader in this repo whose input is
+  ordinary line text: `BEGIN:VCARD`, `NAME;PARAM=value:value`, values folded by a following line that
+  starts with a space, `END:VCARD`. `vobject` writes the two fixtures and reads them back - so "eight
+  properties" is another implementation's count, not a comment agreeing with itself - and the shape that
+  makes the format worth a reader of its own is the fold: fourteen physical lines carry ten logical ones,
+  so a line count and a property count are different numbers and only the second one is the file's claim
+  about itself. Counting is where the care went, not decoding: `N:Fixture\, Jr.;Lab;;;` has five
+  sub-values because the comma is escaped, `ADR:;;1 Main St;…` has seven, `X;P="a:b;c":one` is one
+  property whose name ends at the colon *outside* the quotes, and a value is never unescaped, so no row
+  here pretends to have read the address book. `vcard` is a `fields` label over that line structure.
+  Two refusals carry weight: `BEGIN:VCALENDAR` shares the grammar but `ics` is `is_text: true` in
+  magika's table and so outside the 219 labels scored here, and `vcs` is inside the 219 with an empty
+  knowledge-base entry - no mime, no description, no extension - which is a label that cannot be pinned
+  to anything, so it stays a gap rather than becoming a guess. `tools/vcard-sim.py` is the usual shadow:
+  a second reading of the same rules in Python, diffed against the rows before a CI cycle is spent.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

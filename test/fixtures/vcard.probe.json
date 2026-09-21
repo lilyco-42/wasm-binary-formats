@@ -1,0 +1,80 @@
+{
+ "lab.vcard": {
+  "backslashes": 1,
+  "bytes": 522,
+  "folded": 4,
+  "logical_lines": 10,
+  "n_line": "N:Fixture\\, Jr.;Lab;;;",
+  "physical_lines": 14,
+  "properties": 8,
+  "witness": {
+   "adr_parts": 1,
+   "children": 8,
+   "emails": 1,
+   "fn": "Lab Fixture",
+   "n": [
+    "Lab",
+    "Fixture, Jr."
+   ],
+   "names": [
+    "ADR",
+    "EMAIL",
+    "FN",
+    "N",
+    "NOTE",
+    "TEL",
+    "VERSION",
+    "X-LAB-TAG"
+   ],
+   "note_length": 300,
+   "params": {
+    "EMAIL": [
+     "TYPE"
+    ],
+    "TEL": [
+     "TYPE"
+    ]
+   },
+   "version": "4.0"
+  }
+ },
+ "lab3.vcard": {
+  "backslashes": 1,
+  "bytes": 559,
+  "folded": 4,
+  "logical_lines": 11,
+  "n_line": "N:Fixture\\, Jr.;Lab;;;",
+  "physical_lines": 15,
+  "properties": 9,
+  "witness": {
+   "adr_parts": 1,
+   "children": 9,
+   "emails": 2,
+   "fn": "Lab Fixture",
+   "n": [
+    "Lab",
+    "Fixture, Jr."
+   ],
+   "names": [
+    "ADR",
+    "EMAIL",
+    "FN",
+    "N",
+    "NOTE",
+    "TEL",
+    "VERSION",
+    "X-LAB-TAG"
+   ],
+   "note_length": 300,
+   "params": {
+    "EMAIL": [
+     "TYPE"
+    ],
+    "TEL": [
+     "TYPE"
+    ]
+   },
+   "version": "3.0"
+  }
+ }
+}
