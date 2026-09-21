@@ -310,7 +310,44 @@ function paintRegions(state) {
       box.appendChild(note);
     }
   }
+  const typed = typeList(state.mod);
+  if (typed && typed.length > 1) {
+    const head = typed[0].split('\t');
+    const title = document.createElement('p');
+    title.textContent = `类型（CodeView 记录，来自 .debug$T；共 ${head[1]} 条记录，`
+      + `流头 ${head[3]}）：`;
+    const table = document.createElement('pre');
+    table.textContent = typed.slice(1).map((row) => {
+      const cell = row.split('\t');
+      // A `field` row belongs to the `type` row above it, so it is hung under it rather than repeated.
+      return cell[0] === 'field'
+        ? `    ↳ ${cell.slice(2).join('  ')}`
+        : `${cell[1]}  ${cell.slice(2).join('  ')}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+  }
   host.out.parentElement.insertBefore(box, host.out.nextSibling);
+}
+
+/// The type list, or null when the loaded module does not have it (an older cached build). A file
+/// without a CodeView type stream answers with no rows at all - DWARF is a different format, and a
+/// name invented from a section title would be a claim the bytes do not support.
+function typeList(mod) {
+  if (!mod || typeof mod.type_count !== 'function' || typeof mod.type_at !== 'function') {
+    return null;
+  }
+  const total = mod.type_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.type_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
 }
 
 /// The string list, or null when the loaded module does not have it (an older cached build).

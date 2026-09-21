@@ -71,7 +71,7 @@ function stubElf() {
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
-    'abi_version', 'self_test']) {
+    'type_count', 'type_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -150,7 +150,8 @@ test('the base module the page always downloads carries none of this', async () 
   if (!basePath) return;
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
-    'region_count', 'region_at', 'string_count', 'string_at', 'self_test']) {
+    'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
+    'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -265,4 +266,24 @@ test('the string list carries only bytes a running program touches', async () =>
       );
     }
   }
+});
+
+test('the type list is the record stream, leaf by leaf', async () => {
+  // `scripts/make-codeview-fixtures.py` writes `cv.obj` with clang, links it with lld and refuses to
+  // emit the probe unless its own walk of `.debug$T` and `llvm-pdbutil dump -types` on the resulting
+  // PDB agree in both directions - including the two records a struct gets when the compiler emits a
+  // forward declaration as well as a definition. So every row below is a fact about CodeView, read off
+  // a second implementation, and the module has to reproduce all of them.
+  const probe = JSON.parse(await readFile('test/fixtures/codeview.probe.json', 'utf8'));
+  const want = probe['cv.obj'].rows;
+  assert.ok(want.length > 50, `the probe lost its rows: ${want.length}`);
+  report(new Uint8Array(await readFile('test/fixtures/cv.obj')));
+  assert.equal(ex.type_count(), want.length, 'the module listed a different number of rows');
+  for (let index = 0; index < want.length; index += 1) {
+    assert.equal(text('type_at', index), want[index], `row ${index} moved`);
+  }
+  // A file with no CodeView stream has no types: the answer is an empty list, not a guess from the
+  // section names. `answer.obj` is clang's output without -gcodeview.
+  report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
+  assert.equal(ex.type_count(), 0, 'a plain object invented a type stream');
 });

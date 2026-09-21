@@ -10,7 +10,7 @@
 
 use apk_lens_analysis::{
     abi_version, alloc, analyse, dealloc, name_at, name_for, names_count, names_len, region_at,
-    region_count, sample_elf, self_test, string_at, string_count,
+    region_count, sample_elf, self_test, string_at, string_count, type_at, type_count,
 };
 use std::fs;
 
@@ -340,6 +340,138 @@ fn an_object_file_gets_no_map_and_a_refused_file_takes_the_last_ones_with_it() {
         "a section-header count that cannot be true is not a file"
     );
     assert_eq!(region_count(), 0, "a refused file kept the last file's map");
+}
+
+/// The type list, read through the same C ABI the page uses.
+fn types() -> Vec<String> {
+    let cap = 4096;
+    let count = type_count();
+    assert!(count <= 1 + 256, "the list is capped, and said so: {count}");
+    (0..count)
+        .map(|index| {
+            let pointer = alloc(cap);
+            let written = type_at(index, pointer, cap).max(0) as usize;
+            let keep = written.min(cap as usize);
+            let bytes = unsafe { std::slice::from_raw_parts(pointer as *const u8, keep) }.to_vec();
+            dealloc(pointer, cap);
+            String::from_utf8_lossy(&bytes).into_owned()
+        })
+        .collect()
+}
+
+/// `test/fixtures/cv.obj` is a `clang -gcodeview` object, and every row below is a fact
+/// `llvm-pdbutil dump -types` printed for the PDB `lld-link` made from that same object - the two
+/// readings are reconciled in `scripts/make-codeview-fixtures.py`, which refuses to write the probe
+/// unless they agree in both directions. Asserting the whole list rather than samples is the point: a
+/// record the walk mis-sizes shifts every index after it, and a sample would not notice.
+#[test]
+fn a_codeview_object_reports_its_types() {
+    let lines = rows(&fixture("cv.obj"));
+    assert!(lines[0].starts_with("file\tcoff"), "{}", lines[0]);
+    assert_eq!(
+        types(),
+        vec![
+            "types\t44\theader\t4",
+            "type\t0x1000\targlist\t2\tint(0x74)\tint(0x74)",
+            "type\t0x1001\tprocedure\treturns\tint(0x74)\targs\t2\t0x1000",
+            "type\t0x1002\taux\tleaf\t0x1601\tnot decoded",
+            "type\t0x1003\tstructure\tbox\tcount\t0\tsize\t0\topts\t0x80",
+            "type\t0x1004\tstructure\tpoint\tcount\t0\tsize\t0\topts\t0x80",
+            "field\t0x1005\tw\tint(0x74)\t0",
+            "field\t0x1005\th\tlong(0x12)\t0",
+            "type\t0x1006\tunion\tbox::<unnamed-tag>\tcount\t2\tsize\t4\topts\t0x408",
+            "type\t0x1007\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x1008\taux\tleaf\t0x1606\tnot decoded",
+            "field\t0x1009\tcorner\t0x1004\t0",
+            "field\t0x1009\tsize\t0x1006\t16",
+            "field\t0x1009\tstopped\t0x1510",
+            "type\t0x100a\tstructure\tbox\tcount\t3\tsize\t24\topts\t0x10",
+            "type\t0x100b\taux\tleaf\t0x1606\tnot decoded",
+            "field\t0x100c\tx\tint(0x74)\t0",
+            "field\t0x100c\ty\tdouble(0x41)\t8",
+            "type\t0x100d\tstructure\tpoint\tcount\t2\tsize\t16\topts\t0x0",
+            "type\t0x100e\taux\tleaf\t0x1606\tnot decoded",
+            "field\t0x100f\tRED\t0",
+            "field\t0x100f\tGREEN\t7",
+            "type\t0x1010\tenum\tcolour\tcount\t2\tbase\tint(0x74)\topts\t0x0",
+            "type\t0x1011\taux\tleaf\t0x1606\tnot decoded",
+            "type\t0x1012\targlist\t2\tunsigned long*(0x622)\t0x1010",
+            "type\t0x1013\tprocedure\treturns\tunsigned long*(0x622)\targs\t2\t0x1012",
+            "type\t0x1014\taux\tleaf\t0x1601\tnot decoded",
+            "type\t0x1015\targlist\t1\t0x1004",
+            "type\t0x1016\tprocedure\treturns\t0x1004\targs\t1\t0x1015",
+            "type\t0x1017\taux\tleaf\t0x1601\tnot decoded",
+            "type\t0x1018\tpointer\tto\t0x1004\tattr\t0x2002c",
+            "type\t0x1019\targlist\t0\t",
+            "type\t0x101a\tprocedure\treturns\tvoid(0x3)\targs\t0\t0x1019",
+            "type\t0x101b\taux\tleaf\t0x1601\tnot decoded",
+            "type\t0x101c\tstructure\twide\tcount\t0\tsize\t0\topts\t0x80",
+            "type\t0x101d\tpointer\tto\t0x101c\tattr\t0x1000c",
+            "type\t0x101e\tmodifier\tof\t0x74\tconst\t0x1",
+            "type\t0x101f\tpointer\tto\t0x101e\tattr\t0x1000c",
+            "type\t0x1020\targlist\t2\t0x101d\t0x101f",
+            "type\t0x1021\tprocedure\treturns\t0x101d\targs\t2\t0x1020",
+            "field\t0x1022\tc\tchar(0x70)\t0",
+            "field\t0x1022\tsc\tsigned char(0x10)\t1",
+            "field\t0x1022\tuc\tunsigned char(0x20)\t2",
+            "field\t0x1022\ts\tshort(0x11)\t4",
+            "field\t0x1022\tus\tunsigned short(0x21)\t6",
+            "field\t0x1022\ti\tint(0x74)\t8",
+            "field\t0x1022\tui\tunsigned(0x75)\t12",
+            "field\t0x1022\tl\tlong(0x12)\t16",
+            "field\t0x1022\tul\tunsigned long(0x22)\t20",
+            "field\t0x1022\tll\t__int64(0x13)\t24",
+            "field\t0x1022\tf\tfloat(0x40)\t32",
+            "field\t0x1022\td\tdouble(0x41)\t40",
+            "type\t0x1023\tstructure\twide\tcount\t12\tsize\t48\topts\t0x0",
+            "type\t0x1024\taux\tleaf\t0x1606\tnot decoded",
+            "type\t0x1025\taux\tleaf\t0x1601\tnot decoded",
+            "type\t0x1026\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x1027\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x1028\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x1029\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x102a\taux\tleaf\t0x1605\tnot decoded",
+            "type\t0x102b\taux\tleaf\t0x1603\tnot decoded",
+        ]
+    );
+}
+
+/// A file whose type stream lies about its own length stops the walk rather than running past the
+/// section into whatever bytes follow it.
+#[test]
+fn a_type_record_that_overruns_ends_the_list() {
+    let object = fixture("cv.obj");
+    let at = find_debug_t(&object).expect("the fixture has a type stream");
+    // Lie about the first record's length: 0xffff says it is bigger than the whole stream, so the walk
+    // has to stop there rather than read past the section into whatever the linker left behind it.
+    let mut lies = object.clone();
+    lies[at + 4] = 0xff;
+    lies[at + 5] = 0xff;
+    rows(&lies);
+    let listed = types();
+    assert_eq!(listed.len(), 2, "{listed:?}");
+    assert_eq!(listed[0], "types\t1\theader\t4", "{listed:?}");
+    assert!(
+        listed[1].starts_with("type\t0x1000\tbroken\tlength 65535"),
+        "{listed:?}"
+    );
+}
+
+/// Where a COFF object's `.debug$T` contents lie in the file. Written out here because the test is
+/// about the reader's own arithmetic, not about re-deriving the section table.
+fn find_debug_t(raw: &[u8]) -> Option<usize> {
+    let nsec = u16::from_le_bytes(raw.get(2..4)?.try_into().ok()?) as usize;
+    let optsz = u16::from_le_bytes(raw.get(16..18)?.try_into().ok()?) as usize;
+    let table = 20 + optsz;
+    for each in 0..nsec {
+        let base = table + 40 * each;
+        if raw.get(base..base + 8)? != b".debug$T"[..] {
+            continue;
+        }
+        let offset = u32::from_le_bytes(raw.get(base + 20..base + 24)?.try_into().ok()?) as usize;
+        return Some(offset);
+    }
+    None
 }
 
 /// The string list, read through the same C ABI the page uses.

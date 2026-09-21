@@ -38,6 +38,9 @@ thread_local! {
     /// The string list for the same file again, over the ranges the map calls loaded data. Kept apart
     /// from the map because a page that wants one should not have to read the other.
     static STRINGS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// The CodeView type records of the same file, from `.debug$T` if it has one. A row per record, the
+    /// same shape as the other two: the page asks for one at a time.
+    static TYPES: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -128,15 +131,25 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     NAMES.with(|slot| slot.borrow_mut().clear());
     REGIONS.with(|slot| slot.borrow_mut().clear());
     STRINGS.with(|slot| slot.borrow_mut().clear());
+    TYPES.with(|slot| slot.borrow_mut().clear());
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
+    let mut types: Vec<String> = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
     let mut imported = 0usize;
 
     for (index, section) in file.sections().enumerate() {
         sections += 1;
+        // Types live in a section a stripped file, or one carrying DWARF instead, does not have at all,
+        // and it is the only section whose *contents* matter here rather than where they lie - so it is
+        // taken by name, before the cap on listed sections could hide it in a file with many of them.
+        if section.name().unwrap_or("") == ".debug$T" {
+            if let Ok(body) = section.data() {
+                types = type_rows(body);
+            }
+        }
         if index >= MAX_LISTED {
             continue;
         }
@@ -191,6 +204,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let (regions, strings) = map_rows(bytes);
     REGIONS.with(|slot| *slot.borrow_mut() = regions);
     STRINGS.with(|slot| *slot.borrow_mut() = strings);
+    TYPES.with(|slot| *slot.borrow_mut() = types);
 
     rows.insert(
         0,
@@ -697,6 +711,240 @@ const MIN_PRINTABLE: u64 = 4;
 /// Strings listed before the report says it stopped.
 const MAX_STRINGS: usize = 128;
 
+/* ---------------------------------------------------------------------------------
+ * CodeView type records: the leaves of `.debug$T`, which are also the records of a PDB's
+ * TPI stream and the thing IDA calls its type list.
+ * --------------------------------------------------------------------------------- */
+
+/// Leaf numbers read out of LLVM's own `CodeViewTypes.def`, not recalled: an invented number decodes
+/// someone else's record, and nothing in the file would complain.
+const LF_MODIFIER: u16 = 0x1001;
+const LF_POINTER: u16 = 0x1002;
+const LF_PROCEDURE: u16 = 0x1008;
+const LF_ARGLIST: u16 = 0x1201;
+const LF_FIELDLIST: u16 = 0x1203;
+const LF_ENUMERATE: u16 = 0x1502;
+const LF_CLASS: u16 = 0x1504;
+const LF_STRUCTURE: u16 = 0x1505;
+const LF_UNION: u16 = 0x1506;
+const LF_ENUM: u16 = 0x1507;
+const LF_MEMBER: u16 = 0x150d;
+
+/// Primitive type indices the fixture's witness names, and only those. Anything else prints as
+/// `?(0x…)`: a guessed type name would be worse than a missing one, because a reader would repeat it.
+const PRIMITIVES: &[(u32, &str)] = &[
+    (0x03, "void"),
+    (0x10, "signed char"),
+    (0x11, "short"),
+    (0x12, "long"),
+    (0x13, "__int64"),
+    (0x20, "unsigned char"),
+    (0x21, "unsigned short"),
+    (0x22, "unsigned long"),
+    (0x40, "float"),
+    (0x41, "double"),
+    (0x70, "char"),
+    (0x74, "int"),
+    (0x75, "unsigned"),
+    (0x622, "unsigned long*"),
+];
+
+/// Records listed before the report says it stopped.
+const MAX_TYPES: usize = 256;
+
+fn hex(value: u32) -> String {
+    format!("0x{value:x}")
+}
+
+/// A type index spelled the way the rows spell it. At or above `0x1000` it names another record in the
+/// same stream; below it, one of the primitives above.
+fn type_label(index: u32) -> String {
+    if index >= 0x1000 {
+        return hex(index);
+    }
+    match PRIMITIVES.iter().find(|(value, _)| *value == index) {
+        Some((_, name)) => format!("{name}({})", hex(index)),
+        None => format!("?({})", hex(index)),
+    }
+}
+
+fn cv_u16(raw: &[u8], at: usize) -> Option<u16> {
+    Some(u16::from_le_bytes(raw.get(at..at + 2)?.try_into().ok()?))
+}
+
+fn cv_u32(raw: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(raw.get(at..at + 4)?.try_into().ok()?))
+}
+
+/// A NUL-terminated name and the offset just past its terminator.
+fn cv_name(raw: &[u8], at: usize) -> Option<(String, usize)> {
+    let tail = raw.get(at..)?;
+    let end = tail.iter().position(|byte| *byte == 0)?;
+    let text = std::str::from_utf8(&tail[..end]).unwrap_or("?");
+    Some((clean(text), at + end + 1))
+}
+
+/// The rows of one type stream.
+///
+/// A record's length counts its kind and its data but not the length field itself, so a record is
+/// `length + 2` bytes wide. The stream opens with a four-byte header that is reported rather than
+/// interpreted - what it means has never been checked here, only that the records start after it. Every
+/// field order below is the order the generator found in clang's bytes and then confirmed against
+/// `llvm-pdbutil dump -types` on the PDB `lld-link` built from that same object, in both directions:
+/// a record the walk names and the witness does not is as much a failure as the other way round.
+fn type_rows(data: &[u8]) -> Vec<String> {
+    let header = match cv_u32(data, 0) {
+        Some(value) => value,
+        None => return Vec::new(),
+    };
+    let mut rows = Vec::new();
+    let mut at = 4usize;
+    let mut index: u32 = 0x1000;
+    let mut records = 0usize;
+    let mut listed = 0usize;
+    while at + 4 <= data.len() {
+        let length = match cv_u16(data, at) {
+            Some(value) => usize::from(value),
+            None => break,
+        };
+        let leaf = match cv_u16(data, at + 2) {
+            Some(value) => value,
+            None => break,
+        };
+        let body = match data.get(at + 4..at + length + 2) {
+            Some(window) => window,
+            None => {
+                rows.push(format!(
+                    "type\t{}\tbroken\tlength {length} at {at} passes the end",
+                    hex(index)
+                ));
+                break;
+            }
+        };
+        records += 1;
+        if listed < MAX_TYPES {
+            listed += 1;
+            rows.extend(type_record(index, leaf, body));
+        }
+        // `length` was bounds-checked against the stream just above, so this cannot overflow.
+        at += length + 2;
+        index += 1;
+    }
+    if records > listed {
+        rows.push(format!("cut\ttypes\t{records}"));
+    }
+    rows.insert(0, format!("types\t{records}\theader\t{header}"));
+    rows
+}
+
+/// One record's rows: usually a single row, and a field list one row per member it can read.
+fn type_record(index: u32, leaf: u16, body: &[u8]) -> Vec<String> {
+    let head = hex(index);
+    let mut rows = Vec::new();
+    match leaf {
+        LF_ARGLIST => {
+            let count = cv_u32(body, 0).unwrap_or(0);
+            let mut args: Vec<String> = Vec::new();
+            for each in 0..count.min(64) {
+                let value = cv_u32(body, 4 + 4 * usize::try_from(each).unwrap_or(0));
+                args.push(type_label(value.unwrap_or(0)));
+            }
+            // The joiner, not the list: an empty argument list still leaves the tab behind, which is
+            // how `void f(void)`'s row reads against the witness.
+            rows.push(format!("type\t{head}\targlist\t{count}\t{}", args.join("\t")));
+        }
+        LF_PROCEDURE => {
+            let returns = type_label(cv_u32(body, 0).unwrap_or(0));
+            let count = cv_u16(body, 4).unwrap_or(0);
+            let args = hex(cv_u32(body, 6).unwrap_or(0));
+            rows.push(format!(
+                "type\t{head}\tprocedure\treturns\t{returns}\targs\t{count}\t{args}"
+            ));
+        }
+        LF_POINTER => {
+            let target = hex(cv_u32(body, 0).unwrap_or(0));
+            match cv_u32(body, 4) {
+                Some(attr) => rows.push(format!("type\t{head}\tpointer\tto\t{target}\tattr\t{}", hex(attr))),
+                None => rows.push(format!("type\t{head}\tpointer\tto\t{target}\tattr\tno room")),
+            }
+        }
+        LF_MODIFIER => {
+            let target = hex(cv_u32(body, 0).unwrap_or(0));
+            let constants = hex(u32::from(cv_u16(body, 4).unwrap_or(0)));
+            rows.push(format!("type\t{head}\tmodifier\tof\t{target}\tconst\t{constants}"));
+        }
+        LF_STRUCTURE | LF_CLASS | LF_UNION | LF_ENUM => {
+            let count = cv_u16(body, 0).unwrap_or(0);
+            let options = hex(u32::from(cv_u16(body, 2).unwrap_or(0)));
+            if leaf == LF_ENUM {
+                let base = type_label(cv_u32(body, 4).unwrap_or(0));
+                let name = cv_name(body, 12).map(|(text, _)| text).unwrap_or_default();
+                rows.push(format!(
+                    "type\t{head}\tenum\t{name}\tcount\t{count}\tbase\t{base}\topts\t{options}"
+                ));
+            } else {
+                // A union names its field list where a struct names its derived class: reading the
+                // struct's fields past the list is what made a union report a type index as its size.
+                let (size_at, name_at, kind) = if leaf == LF_UNION {
+                    (8, 10, "union")
+                } else {
+                    (16, 18, if leaf == LF_CLASS { "class" } else { "structure" })
+                };
+                let size = cv_u16(body, size_at).unwrap_or(0);
+                let name = cv_name(body, name_at).map(|(text, _)| text).unwrap_or_default();
+                rows.push(format!(
+                    "type\t{head}\t{kind}\t{name}\tcount\t{count}\tsize\t{size}\topts\t{options}"
+                ));
+            }
+        }
+        LF_FIELDLIST => {
+            let mut at = 0usize;
+            while at + 2 <= body.len() {
+                let marker = body[at];
+                if (0xf0..=0xf7).contains(&marker) {
+                    // A pad marker stands for `marker - 0xf0` bytes in all, itself included; clang
+                    // writes a descending chain (0xf3, 0xf2, 0xf1) for a three-byte gap.
+                    at += usize::from(marker - 0xf0).max(1);
+                    continue;
+                }
+                let kind = match cv_u16(body, at) {
+                    Some(value) => value,
+                    None => break,
+                };
+                if kind == LF_MEMBER {
+                    let ty = type_label(cv_u32(body, at + 4).unwrap_or(0));
+                    let offset = cv_u16(body, at + 8).unwrap_or(0);
+                    match cv_name(body, at + 10) {
+                        Some((name, next)) => {
+                            rows.push(format!("field\t{head}\t{name}\t{ty}\t{offset}"));
+                            at = next;
+                        }
+                        None => break,
+                    }
+                    continue;
+                }
+                if kind == LF_ENUMERATE {
+                    let value = cv_u16(body, at + 4).unwrap_or(0);
+                    match cv_name(body, at + 6) {
+                        Some((name, next)) => {
+                            rows.push(format!("field\t{head}\t{name}\t{value}"));
+                            at = next;
+                        }
+                        None => break,
+                    }
+                    continue;
+                }
+                // A member record carries no length of its own, so the walk cannot step over one it
+                // does not know: the row says where it stopped instead of guessing at the next name.
+                rows.push(format!("field\t{head}\tstopped\t{kind:#06x}"));
+                break;
+            }
+        }
+        _ => rows.push(format!("type\t{head}\taux\tleaf\t0x{leaf:04x}\tnot decoded")),
+    }
+    rows
+}
+
 /// The first `0x…` in a region's note, which is where the map keeps the section's own virtual base.
 fn note_base(note: &str) -> u64 {
     let at = match note.find("0x") {
@@ -894,6 +1142,26 @@ pub extern "C" fn string_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     STRINGS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many type rows the last file produced, including its totals row. Zero means it carried no
+/// CodeView type stream at all - a stripped binary, or one with DWARF instead.
+#[no_mangle]
+pub extern "C" fn type_count() -> i32 {
+    TYPES.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: `type` or `field`, then the index the other records refer to it by, and what the record
+/// says about itself. Row zero is the totals. A `field` row belongs to the `type` row above it.
+#[no_mangle]
+pub extern "C" fn type_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    TYPES.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

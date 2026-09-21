@@ -34,16 +34,27 @@ FIX = os.path.join(ROOT, "test", "fixtures")
 
 SOURCE = """\
 /* Two structs, an enum, a union, a pointer and a function type - enough leaves
- * to pin down every record the reader claims to decode. */
+ * to pin down every record the reader claims to decode. The wide struct exists so
+ * the witness names the primitive types one by one: each of those fields prints as
+ * `Type = 0xNNNN (name)` in llvm-pdbutil's output, which is where the reader's
+ * table of primitive names comes from rather than out of memory. */
 struct point { int x; double y; };
 struct box { struct point corner; union { int w; long h; } size; };
 union either { int as_int; char as_char; };
 enum colour { RED, GREEN = 7 };
 typedef unsigned long word;
 
+struct wide {
+  char c; signed char sc; unsigned char uc; short s; unsigned short us;
+  int i; unsigned int ui; long l; unsigned long ul; long long ll;
+  float f; double d;
+};
+
 int add(int a, int b) { struct box b2; b2.corner.x = a; b2.size.w = b; return b2.corner.x + b2.size.w; }
 word *pick(word *p, enum colour c) { return p + (int) c; }
 struct point shift(struct point p) { p.x += 1; return p; }
+void nothing(void) { }
+struct wide *widen(struct wide *w, const int *fixed) { w->i = *fixed; return w; }
 """
 
 # Leaf numbers read out of llvm's own CodeViewTypes.def.
