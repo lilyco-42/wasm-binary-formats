@@ -89,10 +89,15 @@ fn an_image_with_no_directory_says_so_rather_than_being_reported_as_broken() {
     rows_of(&fixture("answer.obj"));
     assert_eq!(reloc_count(), 0, "an object file has no base relocations");
     assert_eq!(reloc_at(0, std::ptr::null_mut(), 0), -1);
-    // An ELF is an image and still answers with nothing: the per-page block list is a PE's, and an
-    // ELF's fixups are relocation records, which are a different structure read a different way.
-    rows_of(&fixture("lab.elf"));
-    assert_eq!(reloc_count(), 0, "an ELF keeps its fixups in relocation records");
+    // An ELF answers too, but in its own shape: dynamic record tables rather than a directory. A
+    // freestanding image has no such tables, so it is one row that says there are none.
+    let loaded = rows_of(&fixture("lab.elf"));
+    assert_eq!(loaded.len(), 1, "a static image is one row: {loaded:#?}");
+    assert_eq!(
+        loaded[0],
+        "relocs	kind	dyn	tables	0	entries	0	symbolic	0	relative	0	bits	64",
+        "the totals row for a file with no dynamic records"
+    );
 }
 
 /// A block whose own length is impossible ends the walk and says which claim it stopped on. The entry

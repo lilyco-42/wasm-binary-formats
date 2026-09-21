@@ -1081,6 +1081,161 @@ fn where_lies(pe: &Pe, rva: u64) -> (i64, String) {
     }
 }
 
+/// One relocation record's field, at the width the file's own class uses.
+fn elf_word(body: &[u8], at: usize, wide: bool, little: bool) -> Option<u64> {
+    if wide {
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(body.get(at..at.checked_add(8)?)?);
+        Some(if little { u64::from_le_bytes(buf) } else { u64::from_be_bytes(buf) })
+    } else {
+        let mut buf = [0u8; 4];
+        buf.copy_from_slice(body.get(at..at.checked_add(4)?)?);
+        Some(u64::from(if little { u32::from_le_bytes(buf) } else { u32::from_be_bytes(buf) }))
+    }
+}
+
+/// Which relocation table a section name states, if any: `Some(true)` for the RELA shape that carries
+/// its own addend, `Some(false)` for REL, and `None` for anything that only looks like one.
+fn relocation_shape(name: &str) -> Option<bool> {
+    let (tail, addend) = name
+        .strip_prefix(".rela")
+        .map(|tail| (tail, true))
+        .or_else(|| name.strip_prefix(".rel").map(|tail| (tail, false)))?;
+    if tail.is_empty() || tail.starts_with('.') {
+        Some(addend)
+    } else {
+        None
+    }
+}
+
+/// The tightest named section whose address range holds the address, which is how a `.got` slot is told
+/// apart from the `.relro_padding` that also covers it: the padding is a range, not a thing.
+fn elf_owner(file: &object::File<'_>, where_: u64) -> String {
+    let mut best: Option<(u64, String)> = None;
+    for section in file.sections() {
+        let size = section.size();
+        if size == 0 || where_ < section.address() || where_ >= section.address() + size {
+            continue;
+        }
+        let name = clean(section.name().unwrap_or("?"));
+        if !name.starts_with('.') {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(wide, _)| size < *wide) {
+            best = Some((size, name));
+        }
+    }
+    best.map_or_else(|| "unmapped".to_owned(), |(_, name)| name)
+}
+
+/// The type names both witnesses wrote beside a number in the files on this host - per machine, because
+/// one number means a different word in the two instruction sets: 6 is `R_X86_64_GLOB_DAT` and
+/// `R_386_GLOB_DAT`, 1 is `R_X86_64_64` and `R_386_32`. Anything else stays a number, so an aarch64 or
+/// RISC-V object prints types without names rather than borrowing x86's words for them.
+fn elf_type_name(machine: &str, kind: u64) -> Option<&'static str> {
+    Some(match (machine, kind) {
+        ("x86_64", 1) => "R_X86_64_64",
+        ("x86_64", 6) => "R_X86_64_GLOB_DAT",
+        ("x86_64", 7) => "R_X86_64_JUMP_SLOT",
+        ("x86_64", 8) => "R_X86_64_RELATIVE",
+        ("i386", 1) => "R_386_32",
+        ("i386", 6) => "R_386_GLOB_DAT",
+        ("i386", 7) => "R_386_JUMP_SLOT",
+        ("i386", 8) => "R_386_RELATIVE",
+        _ => return None,
+    })
+}
+
+/// The dynamic relocation records of an ELF: the same question the PE directory answers - which addresses
+/// get rewritten - asked of a format that keeps the answer in sections.
+///
+/// Two shapes, because the record carries its addend in one class and not the other, and the symbol
+/// index is squeezed out of the info word at different widths: 64-bit splits it above the low 32 bits of
+/// an eight-byte word, 32-bit above the low 8 of a four-byte one. A symbol index of zero is the
+/// symbol-less case - the relative record that says "write the load address plus this addend" - and is
+/// printed as no symbol rather than as the table's first entry. The addend is printed as the unsigned
+/// word the file holds: folding it into a sign would be this reader's arithmetic, not the file's.
+fn elf_reloc_rows(raw: &[u8]) -> Vec<String> {
+    let Ok(file) = object::File::parse(raw) else {
+        return Vec::new();
+    };
+    if label(&file.format()) != "elf" {
+        return Vec::new();
+    }
+    let machine = label(&file.architecture());
+    let wide = file.is_64();
+    let little = file.is_little_endian();
+    let step = if wide { 8 } else { 4 };
+    let mut tables: Vec<String> = Vec::new();
+    let mut fixes: Vec<String> = Vec::new();
+    let mut entries = 0usize;
+    let mut relative = 0usize;
+    for section in file.sections() {
+        // The crate calls both relocation tables `Metadata`, so the record's shape is read off the name
+        // the ELF convention uses for it: `.rela…` carries its own addend word and `.rel…` does not.
+        // `.relro_padding` shares the first four letters and is a range rather than a table, which is why
+        // what follows has to be empty or a further dot.
+        let name = clean(section.name().unwrap_or("?"));
+        let Some(addend) = relocation_shape(&name) else {
+            continue;
+        };
+        let Ok(body) = section.data() else { continue };
+        let slot = step * if addend { 3 } else { 2 };
+        let count = body.len() / slot;
+        tables.push(format!(
+            "table\t{name}\tentries\t{count}\tslot_bytes\t{slot}\taddend\t{}",
+            if addend { "yes" } else { "no" }
+        ));
+        for each in 0..count {
+            entries += 1;
+            let at = each * slot;
+            let (Some(where_), Some(info)) = (elf_word(body, at, wide, little), elf_word(body, at + step, wide, little))
+            else {
+                break;
+            };
+            let symbol = if wide { info >> 32 } else { info >> 8 };
+            let number = info & if wide { 0xffff_ffff } else { 0xff };
+            let spelled = if symbol == 0 {
+                relative += 1;
+                "-".to_owned()
+            } else {
+                file.dynamic_symbols()
+                    .nth(symbol as usize)
+                    .map_or_else(|| "?".to_owned(), |one| clean(one.name().unwrap_or("?")))
+            };
+            let stated = if addend {
+                elf_word(body, at + 2 * step, wide, little).map(|one| one.to_string())
+            } else {
+                None
+            };
+            fixes.push(format!(
+                "fixup\t0x{where_:x}\ttype\t{number}\tname\t{}\tsym\t{spelled}\taddend\t{}\tsection\t{}",
+                elf_type_name(&machine, number).unwrap_or("-"),
+                stated.unwrap_or_else(|| "-".to_owned()),
+                elf_owner(&file, where_),
+            ));
+        }
+    }
+    let listed = fixes.len();
+    let symbolic = entries - relative;
+    let mut out = vec![format!(
+        "relocs\tkind\tdyn\ttables\t{}\tentries\t{entries}\tsymbolic\t{symbolic}\trelative\t{relative}\tbits\t{}",
+        tables.len(),
+        if wide { 64 } else { 32 }
+    )];
+    out.append(&mut tables);
+    for (index, row) in fixes.into_iter().enumerate() {
+        if index >= MAX_LISTED {
+            break;
+        }
+        out.push(row);
+    }
+    if listed > MAX_LISTED {
+        out.push(format!("cut\tfixups\t{listed}\tlisted\t{MAX_LISTED}"));
+    }
+    out
+}
+
 /// The base-relocation directory: the fixups a loader applies to the image when it does not land at the
 /// address it was linked for, which is what an analyser needs in order to know that a word in `.data`
 /// is a pointer rather than a number.
@@ -1092,7 +1247,7 @@ fn where_lies(pe: &Pe, rva: u64) -> (i64, String) {
 /// rather than with an entry invented past it.
 fn reloc_rows(raw: &[u8]) -> Vec<String> {
     let Some(pe) = Pe::parse(raw) else {
-        return Vec::new();
+        return elf_reloc_rows(raw);
     };
     // Directory five: the base-relocation table, eight bytes of RVA and size at a fixed distance into
     // the directory array.

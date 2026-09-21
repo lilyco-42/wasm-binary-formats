@@ -425,10 +425,33 @@ word: an entry of any other type prints `type 7` with no `name` column at all, w
 test makes by changing one nibble of a real entry, and the totals row counts what came out `named` so a
 silent narrowing of the table is visible. What the rows do not do: nothing is written back, no page is
 rebased, and no fixup's target is resolved to a symbol - the directory says where to write, and the name
-index says what is there, but joining them is the page's business. An ELF and a COFF object answer with
-no rows at all, and that is the format talking rather than a gap in this one - the per-page block list is
-a PE's, and the fixups of a relocatable object are relocation records, which the engine's COFF reader
-already lists record by record against `objdump -r`.
+index says what is there, but joining them is the page's business. A COFF object answers with no rows
+at all: the per-page block list is a PE's, and a relocatable object's fixups are the records the
+engine's COFF reader already lists against `objdump -r`. An ELF answers too, in the shape its own
+format uses, which is the next paragraph.
+
+**The same fixups in an ELF** are dynamic relocation records rather than a directory: the file names
+one or two tables - `.rela.dyn` and `.rela.plt`, or `.rel.dyn` and `.rel.plt` - and each slot says
+"write something at this address". The two shapes differ twice over, which is why both a 64-bit and
+a 32-bit shared object are committed here: a RELA slot carries its own addend word and a REL slot
+does not (24 bytes against 16 for x86-64, 12 against 8 for i386), and the symbol index is squeezed
+out of the info word above the low 32 bits in one class and above the low 8 in the other. A symbol
+index of zero is not the table's first entry but the symbol-less case - `R_X86_64_RELATIVE`, "write
+the load address plus this addend" - so it prints no name and the totals row counts how many slots
+were of that kind (`symbolic` and `relative`). The type words come from a table keyed on machine
+*and* number, because the same number is a different word per instruction set: 6 is
+`R_X86_64_GLOB_DAT` in `lab.so` and `R_386_GLOB_DAT` in `lab32.so`, and 1 is `R_X86_64_64` against
+`R_386_32`. Both shared objects were compiled here with `clang --target=… -shared -nostdlib -fPIC`,
+and `scripts/make-elf-reloc-fixtures.py` reads each one twice - `readelf -rW` and `objdump -R` - and
+refuses to write `elfreloc.probe.json` unless the two agree on every offset, type name, symbol and
+addend, so the eight pairings the reader knows are the ones those two wrote down in these files. A
+number no fixture paired prints as a number: an aarch64 object's types come out unnamed rather than
+wearing x86's words. The section a slot belongs to is the *tightest* range covering it, because
+`.relro_padding` is NOBITS and spans every address the loader may write - naming it for all nine
+slots would be reading the padding instead of the table's target. What this list does not do: the
+addend is the unsigned word the file holds (a negative one is not folded into a sign), a
+`.gnu.linkonce.rel.*` table is not recognised by that name, nothing is applied, and a freestanding
+image with no dynamic tables answers with one row saying `tables	0`.
 
 **The functions window** (`function_count` / `function_at`) is IDA's Functions list, and its one rule is
 that a row exists only because the file's own symbol table says so: one row per symbol whose kind is
@@ -623,6 +646,9 @@ temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test
 temp/venv/Scripts/python.exe scripts/make-3mf-fixtures.py      # trimesh exports test/fixtures/lab.3mf and then re-reads it, zipfile lists the parts and xml.etree.ElementTree walks the mesh; the probe is not written unless the two counts agree across all three readings, and hand.3mf exists to carry the four shapes trimesh will not produce
 temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus lld-link write test/fixtures/reloc.dll (four address-taken objects, so the linker had to record four fixups); llvm-readobj --coff-basereloc and pefile must agree entry by entry on all three images before the probe is written, and the type names in the rows are the words those two put beside those numbers
+temp/venv/Scripts/python.exe scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
+test/fixtures/lab.so and lab32.so; readelf -rW and objdump -R must agree on every offset, type name, symbol
+and addend before elfreloc.probe.json is written, and the eight type numbers they name are paired per machine
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

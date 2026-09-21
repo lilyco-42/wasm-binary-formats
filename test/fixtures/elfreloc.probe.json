@@ -1,0 +1,52 @@
+{
+ "files": {
+  "lab.so": {
+   "bits": 64,
+   "bytes": 3840,
+   "records": 9,
+   "rows": [
+    "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tbits\t64",
+    "table\t.rela.dyn\tentries\t7\tslot_bytes\t24\taddend\tyes",
+    "table\t.rela.plt\tentries\t2\tslot_bytes\t24\taddend\tyes",
+    "fixup\t0x36d8\ttype\t8\tname\tR_X86_64_RELATIVE\tsym\t-\taddend\t14016\tsection\t.data",
+    "fixup\t0x2680\ttype\t6\tname\tR_X86_64_GLOB_DAT\tsym\tdata_at\taddend\t0\tsection\t.got",
+    "fixup\t0x2688\ttype\t6\tname\tR_X86_64_GLOB_DAT\tsym\tlocal_static\taddend\t0\tsection\t.got",
+    "fixup\t0x2690\ttype\t6\tname\tR_X86_64_GLOB_DAT\tsym\ttable\taddend\t0\tsection\t.got",
+    "fixup\t0x36b8\ttype\t1\tname\tR_X86_64_64\tsym\ttable\taddend\t4\tsection\t.data",
+    "fixup\t0x2698\ttype\t6\tname\tR_X86_64_GLOB_DAT\tsym\tpointer\taddend\t0\tsection\t.got",
+    "fixup\t0x26a0\ttype\t6\tname\tR_X86_64_GLOB_DAT\tsym\toffsets\taddend\t0\tsection\t.got",
+    "fixup\t0x36f8\ttype\t7\tname\tR_X86_64_JUMP_SLOT\tsym\tuse_data\taddend\t0\tsection\t.got.plt",
+    "fixup\t0x3700\ttype\t7\tname\tR_X86_64_JUMP_SLOT\tsym\tcall_me\taddend\t0\tsection\t.got.plt"
+   ]
+  },
+  "lab32.so": {
+   "bits": 32,
+   "bytes": 2676,
+   "records": 9,
+   "rows": [
+    "relocs\tkind\tdyn\ttables\t2\tentries\t9\tsymbolic\t8\trelative\t1\tbits\t32",
+    "table\t.rel.dyn\tentries\t7\tslot_bytes\t8\taddend\tno",
+    "table\t.rel.plt\tentries\t2\tslot_bytes\t8\taddend\tno",
+    "fixup\t0x3488\ttype\t8\tname\tR_386_RELATIVE\tsym\t-\taddend\t-\tsection\t.data",
+    "fixup\t0x2460\ttype\t6\tname\tR_386_GLOB_DAT\tsym\tdata_at\taddend\t-\tsection\t.got",
+    "fixup\t0x2464\ttype\t6\tname\tR_386_GLOB_DAT\tsym\tlocal_static\taddend\t-\tsection\t.got",
+    "fixup\t0x2468\ttype\t6\tname\tR_386_GLOB_DAT\tsym\ttable\taddend\t-\tsection\t.got",
+    "fixup\t0x347c\ttype\t1\tname\tR_386_32\tsym\ttable\taddend\t-\tsection\t.data",
+    "fixup\t0x246c\ttype\t6\tname\tR_386_GLOB_DAT\tsym\tpointer\taddend\t-\tsection\t.got",
+    "fixup\t0x2470\ttype\t6\tname\tR_386_GLOB_DAT\tsym\toffsets\taddend\t-\tsection\t.got",
+    "fixup\t0x3498\ttype\t7\tname\tR_386_JUMP_SLOT\tsym\tuse_data\taddend\t-\tsection\t.got.plt",
+    "fixup\t0x349c\ttype\t7\tname\tR_386_JUMP_SLOT\tsym\tcall_me\taddend\t-\tsection\t.got.plt"
+   ]
+  }
+ },
+ "type_names": {
+  "lab.so:1": "R_X86_64_64",
+  "lab.so:6": "R_X86_64_GLOB_DAT",
+  "lab.so:7": "R_X86_64_JUMP_SLOT",
+  "lab.so:8": "R_X86_64_RELATIVE",
+  "lab32.so:1": "R_386_32",
+  "lab32.so:6": "R_386_GLOB_DAT",
+  "lab32.so:7": "R_386_JUMP_SLOT",
+  "lab32.so:8": "R_386_RELATIVE"
+ }
+}
