@@ -1725,7 +1725,7 @@ async function openFile(file) {
     if (showStructure(bytes, file.name)) {
       report(`${label}，已按结构解析`);
     } else {
-      report(`${label}（${readAt(ex.last_error).text || `code ${rc}`}）`);
+      report(`${label}（随页面加载的那批结构读者都不认它，下面按需加载的「对象文件分析」一栏或许认；最后开口的那一个答「${readAt(ex.last_error).text || `code ${rc}`}」）`);
     }
     return;
   }
