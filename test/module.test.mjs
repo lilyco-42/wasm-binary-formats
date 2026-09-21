@@ -71,7 +71,7 @@ function stubElf() {
 test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
-    'type_count', 'type_at', 'abi_version', 'self_test']) {
+    'type_count', 'type_at', 'export_count', 'export_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -151,7 +151,7 @@ test('the base module the page always downloads carries none of this', async () 
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
-    'self_test']) {
+    'export_count', 'export_at', 'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -306,4 +306,26 @@ test('a program database answers with the types its TPI stream holds', async () 
   // have nothing to say here.
   assert.equal(ex.region_count(), 0, 'a PDB is not loaded anywhere');
   assert.equal(ex.string_count(), 0, 'so it has no loaded data to scan');
+});
+
+test('a DLL hands out the exports both readers say it does', async () => {
+  // `scripts/make-export-fixtures.py` links `exp.dll` with lld and refuses to write
+  // `test/fixtures/exports.probe.json` unless its own walk of the directory agrees with BOTH
+  // `llvm-readobj --coff-exports` and `objdump -x` - on the ordinal base, the three table addresses,
+  // every slot, and the text of the forwarder. The empty slot is the reason two readings are needed:
+  // llvm lists it as ordinal 8 with no address, bfd leaves it out of its table altogether, and the
+  // module has to say `hole` rather than pick a side.
+  const probe = JSON.parse(await readFile('test/fixtures/exports.probe.json', 'utf8'));
+  const want = probe.rows;
+  assert.equal(want.length, 8, `the probe lost its rows: ${want.length}`);
+  const bytes = new Uint8Array(await readFile('test/fixtures/exp.dll'));
+  assert.equal(report(bytes).rc, 0, 'a DLL is an accepted input');
+  assert.equal(ex.export_count(), want.length, 'the module listed a different number of exports');
+  for (let index = 0; index < want.length; index += 1) {
+    assert.equal(text('export_at', index), want[index], `row ${index} moved`);
+  }
+  // A COFF object is not an image and has no export directory, so the list is empty rather than left
+  // over from the DLL that was read a moment before.
+  report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
+  assert.equal(ex.export_count(), 0, 'an object file hands out nothing');
 });

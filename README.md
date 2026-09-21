@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 124 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, and the CodeView type records a `.debug$T` section carries |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, and the export table a PE image keeps |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -338,6 +338,20 @@ says where it stopped instead of guessing where the next name begins. Leaves the
 are listed as `aux leaf 0x1605 not decoded`, so the count of what was skipped is on screen too. DWARF
 is a different format and is not read; a file with no type stream gets no rows rather than names
 invented from its section titles.
+
+**The export list** (`export_count` / `export_at`) is IDA's Exports window: one row per slot of a PE's
+export address table, in the table's own order, so an address that three names share appears three times
+and the `hint` column says which entry of the name table reached it. The three kinds of slot are told
+apart the way the format does it - a zero is an empty slot, an RVA inside the directory's own span is a
+forwarder whose payload is another module's name in text, and anything else is the address of a body,
+resolved through the section table into a file offset and named with the section that holds it. Two
+readers had to be reconciled to write this: `llvm-readobj --coff-exports` lists the empty slot as ordinal
+8 with no address, `objdump -x` leaves it out of its table altogether, and `lld-link` was made to produce
+both by pinning two ordinals (`@7`, and `@9,noname` - a bare `,noname` is rejected, the ordinal has to
+come first). `scripts/make-export-fixtures.py` walks the bytes a third time and refuses to write its
+probe unless all three agree, so the eight rows the tests assert are the linkers' and the readers', and
+never a transcription of this one's. An ELF, a Mach-O or a COFF object answers with no rows: their names
+are already in the symbol list, and inventing an export directory for them is not this reader's job.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -507,6 +521,7 @@ temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py
 temp/venv/Scripts/python.exe scripts/make-image-fixtures.py          # clang + lld link a real ELF64 and PE32+; readelf and objdump check every offset the map uses
 temp/venv/Scripts/python.exe scripts/make-codeview-fixtures.py       # clang -gcodeview writes test/fixtures/cv.obj; the type-stream walk is checked both ways against llvm-pdbutil on the PDB lld links from it
 temp/venv/Scripts/python.exe scripts/make-pdb-fixtures.py          # lld-link writes test/fixtures/lab.pdb; the MSF superblock, stream table, TPI header and its records are checked against llvm-pdbutil --summary --streams --type-stats --types
+temp/venv/Scripts/python.exe scripts/make-export-fixtures.py     # lld-link writes test/fixtures/exp.dll with an aliased, a nameless, an empty and a forwarded export; llvm-readobj --coff-exports and objdump -x must both agree with the byte walk before the probe is written
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows

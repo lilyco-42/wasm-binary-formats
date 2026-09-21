@@ -41,6 +41,9 @@ thread_local! {
     /// The CodeView type records of the same file, from `.debug$T` if it has one. A row per record, the
     /// same shape as the other two: the page asks for one at a time.
     static TYPES: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// What a PE hands out: its export directory, one row per slot of the address table. Only a PE has
+    /// one, so an ELF or a Mach-O leaves this empty - its exported names are already in the symbol rows.
+    static EXPORTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -132,6 +135,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     REGIONS.with(|slot| slot.borrow_mut().clear());
     STRINGS.with(|slot| slot.borrow_mut().clear());
     TYPES.with(|slot| slot.borrow_mut().clear());
+    EXPORTS.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -213,6 +217,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     REGIONS.with(|slot| *slot.borrow_mut() = regions);
     STRINGS.with(|slot| *slot.borrow_mut() = strings);
     TYPES.with(|slot| *slot.borrow_mut() = types);
+    EXPORTS.with(|slot| *slot.borrow_mut() = export_rows(bytes));
 
     rows.insert(
         0,
@@ -566,6 +571,213 @@ fn pe_kind(name: &str, chars: u64) -> &'static str {
     } else {
         "meta"
     }
+}
+
+/// The header facts an RVA has to be walked through: the image base, the sections and where the data
+/// directories begin. `pe_spans` reads the same fields for the map; this exists for the readers that
+/// need to turn an address the file states into a byte position, which is a question the map never asks.
+struct Pe {
+    image_base: u64,
+    dirs: usize,
+    sections: Vec<(u64, u64, u64, String)>,
+}
+
+impl Pe {
+    fn parse(raw: &[u8]) -> Option<Pe> {
+        if raw.len() < 0x40 || !raw.starts_with(b"MZ") {
+            return None;
+        }
+        let lfanew = word_at(raw, 0x3c, true)? as usize;
+        if raw.get(lfanew..).map_or(true, |rest| !rest.starts_with(b"PE\0\0")) {
+            return None;
+        }
+        let nsec = half_at(raw, lfanew + 6, true)?;
+        let optsz = half_at(raw, lfanew + 20, true)? as usize;
+        let opt = lfanew.checked_add(24)?;
+        let plus = half_at(raw, opt, true)? == 0x20b;
+        let dirs = opt.checked_add(if plus { 112 } else { 96 })?;
+        let image_base = if plus {
+            addr_at(raw, opt + 24, true, true)?
+        } else {
+            word_at(raw, opt + 28, true)?
+        };
+        let table = opt.checked_add(optsz)?;
+        let mut sections = Vec::new();
+        for each in 0..nsec.min(192) {
+            let step = usize::try_from(each.checked_mul(40).unwrap_or(u64::MAX)).ok()?;
+            let at = table.checked_add(step)?;
+            let name = raw.get(at..at + 8)?.split(|byte| *byte == 0).next()?;
+            let (vsize, vaddr, rawsize, roff) = (
+                word_at(raw, at + 8, true)?,
+                word_at(raw, at + 12, true)?,
+                word_at(raw, at + 16, true)?,
+                word_at(raw, at + 20, true)?,
+            );
+            if rawsize == 0 {
+                continue;
+            }
+            // The span an RVA can fall in: a section's virtual size is what it claims to hold, and its
+            // raw size is what the file gives it. Either can be the larger one, so the map takes the
+            // wider - which is what lets a byte past the declared end still resolve to a section.
+            sections.push((vaddr, vsize.max(rawsize), roff, String::from_utf8_lossy(name).into_owned()));
+        }
+        Some(Pe { image_base, dirs, sections })
+    }
+
+    /// Where an RVA lies: a file offset and the section that owns it. `None` is the honest answer for
+    /// an address no section covers, and a caller must not turn that into an offset of its own.
+    fn at(&self, rva: u64) -> Option<(usize, &str)> {
+        for (base, span, offset, name) in self.sections.iter() {
+            if *base <= rva && rva < base.checked_add(*span)? {
+                let where_ = offset.checked_add(rva - base)?;
+                return Some((usize::try_from(where_).ok()?, name.as_str()));
+            }
+        }
+        None
+    }
+}
+
+/// IDA's Exports window: what a PE hands out, by ordinal and by name.
+///
+/// Every address in the directory is an RVA, so each one is walked through the sections before it names
+/// a byte. The three kinds of slot are told apart the way the format does it: a zero is an empty slot,
+/// an RVA that falls inside the directory's own span is a forwarder whose payload is the text of another
+/// module's name, and anything else is the address of a body. The row order is the table's own - by
+/// ordinal - which is why a file with two names on one address shows it twice, and why `hint` is printed
+/// where it comes from: the name table's index, not the ordinal.
+fn export_rows(raw: &[u8]) -> Vec<String> {
+    let pe = match Pe::parse(raw) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let (dir_rva, dir_size) = match (word_at(raw, pe.dirs, true), word_at(raw, pe.dirs + 4, true)) {
+        (Some(one), Some(two)) => (one, two),
+        _ => return Vec::new(),
+    };
+    // No directory, or one too short to hold its own fixed header, is not a file with no exports - it
+    // is a file that says nothing here, which an ELF also does. Both answer with no rows.
+    if dir_rva == 0 || dir_size < 40 {
+        return Vec::new();
+    }
+    let (at, section) = match pe.at(dir_rva) {
+        Some(found) => found,
+        None => return Vec::new(),
+    };
+    let at = match usize::try_from(at).ok().filter(|each| raw.get(*each..*each + 40).is_some()) {
+        Some(where_) => where_,
+        None => return Vec::new(),
+    };
+    let (name_rva, base, functions, names) = (
+        match word_at(raw, at + 12, true) {
+            Some(value) => value,
+            None => return Vec::new(),
+        },
+        match word_at(raw, at + 16, true) {
+            Some(value) => value,
+            None => return Vec::new(),
+        },
+        match word_at(raw, at + 20, true) {
+            Some(value) => value,
+            None => return Vec::new(),
+        },
+        match word_at(raw, at + 24, true) {
+            Some(value) => value,
+            None => return Vec::new(),
+        },
+    );
+    let (eat_at, names_at, ordinals_at): (usize, usize, usize) = match (
+        word_at(raw, at + 28, true).and_then(|value| pe.at(value)),
+        word_at(raw, at + 32, true).and_then(|value| pe.at(value)),
+        word_at(raw, at + 36, true).and_then(|value| pe.at(value)),
+    ) {
+        (Some(one), Some(two), Some(three)) => (one.0, two.0, three.0),
+        _ => return Vec::new(),
+    };
+    // The name table is read first, because a slot's name is only known through it: entry `i` of that
+    // table holds the i-th hint, the index into the name list, which is why the rows print `hint` and
+    // not something derived from the ordinal.
+    let entries: Vec<(u32, u64)> = (0..names)
+        .filter_map(|each| {
+            let step = usize::try_from(each.checked_mul(4)?).ok()?;
+            let rva = word_at(raw, names_at.checked_add(step)?, true)?;
+            let step = usize::try_from(each.checked_mul(2)?).ok()?;
+            Some((half_at(raw, ordinals_at.checked_add(step)?, true)? as u32, rva))
+        })
+        .collect();
+    let dll = cstr_at(raw, pe.at(name_rva).map(|(where_, _)| where_).unwrap_or(0));
+    let mut rows = vec![format!(
+        "exports\trva\t{:#x}\tbytes\t{}\toff\t{}\tsection\t{}\tdll\t{}\tbase\t{}\tfunctions\t{}\tnames\t{}",
+        dir_rva, dir_size, at, clean(section), clean(&dll), base, functions, names
+    )];
+    for index in 0..functions {
+        let ordinal = match base.checked_add(index) {
+            Some(value) => value,
+            None => break,
+        };
+        let slot = u32::try_from(index).unwrap_or(u32::MAX);
+        let hint = entries.iter().position(|(owner, _)| *owner == slot);
+        let name = match hint {
+            Some(where_) => match pe.at(entries[where_].1) {
+                Some((where_, _)) => cstr_at(raw, where_),
+                None => String::new(),
+            },
+            None => String::new(),
+        };
+        let name = clean(&name);
+        let label = if name.is_empty() { "-" } else { &name };
+        let rva = match usize::try_from(index.saturating_mul(4))
+            .ok()
+            .and_then(|step| eat_at.checked_add(step))
+            .and_then(|where_| word_at(raw, where_, true))
+        {
+            Some(value) => value,
+            None => {
+                rows.push(format!("broken\texports\t{index}"));
+                break;
+            }
+        };
+        if rows.len() > MAX_LISTED {
+            rows.push(format!("cut\texports\t{functions}"));
+            break;
+        }
+        if rva == 0 {
+            rows.push(format!("export\t{ordinal}\t-\thole"));
+            continue;
+        }
+        // An RVA inside the directory's own span is a forwarder: the bytes there are the text of
+        // another module's export name, and no body of this file's.
+        if dir_rva <= rva && rva < dir_rva.checked_add(dir_size).unwrap_or(u64::MAX) {
+            let target = match pe.at(rva) {
+                Some((where_, _)) => clean(&cstr_at(raw, where_)),
+                None => String::new(),
+            };
+            match hint {
+                Some(where_) => rows.push(format!(
+                    "export\t{ordinal}\t{label}\tforward\t{target}\thint\t{where_}")),
+                None => rows.push(format!("export\t{ordinal}\t{label}\tforward\t{target}\tnoname")),
+            }
+            continue;
+        }
+        let (offset, section) = match pe.at(rva) {
+            Some(found) => found,
+            None => {
+                rows.push(format!("export\t{ordinal}\t{label}\trva\t{:#x}\tunmapped", rva));
+                continue;
+            }
+        };
+        let tail = match hint {
+            Some(where_) => format!("hint\t{where_}"),
+            None => "noname".to_string(),
+        };
+        rows.push(format!(
+            "export\t{ordinal}\t{label}\trva\t{:#x}\taddr\t{}\toff\t{}\tsection\t{}\t{tail}",
+            rva,
+            pe.image_base + rva,
+            offset,
+            clean(section)
+        ));
+    }
+    rows
 }
 
 /// The map: every range the file names, in order, with what falls between them called what it is -
@@ -1307,6 +1519,26 @@ pub extern "C" fn type_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     TYPES.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many export rows the last file produced, including its totals row. Zero means the file had
+/// nothing to say here: an ELF, a Mach-O, or a PE with no export directory.
+#[no_mangle]
+pub extern "C" fn export_count() -> i32 {
+    EXPORTS.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: `export`, then the ordinal, then the name the file gives it - or `-` where it has none - and
+/// what the slot holds: an address, a forwarded name, or nothing at all. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn export_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    EXPORTS.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

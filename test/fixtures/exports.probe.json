@@ -1,0 +1,88 @@
+{
+ "bytes": 2560,
+ "header": {
+  "base": 7,
+  "characteristics": 0,
+  "dll": "exp.dll",
+  "eat": 8240,
+  "functions": 7,
+  "image_base": 6442450944,
+  "name_rva": 8232,
+  "names": 5,
+  "names_at": 8268,
+  "offset": 1536,
+  "ordinals_at": 8288,
+  "rva": 8192,
+  "section": ".rdata",
+  "size": 162,
+  "stamp": 0
+ },
+ "rows": [
+  "exports\trva\t0x2000\tbytes\t162\toff\t1536\tsection\t.rdata\tdll\texp.dll\tbase\t7\tfunctions\t7\tnames\t5",
+  "export\t7\tshipped\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t4",
+  "export\t8\t-\thole",
+  "export\t9\t-\trva\t0x1020\taddr\t6442455072\toff\t1056\tsection\t.text\tnoname",
+  "export\t10\talias\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t0",
+  "export\t11\tanswer\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t1",
+  "export\t12\tforward\tforward\tKERNEL32.GetVersion\thint\t2",
+  "export\t13\thelper\trva\t0x1010\taddr\t6442455056\toff\t1040\tsection\t.text\thint\t3"
+ ],
+ "slots": [
+  {
+   "forward": null,
+   "hint": 4,
+   "hole": false,
+   "name": "shipped",
+   "ordinal": 7,
+   "rva": 4096
+  },
+  {
+   "forward": null,
+   "hint": null,
+   "hole": true,
+   "name": null,
+   "ordinal": 8,
+   "rva": null
+  },
+  {
+   "forward": null,
+   "hint": null,
+   "hole": false,
+   "name": null,
+   "ordinal": 9,
+   "rva": 4128
+  },
+  {
+   "forward": null,
+   "hint": 0,
+   "hole": false,
+   "name": "alias",
+   "ordinal": 10,
+   "rva": 4096
+  },
+  {
+   "forward": null,
+   "hint": 1,
+   "hole": false,
+   "name": "answer",
+   "ordinal": 11,
+   "rva": 4096
+  },
+  {
+   "forward": "KERNEL32.GetVersion",
+   "hint": 2,
+   "hole": false,
+   "name": "forward",
+   "ordinal": 12,
+   "rva": 8334
+  },
+  {
+   "forward": null,
+   "hint": 3,
+   "hole": false,
+   "name": "helper",
+   "ordinal": 13,
+   "rva": 4112
+  }
+ ]
+}

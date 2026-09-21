@@ -9,8 +9,8 @@
 //! index is checked against a file whose objdump listing is frozen in this repo.
 
 use apk_lens_analysis::{
-    abi_version, alloc, analyse, dealloc, name_for, names_len, region_at, region_count, sample_elf,
-    self_test, string_at, string_count, type_at, type_count,
+    abi_version, alloc, analyse, dealloc, export_at, export_count, name_for, names_len, region_at,
+    region_count, sample_elf, self_test, string_at, string_count, type_at, type_count,
 };
 use std::fs;
 
@@ -584,4 +584,101 @@ fn tiles(total: u64, lines: &[String]) -> bool {
         cursor = start + length;
     }
     cursor == total
+}
+
+/// The export list of a real DLL, as `test/fixtures/exports.probe.json` holds it: `lld-link` wrote the
+/// table and both `llvm-readobj --coff-exports` and `objdump -x` read it back, so the ordinals, names,
+/// hints, RVAs and the forwarder's text below are the witnesses' own answers.
+fn exports() -> Vec<String> {
+    let total = export_count();
+    assert!(total > 0, "the fixture has to answer with something");
+    let buffer = vec![0u8; 4096];
+    (0..total)
+        .map(|index| {
+            let mut slot = buffer.clone();
+            let written = export_at(index, slot.as_mut_ptr(), slot.len() as i32);
+            assert!(written > 0 && written < slot.len() as i32, "row {index}");
+            slot.truncate(written as usize);
+            String::from_utf8(slot).expect("a row is text")
+        })
+        .collect()
+}
+
+#[test]
+fn a_dll_lists_the_exports_its_linker_wrote() {
+    rows(&fixture("exp.dll"));
+    assert_eq!(
+        exports(),
+        vec![
+            "exports\trva\t0x2000\tbytes\t162\toff\t1536\tsection\t.rdata\tdll\texp.dll\tbase\t7\tfunctions\t7\tnames\t5",
+            "export\t7\tshipped\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t4",
+            "export\t8\t-\thole",
+            "export\t9\t-\trva\t0x1020\taddr\t6442455072\toff\t1056\tsection\t.text\tnoname",
+            "export\t10\talias\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t0",
+            "export\t11\tanswer\trva\t0x1000\taddr\t6442455040\toff\t1024\tsection\t.text\thint\t1",
+            "export\t12\tforward\tforward\tKERNEL32.GetVersion\thint\t2",
+            "export\t13\thelper\trva\t0x1010\taddr\t6442455056\toff\t1040\tsection\t.text\thint\t3",
+        ],
+        "one row per slot of the address table, in the table's own order"
+    );
+    // Three names, one body: the alias is the file's fact, not the reader's, and `shipped` carries the
+    // ordinal the linker was told to give it rather than a position in the name list.
+    let listed = exports();
+    let bodies: Vec<&String> = listed
+        .iter()
+        .skip(1)
+        .filter(|row| row.contains("rva\t0x1000"))
+        .collect();
+    assert_eq!(bodies.len(), 3, "three names reach one address");
+}
+
+#[test]
+fn a_table_that_runs_past_its_own_file_is_stopped_and_said_so() {
+    let mut bytes = fixture("exp.dll");
+    // NumberOfFunctions, the u32 at directory offset 20: 4 000 slots in a 2 560-byte file.
+    let at = 1536 + 20;
+    bytes[at..at + 4].copy_from_slice(&4000u32.to_le_bytes());
+    rows(&bytes);
+    let lines = exports();
+    assert_eq!(lines[0], "exports\trva\t0x2000\tbytes\t162\toff\t1536\tsection\t.rdata\tdll\texp.dll\tbase\t7\tfunctions\t4000\tnames\t5");
+    assert_eq!(lines.len(), 66, "a totals row, 64 slots, then the stop");
+    assert_eq!(lines[65], "cut\texports\t4000", "the count stays the file's own");
+}
+
+#[test]
+fn an_export_that_points_at_nothing_says_so() {
+    let mut bytes = fixture("exp.dll");
+    // Slot 4 of the address table (ordinal 11, `answer`) pointed at 0xdeadbeef, which is in no section.
+    // The table starts at file 1584 - the directory's own 40 bytes, then 8 of padding to its 0x2030 -
+    // so slot 4 is the u32 at 1600.
+    let at = 1536 + 48 + 4 * 4;
+    bytes[at..at + 4].copy_from_slice(&0xdead_beefu32.to_le_bytes());
+    rows(&bytes);
+    let lines = exports();
+    assert_eq!(lines[5], "export\t11\tanswer\trva\t0xdeadbeef\tunmapped");
+    assert_eq!(lines.len(), 8, "the rest of the table is still the table");
+}
+
+#[test]
+fn a_file_with_no_export_directory_leaves_the_list_empty() {
+    rows(&sample_elf());
+    assert_eq!(export_count(), 0, "an ELF's exported names are in its symbol rows");
+    rows(&fixture("lab.pdb"));
+    assert_eq!(export_count(), 0, "a program database hands out nothing");
+    assert!(exports_all().is_empty(), "and no row of the last DLL is left standing");
+}
+
+/// `exports()` above asserts the list is non-empty, which is wrong for a file that has none.
+fn exports_all() -> Vec<String> {
+    let total = export_count();
+    let buffer = vec![0u8; 4096];
+    (0..total)
+        .map(|index| {
+            let mut slot = buffer.clone();
+            let written = export_at(index, slot.as_mut_ptr(), slot.len() as i32);
+            assert!(written > 0, "row {index}");
+            slot.truncate(written as usize);
+            String::from_utf8(slot).expect("a row is text")
+        })
+        .collect()
 }

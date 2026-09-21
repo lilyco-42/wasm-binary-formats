@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。',
   },
   {
     id: 'disasm',
@@ -339,6 +339,31 @@ function appendLists(box, state) {
     box.appendChild(title);
     box.appendChild(table);
   }
+  const handed = exportList(state.mod);
+  if (handed && handed.length > 1) {
+    const head = handed[0].split('\t');
+    const title = document.createElement('p');
+    title.textContent = `导出（PE 的导出表 ${field(head, 'dll')}，表在 ${field(head, 'section')} `
+      + `${field(head, 'rva')}，序号自 ${field(head, 'base')} 起；地址表 ${field(head, 'functions')} 槽、`
+      + `名字表 ${field(head, 'names')} 项。同一个地址可以有多个名字，名字表也可以没有它：`
+      + '这两件事都是文件自己的，不合并也不补）：';
+    const table = document.createElement('pre');
+    table.textContent = handed.slice(1).map((row) => {
+      const cell = row.split('\t');
+      if (cell[0] === 'cut') return `（地址表共 ${cell[2]} 槽，列到这里为止）`;
+      if (cell[0] === 'broken') return `（地址表走到第 ${cell[2]} 槽就出了文件范围，不猜后面的）`;
+      const name = cell[2] === '-' ? '（名字表里没有这一项）' : cell[2];
+      if (cell[3] === 'hole') return `${cell[1]}  （空槽：地址表有这一格，文件没往里放地址）`;
+      if (cell[3] === 'forward') return `${cell[1]}  ${name}  →  转发到 ${cell[4]}`;
+      const where = field(cell, 'section') || field(cell, 'off') || '?';
+      const at = field(cell, 'off') || '?';
+      const via = cell.includes('noname') ? '' : `  名字表第 ${field(cell, 'hint')} 项`;
+      const body = cell[5] === 'unmapped' ? '（这个地址不在任何节里）' : `off ${at}  ${where}`;
+      return `${cell[1]}  ${name}  →  ${cell[4]}  ${body}${via}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+  }
 }
 
 /// The type list, or null when the loaded module does not have it (an older cached build). A file
@@ -373,6 +398,26 @@ function stringList(mod) {
     const room = 512;
     const buffer = mod.alloc(room);
     const written = mod.string_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
+}
+
+/// The export list of a PE, or null when the loaded module does not have it (an older cached build).
+/// An ELF, a Mach-O or an object file answers with no rows: their exported names are already in the
+/// symbol list, and a PE without an export directory has nothing to say here either.
+function exportList(mod) {
+  if (!mod || typeof mod.export_count !== 'function' || typeof mod.export_at !== 'function') {
+    return null;
+  }
+  const total = mod.export_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.export_at(index, buffer, room);
     rows.push(written < 0 ? '' : cString(mod, buffer));
     mod.dealloc(buffer, room);
   }
