@@ -72,7 +72,7 @@ test('the analysis module stands on its own exports', () => {
   for (const name of ['memory', 'alloc', 'dealloc', 'analyse_run', 'analyse_count', 'analyse_at',
     'names_count', 'name_at', 'region_count', 'region_at', 'string_count', 'string_at',
     'type_count', 'type_at', 'export_count', 'export_at', 'import_count', 'import_at',
-    'abi_version', 'self_test']) {
+    'demangle_count', 'demangle_at', 'abi_version', 'self_test']) {
     assert.ok(name in ex, `${modulePath} does not export ${name}`);
   }
   assert.equal(ex.abi_version(), 1);
@@ -152,7 +152,8 @@ test('the base module the page always downloads carries none of this', async () 
   const base = await instantiate(basePath);
   for (const name of ['analyse_run', 'analyse_count', 'analyse_at', 'names_count', 'name_at',
     'region_count', 'region_at', 'string_count', 'string_at', 'type_count', 'type_at',
-    'export_count', 'export_at', 'import_count', 'import_at', 'self_test']) {
+    'export_count', 'export_at', 'import_count', 'import_at', 'demangle_count', 'demangle_at',
+    'self_test']) {
     assert.ok(!(name in base), `${name} leaked into the base module: ${basePath}`);
   }
   assert.ok('parse_container' in base, 'the base module lost the structural readers');
@@ -363,4 +364,33 @@ test('the imports a loader will fill in come through as the readers spell them',
   report(new Uint8Array(await readFile('test/fixtures/exp.dll')));
   assert.equal(text('name_at', 0x1_8000_1000n), 'shipped', 'three names, the table’s first one');
   assert.equal(ex.import_count(), 0, 'a DLL that hands out names need not ask for any');
+});
+
+test('the C++ names in an object answer as two demanglers read them', async () => {
+  // `cxx.o` is clang's own output for a linux target, and its `_Z` names are the compiler's spelling -
+  // nothing here was typed by hand. `scripts/make-demangle-fixtures.py` read those names out of the
+  // object with `llvm-readobj --symbols`, then asked binutils' `c++filt` and LLVM's `llvm-cxxfilt` what
+  // each means, and kept as the claim only the names where the two wrote the same string. So every row
+  // below is an answer two independent demanglers give.
+  const probe = JSON.parse(await readFile('test/fixtures/demangle.probe.json', 'utf8'));
+  const want = probe.rows;
+  assert.equal(want.length, 21, 'the probe itself has to hold the whole list');
+  const seen = report(new Uint8Array(await readFile('test/fixtures/cxx.o')));
+  assert.equal(seen.rc, 0, 'the object has to be accepted');
+  assert.equal(ex.demangle_count(), want.length, 'a different number of name rows');
+  for (let index = 0; index < want.length; index += 1) {
+    assert.equal(text('demangle_at', index), want[index], `row ${index} moved`);
+  }
+  // The one name the two witnesses spell differently is answered with a refusal, and neither of their
+  // spellings reaches the report: `Dn` is `decltype(nullptr)` to one and `std::nullptr_t` to the other,
+  // so no string is a fact about those two bytes.
+  const refused = want.find((row) => row.includes('\tout\t-\t'));
+  assert.match(refused, /^sym\t14\tin\t_Z4varsPcPKwDn\tout\t-\twhy\t/);
+  assert.ok(!want.some((row) => row.includes('nullptr')), 'a spelling was picked anyway');
+  assert.equal(Object.keys(probe.diverged).join(), '_Z4varsPcPKwDn', 'the divergence moved');
+  // A C object has no mangled name in it, and the list says so rather than keeping the previous file's.
+  report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
+  assert.equal(ex.demangle_count(), 1, 'the totals row and nothing else');
+  assert.equal(text('demangle_at', 0),
+    'demangle\tmangled\t0\tdemangled\t0\trefused\t0\twitnesses\ttwo');
 });

@@ -82,8 +82,8 @@ const MODULES = [
   {
     id: 'analysis',
     file: 'apk-lens-analysis.wasm',
-    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出 / 导入）',
-    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。导入表也是 PE 的：按名字要的和按序号要的是两种写法，序号那种压根没有名字可读；文件没给查找表时，名字只能从地址表里读，行里会写明是哪一个。这里只说文件开口要了什么，不去解析也不去加载任何东西。',
+    title: '对象文件分析（节表 / 符号表 / 分区图 / 字符串 / 类型 / 导出 / 导入 / C++ 名字）',
+    detail: '读出 PE、ELF、Mach-O 的节与符号，看一个二进制到底被切成什么样；再把整份文件按区上色：头部、表、代码、数据、只读数据、符号与重定位这类复杂区、签名，以及没有任何表或加载段引用的空闲区（绿）。绿只说明文件自己的结构里没有谁指向那些字节，不保证改了没事。可打印字符串只在被加载的数据区里找，所以链接器写在 .comment 里的自我介绍不会进这份名单 —— 这是它和 strings -a 的差别。换文件后再点一次这一行就行：模块已在内存里，不会重新下载。类型只在文件自己带 CodeView 类型流时列出 —— 目标文件的 .debug$T（clang -gcodeview 写的就有）或 .pdb 的 TPI 流；DWARF 是另一套格式，这里不读，也不拿节区的名字凑一份类型表。导出表只有 PE 有：一个地址可以挂着几个名字，名字表里也可以没有它（noname），地址表里还可以留一格空的 —— 这三种都是文件的说法，页面不替它合并，也不替它补名字。导入表也是 PE 的：按名字要的和按序号要的是两种写法，序号那种压根没有名字可读；文件没给查找表时，名字只能从地址表里读，行里会写明是哪一个。这里只说文件开口要了什么，不去解析也不去加载任何东西。符号表里 `_Z` 开头的 C++ 名字会解成人能读的样子，但只认两个互不相干的解码器（binutils 的 `c++filt` 和 LLVM 的 `llvm-cxxfilt`）写法一致的那些：两边不一致的那个名字就在行里写明没解码，不挑一个拼上。构造函数的 `C1`/`C2`、析构的 `D1`/`D2` 展开成同一个名字，所以原始拼写留在行里；非模板函数的返回类型根本不在名字里，页面也不替它编一个。',
   },
   {
     id: 'disasm',
@@ -388,6 +388,43 @@ function appendLists(box, state) {
     box.appendChild(title);
     box.appendChild(table);
   }
+  const spelled = demangleList(state.mod);
+  if (spelled && spelled.length > 1) {
+    const head = spelled[0].split('\t');
+    const title = document.createElement('p');
+    title.textContent = `C++ 名字（符号表里 ${field(head, 'mangled')} 个 _Z 开头的名字，${field(head, 'demangled')} 个两个解码器写法一致、这里给出读法，`
+      + `${field(head, 'refused')} 个写法不一致 —— 不挑一个拼上。构造的 C1/C2 与析构的 D1/D2 会展开成同一个名字，`
+      + '所以原始拼写留在行里；非模板函数的返回类型不在名字里，这里也就不写）：';
+    const table = document.createElement('pre');
+    table.textContent = spelled.slice(1).map((row) => {
+      const cell = row.split('\t');
+      if (cell[0] === 'cut') return `（名字比列出来的多，共 ${cell[2]} 个，到这里为止）`;
+      if (cell[5] === '-') return `    ${cell[3]}  →  （${cell[7]}）`;
+      return `    ${cell[3]}  →  ${cell[5]}`;
+    }).join('\n');
+    box.appendChild(title);
+    box.appendChild(table);
+  }
+}
+
+/// The C++ name list of the loaded module, or null when it does not have one (an older cached build).
+/// Nothing here is loaded or run: a row says what the file's own symbol table spells and what the two
+/// demanglers that agree on it read that as - or says that they do not agree.
+function demangleList(mod) {
+  if (!mod || typeof mod.demangle_count !== 'function' || typeof mod.demangle_at !== 'function') {
+    return null;
+  }
+  const total = mod.demangle_count();
+  if (total <= 0) return [];
+  const rows = [];
+  for (let index = 0; index < total; index += 1) {
+    const room = 512;
+    const buffer = mod.alloc(room);
+    const written = mod.demangle_at(index, buffer, room);
+    rows.push(written < 0 ? '' : cString(mod, buffer));
+    mod.dealloc(buffer, room);
+  }
+  return rows;
 }
 
 /// The type list, or null when the loaded module does not have it (an older cached build). A file

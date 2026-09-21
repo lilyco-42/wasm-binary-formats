@@ -24,6 +24,8 @@
 use object::{Object, ObjectSection, ObjectSymbol, SymbolKind};
 use std::cell::RefCell;
 
+mod demangle;
+
 /// Rows past this are counted but not listed, so a 4 000-section file cannot make the report huge.
 const MAX_LISTED: usize = 64;
 
@@ -47,6 +49,10 @@ thread_local! {
     /// What a PE asks for instead: its import directory, a row per DLL and a row per name. The other half
     /// of the same window, and empty for the same reason.
     static IMPORTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    /// The C++ names in the same file's symbol tables and what this reader can say about them: one line
+    /// of totals, then a line per mangled name in table order. Only names that begin `_Z` are listed,
+    /// because that prefix is the whole of how an Itanium mangled name announces itself.
+    static DEMANGLED: RefCell<Vec<String>> = RefCell::new(Vec::new());
 }
 
 /// Names come out of the file, and the report is tab-separated: a tab or a newline in a section name
@@ -105,6 +111,62 @@ fn name_pair<'data, T: ObjectSymbol<'data>>(symbol: &T) -> Option<(u64, String)>
     Some((symbol.address(), name))
 }
 
+/// A name to ask the C++ demangler about: the `_Z` prefix, and only the characters that prefix's
+/// grammar is written with. A name carrying anything else - a `$` from a local label, a `.` from a
+/// compiler-generated one - stays out of the list, because there is no reading of it this module can
+/// defend.
+fn mangled_name<'data, T: ObjectSymbol<'data>>(symbol: &T) -> Option<String> {
+    let name = symbol.name().ok()?;
+    if name.len() < 3 || !name.starts_with("_Z") {
+        return None;
+    }
+    if !name.bytes().all(|byte| {
+        matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'.' | b'$')
+    }) {
+        return None;
+    }
+    Some(clean(name))
+}
+
+/// What the demangler makes of one name, with no file in the way. `None` means the same thing a row's
+/// `out\t-` means: no spelling that two demanglers agree on was found for it.
+pub fn demangle_name(name: &str) -> Option<String> {
+    demangle::demangle(name)
+}
+
+/// The report on those names: totals, then one line per name in the order the symbol tables list them.
+///
+/// A name the demangler stops on is answered with `-` and the reason the reader can actually give - that
+/// no two-witness spelling was found for it - rather than with a guess. `cxx.o`'s `_Z4varsPcPKwDn` is
+/// that row: binutils writes `decltype(nullptr)` where LLVM writes `std::nullptr_t`, so neither is a
+/// fact about the bytes.
+fn demangle_rows(names: &[String]) -> Vec<String> {
+    let solved = names
+        .iter()
+        .filter(|one| demangle::demangle(one).is_some())
+        .count();
+    let mut out = vec![format!(
+        "demangle\tmangled\t{}\tdemangled\t{solved}\trefused\t{}\twitnesses\ttwo",
+        names.len(),
+        names.len() - solved
+    )];
+    for (index, name) in names.iter().enumerate() {
+        if index >= MAX_LISTED {
+            continue;
+        }
+        match demangle::demangle(name) {
+            Some(text) => out.push(format!("sym\t{index}\tin\t{name}\tout\t{}", clean(&text))),
+            None => out.push(format!(
+                "sym\t{index}\tin\t{name}\tout\t-\twhy\tnot in the two-witness subset"
+            )),
+        }
+    }
+    if names.len() > MAX_LISTED {
+        out.push(format!("cut\tdemangle\t{}", names.len()));
+    }
+    out
+}
+
 /// The name an address answers with, in the spelling `objdump -d` uses: `answer` at the symbol itself,
 /// `helper+0x9` nine bytes past one. The nearest name *below* the address wins, with no bound on the
 /// distance - which is what objdump does, and what an object file permits, since a symbol there carries
@@ -140,6 +202,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     TYPES.with(|slot| slot.borrow_mut().clear());
     EXPORTS.with(|slot| slot.borrow_mut().clear());
     IMPORTS.with(|slot| slot.borrow_mut().clear());
+    DEMANGLED.with(|slot| slot.borrow_mut().clear());
     if let Some((summary, listed)) = msf_types(bytes) {
         // A program database is not an object file - `object` refuses it, and with good reason - but
         // what a linker leaves beside an executable is the type stream, which is the answer a visitor
@@ -151,6 +214,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
+    let mut mangled: Vec<String> = Vec::new();
     let mut types: Vec<String> = Vec::new();
     let mut sections = 0usize;
     let mut symbols = 0usize;
@@ -197,6 +261,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
         // The index is not capped by MAX_LISTED: a name is worth finding precisely when the table is
         // too long to read as a list.
         named.extend(name_pair(&symbol));
+        mangled.extend(mangled_name(&symbol));
     }
     for (index, symbol) in file.dynamic_symbols().enumerate() {
         imported += 1;
@@ -204,6 +269,7 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
             rows.push(symbol_row("dynsym", index, &symbol));
         }
         named.extend(name_pair(&symbol));
+        mangled.extend(mangled_name(&symbol));
     }
     if symbols > MAX_LISTED {
         rows.push(format!("cut\tsymbols\t{symbols}"));
@@ -216,6 +282,8 @@ pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     let (imports, import_names) = import_rows(bytes);
     EXPORTS.with(|slot| *slot.borrow_mut() = exports);
     IMPORTS.with(|slot| *slot.borrow_mut() = imports);
+    let names = demangle_rows(&mangled);
+    DEMANGLED.with(|slot| *slot.borrow_mut() = names);
     // The file's own symbol names come first, then the export table's, then the imports: an address a
     // linker named is still called that by the symbol table, and what is left to name is the exported
     // body and the slot the loader fills in.
@@ -1729,6 +1797,26 @@ pub extern "C" fn import_at(index: i32, out: *mut u8, cap: i32) -> i32 {
         return -1;
     }
     IMPORTS.with(|rows| match rows.borrow().get(index as usize) {
+        Some(row) => copy(row, out, cap),
+        None => -1,
+    })
+}
+
+/// How many demangled-name rows the last file produced, including its totals row. Zero means its symbol
+/// tables held no `_Z` name at all - which is what an object built from C, or a stripped one, gives.
+#[no_mangle]
+pub extern "C" fn demangle_count() -> i32 {
+    DEMANGLED.with(|rows| rows.borrow().len() as i32)
+}
+
+/// One row: `sym`, the name's position in the symbol tables' own order, the name as the file spells it
+/// and what this reader says it means - or `-` with the reason it stopped. Row zero is the totals.
+#[no_mangle]
+pub extern "C" fn demangle_at(index: i32, out: *mut u8, cap: i32) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    DEMANGLED.with(|rows| match rows.borrow().get(index as usize) {
         Some(row) => copy(row, out, cap),
         None => -1,
     })

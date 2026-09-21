@@ -154,8 +154,8 @@ Verified against the projects themselves on 2026-09-19:
   (its backends are GPL-2.0); unusable for a commercial product on that basis alone.
 
 Cost either way: `v86.wasm` alone is 2,101,621 B, and a BoxedWine web build ships ~2.5 MB of wasm
-plus a ~10 MB overlay and a ~50 MB Wine rootfs — against this repo's entire engine, which is around
-200 KB (`engine/target/wasm32-unknown-unknown/release/apk_lens.wasm`, reported by CI). Modern Win32
+plus a ~10 MB overlay and a ~50 MB Wine rootfs — against this repo's entire engine: 587 350 B of wasm,
+202 303 B once gzipped, both measured on the deployed `apk-lens.wasm`. Modern Win32
 (64-bit, current .NET) is out of reach regardless.
 
 **Decision: do not ship execution.** Ship inspection (`engine/src/pe.rs`) plus an honest "use the
@@ -304,7 +304,7 @@ time after it.
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
 | `apk-lens.wasm` | `engine/` | yes | container and header structure for 125 binary labels |
-| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, and the export and import tables a PE image keeps |
+| `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, an address-to-name index over those tables, the byte-region map below, the printable strings that map loads, the CodeView type records a `.debug$T` section carries, the export and import tables a PE image keeps, and the demangled reading of the C++ names in those tables |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
 **The region map** (`region_count` / `region_at`, painted by the page under the analyser's rows) answers a
@@ -373,6 +373,24 @@ what the `names	iat` column reports. Both readers agreed with the walk on all th
 probe was written. What the rows do not do: no name is resolved, no bound-import table is read (entry 11
 is empty in every file here), and delay-loaded imports - a different directory, a different structure -
 are not looked at, so a file whose only imports are delay imports reads as importing nothing.
+
+**The demangled names** (`demangle_count` / `demangle_at`) are that analyser's other automatic service,
+and the only honest way to ship one here is to be told the answers twice:
+`scripts/make-demangle-fixtures.py` compiles a C++ source for `x86_64-unknown-linux-gnu` with `clang++` -
+so every name is the compiler's spelling rather than one typed into a test - reads the symbol table back
+with `llvm-readobj --symbols`, then asks binutils' `c++filt` and LLVM's `llvm-cxxfilt` what each name
+means. A name enters the probe only if the two write the same string, and the script stops if a shape it
+means to cover (a nested substitution, an array under a reference, a template argument) has disappeared
+from clang's list, so the claim cannot narrow when a compiler changes. The one name here where the two do
+not agree is `_Z4varsPcPKwDn`: `decltype(nullptr)` to binutils, `std::nullptr_t` to LLVM, so its row
+answers `-` with the reason instead of picking a side - and the refusal is whole, which is why no part of
+that signature is printed either. Twenty names, nineteen spellings, one refusal. Three facts the rows
+carry because a witness said them first: `C1` and `C2` (and `D1`/`D2`) are different symbols that demangle
+to the same string, so the raw name stays in the row; a non-template function's return type is not in its
+mangled name at all, which is why `retfn` - a function returning a function pointer - reads as `retfn(int)`;
+and `T_` in a template resolves through its own argument list, which is why `int pick<int>(int, int)`
+starts with a type and `retfn(int)` does not. Operator names, `Dn`, and every other spelling without a
+second witness are refused, and the `refused` column counts them.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -547,6 +565,7 @@ temp/venv/Scripts/python.exe scripts/make-import-fixtures.py     # csc.exe write
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
+temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py   # clang++ writes test/fixtures/cxx.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically, and the script stops if a shape the reader claims is missing from clang's list
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
