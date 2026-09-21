@@ -453,7 +453,8 @@ test('the fixups a loader would apply come through as two readers listed them', 
   // different list in a different format, so the panel comes back empty rather than with the rows the
   // image read a moment before left behind.
   report(new Uint8Array(await readFile('test/fixtures/lab.elf')));
-  assert.equal(ex.reloc_count(), 0, 'an ELF image has no base relocation directory');
+  assert.equal(ex.reloc_count(), 1, 'an ELF answers with its own record tables');
+  assert.match(text('reloc_at', 0), /^relocs	kind	dyn	tables	0	entries	0	/);
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
-  assert.equal(ex.reloc_count(), 0, 'nor has a COFF object');
+  assert.equal(ex.reloc_count(), 0, 'and a COFF object has neither shape');
 });
