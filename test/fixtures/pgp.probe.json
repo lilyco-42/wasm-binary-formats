@@ -31,21 +31,9 @@
     "off": 96,
     "plen": 87,
     "tag": 18
-   },
-   {
-    "ctb": "ac",
-    "detail": [
-     "mode b (62), created 1789968001, name=\"note.txt\",",
-     "raw data: 30 bytes"
-    ],
-    "flags": [],
-    "hlen": 2,
-    "label": "literal data",
-    "off": 117,
-    "plen": 44,
-    "tag": 11
    }
   ],
+  "gpg_printed": 2,
   "opaque": true,
   "packets": 2,
   "rows": [
@@ -171,6 +159,7 @@
     "tag": 2
    }
   ],
+  "gpg_printed": 5,
   "opaque": false,
   "packets": 5,
   "rows": [
@@ -292,6 +281,7 @@
     "tag": 2
    }
   ],
+  "gpg_printed": 3,
   "opaque": false,
   "packets": 3,
   "rows": [
@@ -385,6 +375,7 @@
     "tag": 2
    }
   ],
+  "gpg_printed": 3,
   "opaque": false,
   "packets": 3,
   "rows": [
@@ -445,53 +436,9 @@
     "off": 0,
     "plen": 0,
     "tag": 8
-   },
-   {
-    "ctb": "90",
-    "detail": [
-     "keyid 829E8BB58926A196",
-     "version 3, sigclass 0x00, digest 10, pubkey 22, last=1"
-    ],
-    "flags": [],
-    "hlen": 2,
-    "label": "onepass_sig",
-    "off": 2,
-    "plen": 13,
-    "tag": 4
-   },
-   {
-    "ctb": "ac",
-    "detail": [
-     "mode b (62), created 1789968001, name=\"note.txt\",",
-     "raw data: 30 bytes"
-    ],
-    "flags": [],
-    "hlen": 2,
-    "label": "literal data",
-    "off": 17,
-    "plen": 44,
-    "tag": 11
-   },
-   {
-    "ctb": "88",
-    "detail": [
-     "algo 22, keyid 829E8BB58926A196",
-     "version 4, created 1789968001, md5len 0, sigclass 0x00",
-     "digest algo 10, begin of digest 77 e6",
-     "hashed subpkt 33 len 21 (issuer fpr v4 6238A5C6581FE0FF69AE54FE829E8BB58926A196)",
-     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
-     "subpkt 16 len 8 (issuer key ID 829E8BB58926A196)",
-     "data: [256 bits]",
-     "data: [256 bits]"
-    ],
-    "flags": [],
-    "hlen": 2,
-    "label": "signature",
-    "off": 63,
-    "plen": 117,
-    "tag": 2
    }
   ],
+  "gpg_printed": 4,
   "opaque": true,
   "packets": 1,
   "rows": [
@@ -546,6 +493,7 @@
     "tag": 18
    }
   ],
+  "gpg_printed": 2,
   "opaque": true,
   "packets": 2,
   "rows": [

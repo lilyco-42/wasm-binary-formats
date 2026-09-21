@@ -152,8 +152,18 @@ def build(home, notes):
 
 
 def listing(path, home):
-    """Every packet gpg prints for the file, in print order - including those inside a wrapper."""
-    out, err = gpg(["--list-packets", rel(path)], home, allow_fail=True)
+    """The packets gpg prints for the file, in print order.
+
+    The listing runs against an *empty* keyring on purpose. Given the secret key, gpg uses the agent to
+    decrypt and descend into an encrypted packet - which adds nothing this reader claims, and on a host
+    whose agent has gone away it waits forever. With no keyring it reads framing only, so the witness is a
+    property of the bytes rather than of the machine, and it cannot hang.
+    """
+    bare = os.path.join(ROOT, "temp", "pgp-list-home")
+    if os.path.isdir(bare):
+        shutil.rmtree(bare)
+    os.makedirs(bare)
+    out, err = gpg(["--no-autostart", "--list-packets", rel(path)], bare, allow_fail=True)
     text = out.decode("utf8", "replace")
     found, current = [], None
     for line in text.splitlines():
@@ -426,8 +436,12 @@ def describe(name, path, home):
         "rows": rows,
         "walk": packets,
         # gpg's own words for each packet, kept so a test can assert that a field the row prints is a
-        # field the witness printed too, rather than trusting this script's parsing of it.
-        "gpg": [dict(each) for each in printed],
+        # field the witness printed too, rather than trusting this script's parsing of it. Only as far as
+        # the top-level walk goes: past an encrypted or compressed packet gpg prints positions inside a
+        # stream it decrypted or decompressed, and whether it *can* depends on which secret keys the
+        # keyring holds, which is not something a committed probe should be able to change.
+        "gpg": [dict(each) for each in printed[:len(packets)]],
+        "gpg_printed": len(printed),
     }
     print("== {} {} bytes, {} packets, opaque {}".format(name, len(raw), len(packets), opaque))
     for row in rows:
