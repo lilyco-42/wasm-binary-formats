@@ -796,7 +796,11 @@ does not re-derive them:
 * 7z (+1 container-level label, 116 covered, 103 gaps) is the third label the sweep mis-filed as
   unreachable: `py7zr 1.1.3` is installed here as both producer and witness, and it writes the two shapes
   the format has - `encoded.7z` with its header compressed, and `plain.7z` from
-  `set_encoded_header_mode(False)` with the property tree in the open. What the reader reports is the
+  `set_encoded_header_mode(False)` with the property tree in the open. A third archive comes from a
+  different program altogether: the `bsdtar` 3.8.4 that Windows ships writes 7z with `--format=7zip`, at
+  version 0.3 with its own packing, so the envelope rows stop describing one library's habits. The script
+  keeps that archive only if `py7zr` - which did not write it - and bsdtar agree on its member list.
+  What the reader reports is the
   envelope: version, where the header block is, how long it is, which of the two shapes it starts out to
   be, and the two CRCs the archive states about itself recomputed over the bytes they cover. That last
   pair is the useful part, because it works on every 7z whoever wrote it - it is the check that says a
