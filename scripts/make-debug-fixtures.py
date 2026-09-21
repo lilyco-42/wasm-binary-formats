@@ -34,11 +34,12 @@ the file's byte order: LLVM brackets them and pefile prints the same digits unbr
 checked against the bytes here, which is what earns writing them at all. It is also why the placeholder
 lld fills in still reads `LLD PDB.` in ASCII at the end.
 
-Re-running this script reproduces the committed `dbg.exe` byte for byte, which is what lets a committed
-probe be compared against a committed fixture at all. What does *not* hold is reproducibility within one
-run: linking the same command a second time in the same directory moves eight bytes inside the CodeView
-GUID - so the digits are compared against the readers' own listings here, and are never written into an
-assertion anywhere in this repository.
+The PDB GUID is neither a clock nor a coin: this script reproduces the committed `dbg.exe` and its probe
+byte for byte, run after run, while linking the same object under another output name or in another
+directory changes eight bytes of the GUID. What the digits are a function of is not settled here - only
+that they track the build's name and place rather than its clock, and that no assertion anywhere spells
+them out. They are compared against the two readers' listings instead, which is the claim the fixtures
+do support.
 
 One shape this lab cannot produce is the older `CV_INFO_PDB20` body, which rides on the same type number
 as `RSDS` and is told apart by its signature alone. Nothing here writes one and no reader was asked to
@@ -84,7 +85,10 @@ def build():
         handle.write(SOURCE)
     run(["clang", "--target=x86_64-w64-windows-gnu", "-c", "-g", "-gcodeview", "dbg.c", "-o", "dbg.obj"], "clang")
     # `/timeStamp` is what keeps the two stamps off the clock: without it the header and this entry
-    # carry the minute the build ran, and a probe written yesterday would not match today.
+    # each carry the minute the link ran, and a probe written yesterday would not match today. What it
+    # cannot pin is the PDB GUID - three fresh build directories, the same object, the same command and
+    # the same stamp gave three different sets of digits - so this builds each file once and the fixture
+    # is committed together with the probe that describes it.
     run(["lld-link", "/out:dbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj", "/debug",
          "/pdbaltpath:dbg.pdb", "/timeStamp:%d" % STAMP], "lld-link /debug")
     run(["lld-link", "/out:nodbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj",
