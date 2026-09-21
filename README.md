@@ -499,9 +499,11 @@ over two lines, so agreeing with it would have been agreeing about its formattin
 Two field-position traps are the reason four files are in this set. A 32-bit program header puts `p_flags`
 between `p_memsz` and `p_align`, where the 64-bit record puts it second, and the data encoding is a byte of
 `e_ident`, not a consequence of the class - read either the same way for both and `lab32.so`'s first
-segment reports its permission word as its file offset. The six type words the reader prints (`LOAD`,
-`DYNAMIC`, `PHDR` and the three `GNU_` kinds) are the six that appear in these files under two readers;
-`PT_INTERP`, `PT_NOTE` and `PT_TLS` are not, so their numbers print as numbers. A `GNU_RELRO` sharing an
+segment reports its permission word as its file offset. The nine type words it prints (`LOAD`, `DYNAMIC`, `INTERP`, `NOTE`, `PHDR`, `TLS` and the three
+`GNU_` kinds) are the nine that appear in these files under both readers, and `interp.elf` is there
+for that reason alone: an interpreter, a thread-local block whose `memsz` is twice its `filesz`,
+and a build-id note exist only in an executable, and lld drops `-dynamic-linker` from a shared
+object. Any other number prints as a number. A `GNU_RELRO` sharing an
 address with a `LOAD` is the file's own overlap and is left in both rows, and `mapped` is the sum of
 `p_memsz`, which is more than the bytes on disk wherever a segment ends in a `NOBITS` tail. A PE and a COFF
 object answer with no rows, because translating their sections into headers they do not have would be this
@@ -687,7 +689,8 @@ temp/venv/Scripts/python.exe scripts/make-reloc-fixtures.py        # clang plus 
 temp/venv/Scripts/python.exe scripts/make-segment-fixtures.py      # no new files: lab.elf, lab.so, lab32.so and
 test/fixtures/labarm.so already exist, and every program header is read three times - the bytes at e_phoff,
 readelf -lW and llvm-readobj --segments - which must agree on all six numbers and on the type word before
-test/fixtures/segment.probe.json is written
+test/fixtures/segment.probe.json is written; the script also compiles test/fixtures/interp.elf, because an
+interpreter, a thread-local block and a note appear only in an executable
 temp/venv/Scripts/python.exe scripts/make-elf-reloc-fixtures.py    # clang -shared -nostdlib -fPIC writes
 test/fixtures/lab.so and lab32.so; readelf -rW and objdump -R must agree on every offset, type name, symbol
 and addend before elfreloc.probe.json is written, and the eight type numbers they name are paired per machine

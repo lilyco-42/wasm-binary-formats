@@ -32,7 +32,35 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 FIX = os.path.join(ROOT, "test", "fixtures")
 
-FILES = ["lab.elf", "lab.so", "lab32.so", "labarm.so"]
+FILES = ["lab.elf", "lab.so", "lab32.so", "labarm.so", "interp.elf"]
+
+INTERP_SOURCE = """\
+/* A dynamic executable, deliberately self-contained: `ld.lld` refuses an undefined symbol when it links
+   one, so the three segment kinds this file exists for - an interpreter, a thread-local block and a note -
+   have to come from a program that needs nothing. `-dynamic-linker` only leaves a PT_INTERP in an
+   executable, which is why no `.so` here has one; `--build-id` gives the note and `__thread` the TLS
+   block. */
+int __thread scratch;
+int __thread other = 3;
+int table[2] = { 1, 2 };
+
+int entry(void) { return scratch + other + table[0]; }
+"""
+
+
+def build_interp():
+    """Write the one fixture the relocation rounds' four files do not provide."""
+    work = os.path.join(ROOT, "temp", "seglab")
+    os.makedirs(work, exist_ok=True)
+    src = os.path.join(work, "e.c")
+    with open(src, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(INTERP_SOURCE)
+    out = os.path.join(work, "interp.elf")
+    run(["clang", "--target=x86_64-unknown-linux-gnu", "-nostdlib", "-no-pie", "-e", "entry",
+         "-Wl,-dynamic-linker,/lib64/ld-linux-x86-64.so.2", "-Wl,--build-id=sha1", "-o", out, src])
+    blob = open(out, "rb").read()
+    with open(os.path.join(FIX, "interp.elf"), "wb") as handle:
+        handle.write(blob)
 
 
 def run(cmd):
@@ -138,6 +166,7 @@ def flags_text(pflags):
 
 
 def main():
+    build_interp()
     files = {}
     for name in FILES:
         readelf = from_readelf(name)

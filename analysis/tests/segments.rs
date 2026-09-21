@@ -33,6 +33,14 @@ fn rows(name: &str) -> Vec<String> {
         .collect()
 }
 
+/// The cell after `key`, read past the row's own tag so a tag that spells the key cannot answer for it.
+fn column(row: &str, key: &str) -> Option<String> {
+    let cell: Vec<&str> = row.split('\t').collect();
+    let at = cell.iter().skip(1).position(|one| *one == key)?;
+    let value = *cell.get(at + 2)?;
+    Some(value.to_owned())
+}
+
 /// A freestanding image states four headers, two of them loadable and one of those executable, and 615
 /// bytes to map - which is the sum of `p_memsz`, so a `NOBITS` tail would be counted here and not in the
 /// file's `filesz`.
@@ -124,5 +132,38 @@ fn a_pe_names_no_segments_because_the_format_has_no_header_table() {
     for file in ["exp.dll", "lab.dll", "answer.obj"] {
         let listed = rows(file);
         assert!(listed.is_empty(), "{file} listed segments it cannot have: {listed:#?}");
+    }
+}
+
+/// A dynamic executable is the only one of the five whose headers an OS loader reads for more than
+/// mappings: it names the program interpreter, a thread-local block whose `memsz` is twice its `filesz`
+/// (the zero-filled remainder is what `__thread` needs per thread), and a note. Every one of the eleven
+/// rows carries a word, because both readers named every type this file has - which is also what keeps the
+/// nine-word table honest: a type that stopped appearing would fall back to a number and this assertion
+/// would say so.
+#[test]
+fn an_executable_adds_the_interpreter_the_thread_block_and_the_note() {
+    let listed = rows("interp.elf");
+    assert_eq!(
+        listed[0],
+        "segments\ttotal\t11\tload\t4\twritable\t3\texec\t1\tmapped\t8024\tbits\t64",
+        "{}",
+        listed[0]
+    );
+    assert_eq!(listed.len(), 12, "{} rows: {listed:#?}", listed.len());
+    assert_eq!(
+        listed[2],
+        "segment\t1\ttype\t3\tname\tINTERP\toff\t680\tvaddr\t0x2002a8\tpaddr\t0x2002a8\tfilesz\t28\tmemsz\t28\tflags\tr--\talign\t1"
+    );
+    assert_eq!(
+        listed[7],
+        "segment\t6\ttype\t7\tname\tTLS\toff\t880\tvaddr\t0x202370\tpaddr\t0x202370\tfilesz\t4\tmemsz\t8\tflags\tr--\talign\t4"
+    );
+    assert_eq!(
+        listed[11],
+        "segment\t10\ttype\t4\tname\tNOTE\toff\t708\tvaddr\t0x2002c4\tpaddr\t0x2002c4\tfilesz\t36\tmemsz\t36\tflags\tr--\talign\t4"
+    );
+    for row in listed.iter().skip(1) {
+        assert_ne!(column(row, "name"), Some("-".to_owned()), "{row}");
     }
 }

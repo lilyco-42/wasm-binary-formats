@@ -1115,16 +1115,20 @@ thread_local! {
     static SEGMENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
-/// The segment types two readers named in the files here, by number. Six words, because six appear in
-/// `lab.elf`, `lab.so`, `lab32.so` and `labarm.so` - `readelf` and `llvm-readobj --segments` agree on each
-/// one, LLVM's being readelf's with `PT_` in front. `PT_INTERP`, `PT_NOTE` and `PT_TLS` are absent from
-/// every file this lab can build, so their numbers print as numbers: a name copied from documentation
-/// would be a claim no fixture on this host has checked.
+/// The segment types two readers named in the files here, by number. Nine words, because nine appear
+/// across `lab.elf`, `lab.so`, `lab32.so`, `labarm.so` and `interp.elf` - `readelf` and
+/// `llvm-readobj --segments` agree on each one, LLVM's being readelf's with `PT_` in front, and a
+/// disagreement about a word would stop the probe being written at all. Any other number prints as a
+/// number: the OS-specific ranges and the unwinding kinds of other machines are in no file this lab can
+/// build, so a name copied out of documentation would be a claim nothing here has checked.
 fn segment_word(kind: u32) -> Option<&'static str> {
     Some(match kind {
         1 => "LOAD",
         2 => "DYNAMIC",
+        3 => "INTERP",
+        4 => "NOTE",
         6 => "PHDR",
+        7 => "TLS",
         0x6474_E550 => "GNU_EH_FRAME",
         0x6474_E551 => "GNU_STACK",
         0x6474_E552 => "GNU_RELRO",
