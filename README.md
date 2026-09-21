@@ -590,10 +590,12 @@ writes and no second reader was asked to agree about.
 Three things this round settled by being checked rather than remembered. `/pdbaltpath` is what keeps the
 linking machine's absolute path out of a committed fixture, and it is also the realistic shape, since the
 name in the entry is the one a symbol service looks up. `/timeStamp` has to be pinned, because the linker
-stamps the header and the entry from the clock and a probe written yesterday would fail today. Re-running
-the script reproduces the committed fixture byte for byte, and that is the only reproducibility claimed:
-linking the same command a *second* time in the same place moves eight bytes inside the GUID, so nothing
-in this repository writes those digits into an assertion. And the GUID's 32 hex digits
+stamps the header and the entry from the clock and a probe written yesterday would fail today. The PDB
+GUID is a different matter: it tracks the build rather than the bytes, since the same object, command and
+stamp linked in three fresh build directories gave three different sets of digits and linking twice into
+one directory moved eight bytes of it - while re-running this generator in its own directory has returned
+the committed fixture byte for byte. A fixture therefore goes in with the probe written beside it, and
+those digits appear in no assertion: they are only compared against the two readers' own listings. And the GUID's 32 hex digits
 are *not* the file's byte order - three little-endian integers then eight bytes - which is not this
 reader's convention either: LLVM prints the digits bracketed, pefile prints them plain, and the probe is
 written only if both equal the bytes under the rule the two of them use. It is also why lld's placeholder

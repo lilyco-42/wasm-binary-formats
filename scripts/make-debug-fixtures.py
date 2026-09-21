@@ -34,12 +34,13 @@ the file's byte order: LLVM brackets them and pefile prints the same digits unbr
 checked against the bytes here, which is what earns writing them at all. It is also why the placeholder
 lld fills in still reads `LLD PDB.` in ASCII at the end.
 
-The PDB GUID is neither a clock nor a coin: this script reproduces the committed `dbg.exe` and its probe
-byte for byte, run after run, while linking the same object under another output name or in another
-directory changes eight bytes of the GUID. What the digits are a function of is not settled here - only
-that they track the build's name and place rather than its clock, and that no assertion anywhere spells
-them out. They are compared against the two readers' listings instead, which is the claim the fixtures
-do support.
+The PDB GUID tracks the build rather than the bytes: the same object, command and pinned stamp linked in
+three fresh build directories came back with three different sets of digits, and linking twice into one
+directory moved eight bytes of it too - while re-running this script in its own directory has returned
+the committed `dbg.exe` and its probe byte for byte, five times over. So each file is built once, a
+fixture is committed together with the probe written beside it, and those digits are spelled out in no
+assertion anywhere: they are compared against the two readers' own listings, which is a claim about the
+bytes in this file rather than about what the next link will happen to produce.
 
 One shape this lab cannot produce is the older `CV_INFO_PDB20` body, which rides on the same type number
 as `RSDS` and is told apart by its signature alone. Nothing here writes one and no reader was asked to
@@ -84,11 +85,11 @@ def build():
     with open(os.path.join(SCRATCH, "dbg.c"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(SOURCE)
     run(["clang", "--target=x86_64-w64-windows-gnu", "-c", "-g", "-gcodeview", "dbg.c", "-o", "dbg.obj"], "clang")
-    # `/timeStamp` is what keeps the two stamps off the clock: without it the header and this entry
-    # each carry the minute the link ran, and a probe written yesterday would not match today. What it
-    # cannot pin is the PDB GUID - three fresh build directories, the same object, the same command and
-    # the same stamp gave three different sets of digits - so this builds each file once and the fixture
-    # is committed together with the probe that describes it.
+    # `/timeStamp` is what keeps the two stamps off the clock: without it the header and this entry each
+    # carry the minute the link ran, and a probe written yesterday would not match today. The GUID is a
+    # different matter - it moved between three fresh build directories with identical inputs, and again
+    # when the same command was linked twice into one directory - so each file is built once here and
+    # the fixture is committed together with the probe that describes it.
     run(["lld-link", "/out:dbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj", "/debug",
          "/pdbaltpath:dbg.pdb", "/timeStamp:%d" % STAMP], "lld-link /debug")
     run(["lld-link", "/out:nodbg.exe", "/subsystem:console", "/entry:lab_first", "dbg.obj",
