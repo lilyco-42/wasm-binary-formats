@@ -263,14 +263,14 @@ the committed matrix disagrees with upstream, and asserts the buckets add up.
 
 | state | binary labels | share |
 |---|---|---|
-| own Rust reader, named header fields decoded | 52 | 23.7% |
+| own Rust reader, named header fields decoded | 53 | 24.2% |
 | own Rust reader, container framing only | 28 | 12.8% |
 | generated Kaitai reader, load-gated in CI | 41 | 18.7% |
 | an upstream spec exists but the pinned compiler lacks it | 0 | 0.0% |
-| **no parser at all - real gap** | **98** | 44.7% |
-| **covered, any level** | **121** | 55.3% |
+| **no parser at all - real gap** | **97** | 44.3% |
+| **covered, any level** | **122** | 55.7% |
 
-Top binary gap groups by count: unknown 52, archive 10, image 8, application 8, document 6,
+Top binary gap groups by count: unknown 52, archive 10, image 8, application 7, document 6,
 code 5, executable 4, inode 3, text 1.
 Named gaps that an end user would call common: `ppt` - the last compound-file Office type, and
 re-probed here rather than repeated: LibreOffice accepts `ppt:impress8_export` for a PNG (opened as a
@@ -287,9 +287,9 @@ does exist upstream, and `sevenzip` because `py7zr` turned out to be installed a
 reader for it here - see below. `otf` is the same story a fourth time: the blocker on record was "no CFF
 charstring writer runs here", and the writer has been installed in this repo's own venv the whole time.
 
-So the honest answer to the objective is **no, not yet**: 121 of 219 binary labels have a parser
-that runs here (52 field-level and 28 container-level from our own Rust engine, 41 generated from
-Kaitai specs and load-gated in CI), 98 have none. The buckets are deliberately separate from "identified" - the Tika
+So the honest answer to the objective is **no, not yet**: 122 of 219 binary labels have a parser
+that runs here (53 field-level and 28 container-level from our own Rust engine, 41 generated from
+Kaitai specs and load-gated in CI), 97 have none. The buckets are deliberately separate from "identified" - the Tika
 signature table covers 353 types for naming a file, which is not the same as parsing it.
 
 ## Analysis modules, fetched only when a visitor asks
@@ -303,7 +303,7 @@ time after it.
 
 | module | built from | in the base download | what it answers |
 |---|---|---|---|
-| `apk-lens.wasm` | `engine/` | yes | container and header structure for 121 binary labels |
+| `apk-lens.wasm` | `engine/` | yes | container and header structure for 122 binary labels |
 | `apk-lens-analysis.wasm` | `analysis/` | **no** | object-file layout: sections with their file offsets, both symbol tables, the machine, and an address-to-name index over those tables |
 | `apk-lens-disasm.wasm` | `disasm/shim.c` + Capstone 5.0.5 (BSD-3), via emscripten | **no** | instruction text, cross-references, basic blocks / function boundaries, the control-flow edges between blocks, and the names the symbol table gives each function entry, for x86-64, AArch64 and Thumb bytes |
 
@@ -461,6 +461,7 @@ temp/venv/Scripts/python.exe scripts/make-dotx-fixture.py           # LibreOffic
 temp/venv/Scripts/python.exe scripts/make-otf-fixtures.py           # fontTools writes the CFF font, FreeType reads its numbers back
 temp/venv/Scripts/python.exe scripts/make-vcard-fixtures.py         # vobject writes the cards and counts their properties back
 temp/venv/Scripts/python.exe scripts/make-torrent-fixtures.py       # bencode.py writes the .torrent files and re-encodes them to themselves
+temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing
@@ -571,8 +572,8 @@ builds the wasm target and runs both test layers on CI.
 
 ### Where the breadth work stands, and what is deliberately not attempted
 
-Coverage is scored against magika's 219 binary labels: **121 covered** (52 field-level and 28
-container-level from this repo's own readers, 41 generated and mostly load-gated), **98 with no
+Coverage is scored against magika's 219 binary labels: **122 covered** (53 field-level and 28
+container-level from this repo's own readers, 41 generated and mostly load-gated), **97 with no
 parser**. Four things follow from measuring rather than assuming, and are recorded so the next pass
 does not re-derive them:
 
@@ -951,6 +952,21 @@ does not re-derive them:
   check the format offers on a field rather than on the file. A `length` inside a `files` entry is one
   file's size and not the torrent's, so named values are read at the key they were reached under, and
   the shape row says `single` or `multi` from which of the two the file actually has.
+* OpenPGP (+1 field-level label, 122 covered, 97 gaps) is the fourth format here with no magic: a
+  transfer is a run of packets and each one states its own payload length, so the acceptance rule is
+  again "the lengths tile the file". `gpg` 2.4.9 (Git for Windows) writes six fixtures and
+  `gpg --list-packets` is the witness, which is an unusually direct one - it prints `off`, `ctb`, `tag`,
+  `hlen` and `plen` for every packet - so the generator refuses to write the probe unless its own walk of
+  the bytes agrees with gpg's numbers packet for packet, *and* with the names gpg spells (`public key`,
+  `onepass_sig`, `literal data`). Two header formats had to be demonstrated rather than recalled: an
+  old-format header puts the length octet count in the tag octet's two low bits, so the ed25519 export
+  (every packet under 192 bytes) never shows the two-octet branch and the rsa2048 export exists to - and
+  a witness can be quietly wrong about field *order*: gpg lists a session-key packet as "version, algo,
+  keyID" while the packet itself spells version, keyID, algo, so reading them positionally prints `0xff`,
+  the key ID's first octet, as an algorithm, which is the kind of number that would have shipped as a
+  confident wrong field. Nothing is decompressed or decrypted: past a compressed or encrypted packet the
+  report says `descend no deflate` / `descend no encrypted` and stops, and a one-pass signature prints no
+  algorithm fields at all because the witness prints none either.
 * A format only looked blocked because the producer was looked for in the wrong place. PDF has no
   Kaitai spec and no `qpdf`, `mutool`, `gs` or `pandoc` on this host, so the only writer available
   was Pillow - one habits, one object numbering. `scripts/make-pdf-fixtures.sh` finds that a headless

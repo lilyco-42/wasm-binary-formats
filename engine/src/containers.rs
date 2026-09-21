@@ -32,6 +32,12 @@
 //!   der   one length-prefixed object per file, which for a certificate means the top SEQUENCE's
 //!         own length is the only claim about its size - and a tree the reader lists and names
 //!         against what openssl's asn1parse printed for the same bytes
+//!   pgp   a run of packets, each stating its own payload length in one of two header formats: an
+//!         old-format header puts the octet count in the tag octet's two low bits (0 -> one, 1 -> two,
+//!         2 -> four, 3 -> indeterminate, and the number is plain big-endian) while a new-format one
+//!         lets the first length octet choose its form. Nothing here has a magic, so the tiling is the
+//!         identification - and every offset, tag, header size and length is checked against the
+//!         `# off=N ctb=XX tag=T hlen=H plen=P` line gpg prints for the same packet.
 //!   emf   a record list where every record is `u32 type, u32 size`, including the first: the header
 //!         states the file's byte count at 48 and its signature - " EMF" as a little-endian word - at
 //!         40; bounds are device units, frame is the same rectangle in hundredths of a millimetre, and
@@ -146,6 +152,7 @@ pub fn name() -> &'static str {
         FORMAT_OTF => "otf",
         FORMAT_VCARD => "vcard",
         FORMAT_TORRENT => "torrent",
+        FORMAT_PGP => "pgp",
         _ => "unknown",
     }
 }
@@ -7703,6 +7710,301 @@ fn read_torrent(bytes: &[u8]) -> Option<Vec<String>> {
     Some(book.rows(bytes.len()))
 }
 
+// ------------------------------------------------------------------------ PGP / OpenPGP packet framing
+pub const FORMAT_PGP: i32 = 54;
+
+/// Packets listed before the report says it stopped: a keyring export can hold thousands of them.
+const PGP_MAX_PACKETS: usize = 24;
+
+/// The names the witness gives the tags that appear in `scripts/make-pgp-fixtures.py`'s listings. A tag
+/// outside this list is reported by number, because inventing a name for a packet nothing here produced is
+/// exactly the mistake this repo keeps making when a table is carried from documentation.
+fn pgp_tag(tag: u8) -> Option<&'static str> {
+    match tag {
+        1 => Some("pubkey enc"),
+        2 => Some("signature"),
+        3 => Some("symkey enc"),
+        4 => Some("onepass_sig"),
+        6 => Some("public key"),
+        8 => Some("compressed"),
+        11 => Some("literal data"),
+        13 => Some("user ID"),
+        14 => Some("public sub key"),
+        18 => Some("encrypted data"),
+        _ => None,
+    }
+}
+
+/// Tags whose payload is a compressed or encrypted stream rather than more packets, and the reason the
+/// walk gives up there. Descending would mean decompressing or decrypting, and this reader does neither.
+fn pgp_opaque(tag: u8) -> Option<&'static str> {
+    match tag {
+        8 => Some("deflate"),
+        17 | 18 => Some("encrypted"),
+        _ => None,
+    }
+}
+
+/// One packet header, as far as it can be read. `payload` is `None` for an indeterminate length, whose
+/// body is simply the rest of the file.
+struct Pgp {
+    offset: usize,
+    format: &'static str,
+    tag: u8,
+    header: usize,
+    payload: Option<usize>,
+}
+
+/// The length field that follows a packet's tag octet. The two formats count their octets differently,
+/// and this mapping is what `gpg`'s own listings show rather than what a summary of the RFC recalls: an
+/// old-format header puts the octet count in the tag octet's two low bits (0 -> one, 1 -> two, 2 -> four)
+/// with 3 meaning indeterminate, while a new-format one lets the first length octet pick its own form.
+/// Returns (payload, octets used, unsizable-partial).
+fn pgp_length(bytes: &[u8], at: usize, ctb: u8) -> Option<(usize, usize, bool)> {
+    let first = *bytes.get(at)?;
+    if ctb & 0x40 != 0 {
+        if first < 192 {
+            return Some((usize::from(first), 1, false));
+        }
+        if first < 224 {
+            let second = *bytes.get(at.checked_add(1)?)?;
+            let span = ((usize::from(first) - 192) << 8) + usize::from(second) + 192;
+            return Some((span, 2, false));
+        }
+        if first == 224 {
+            return Some((0, 1, true));
+        }
+        if first == 255 {
+            let raw: [u8; 4] = bytes
+                .get(at.checked_add(1)?..at.checked_add(5)?)?
+                .try_into()
+                .ok()?;
+            return Some((u32::from_be_bytes(raw) as usize, 5, false));
+        }
+        return None;
+    }
+    if ctb & 3 == 3 {
+        return Some((0, 0, false));
+    }
+    let need = 1usize << (ctb & 3);
+    let raw = bytes.get(at..at.checked_add(need)?)?;
+    let span = match need {
+        1 => usize::from(raw[0]),
+        2 => u16::from_be_bytes(raw.try_into().ok()?) as usize,
+        _ => u32::from_be_bytes(raw.try_into().ok()?) as usize,
+    };
+    Some((span, need, false))
+}
+
+/// The top-level walk, which is also the acceptance test: an OpenPGP transfer is a run of packets that
+/// ends on the file's last byte. `broken` counts a header the walk could not size; `ends` says whether the
+/// packets it did read came to the end.
+fn pgp_walk(bytes: &[u8]) -> (Vec<Pgp>, usize, bool) {
+    let mut packets: Vec<Pgp> = Vec::new();
+    let mut at = 0usize;
+    let mut broken = 0usize;
+    let mut ends = false;
+    while at < bytes.len() {
+        let ctb = bytes[at];
+        if ctb & 0x80 == 0 {
+            break;
+        }
+        let fresh = ctb & 0x40 != 0;
+        let tag = if fresh { ctb & 0x3F } else { (ctb >> 2) & 0x0F };
+        let (payload, used, partial) = match pgp_length(bytes, at + 1, ctb) {
+            Some(read) => read,
+            None => {
+                broken += 1;
+                break;
+            }
+        };
+        let body = match at.checked_add(1).and_then(|each| each.checked_add(used)) {
+            Some(stop) => stop,
+            None => {
+                broken += 1;
+                break;
+            }
+        };
+        if partial {
+            // A partial-length chain states its chunks as powers of two; sizing it would mean guessing
+            // where the next packet begins, so the file is refused rather than half-read.
+            broken += 1;
+            break;
+        }
+        if used == 0 {
+            packets.push(Pgp {
+                offset: at,
+                format: if fresh { "new" } else { "old" },
+                tag,
+                header: body - at,
+                payload: None,
+            });
+            return (packets, broken, true);
+        }
+        let stop = match body.checked_add(payload) {
+            Some(stop) => stop,
+            None => {
+                broken += 1;
+                break;
+            }
+        };
+        if stop > bytes.len() {
+            broken += 1;
+            break;
+        }
+        packets.push(Pgp {
+            offset: at,
+            format: if fresh { "new" } else { "old" },
+            tag,
+            header: body - at,
+            payload: Some(payload),
+        });
+        at = stop;
+        ends = at == bytes.len();
+        if pgp_opaque(tag).is_some() {
+            break;
+        }
+    }
+    (packets, broken, ends)
+}
+
+/// Text that has to survive the C-string ABI: control octets become `?` rather than ending the row.
+fn pgp_text(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .chars()
+        .map(|each| {
+            if each == '\0' || each.is_control() {
+                '?'
+            } else {
+                each
+            }
+        })
+        .collect()
+}
+
+fn pgp_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|each| format!("{each:02x}")).collect()
+}
+
+impl Pgp {
+    /// The packet's own payload, or an empty slice for an indeterminate one.
+    fn body<'a>(&self, bytes: &'a [u8]) -> &'a [u8] {
+        let start = self.offset + self.header;
+        match self.payload {
+            Some(length) => bytes.get(start..start + length).unwrap_or(&[]),
+            None => &[],
+        }
+    }
+
+    fn row(&self) -> String {
+        let spelled = match pgp_tag(self.tag) {
+            Some(text) => text.to_string(),
+            None => format!("tag {}", self.tag),
+        };
+        match self.payload {
+            None => format!(
+                "packet\t{}\t{}\ttag\t{}\t{}\thlen\t{}\tplen\t-\tindeterminate",
+                self.offset, self.format, self.tag, spelled, self.header
+            ),
+            Some(length) => format!(
+                "packet\t{}\t{}\ttag\t{}\t{}\thlen\t{}\tplen\t{}",
+                self.offset, self.format, self.tag, spelled, self.header, length
+            ),
+        }
+    }
+
+    /// The fields this packet can name, as far as the witness names them too. A one-pass signature says
+    /// nothing beyond its version on purpose: its algorithm octets sit in the opposite order to a full
+    /// signature's, and gpg prints neither, so there would be nothing to check a reading against.
+    fn detail(&self, bytes: &[u8]) -> Option<String> {
+        if let Some(why) = pgp_opaque(self.tag) {
+            return Some(format!("descend\tno\t{why}"));
+        }
+        let body = self.body(bytes);
+        match self.tag {
+            13 => Some(format!("userid\t{}", pgp_text(body))),
+            11 if body.len() >= 6 => {
+                let named = usize::from(body[1]);
+                let name = match body.get(2..2 + named) {
+                    Some(text) => text,
+                    None => return Some("literal\tunreadable".to_string()),
+                };
+                let framing = 2 + named + 4;
+                if body.len() < framing {
+                    return Some("literal\tunreadable".to_string());
+                }
+                Some(format!(
+                    "literal\t{}\tbody\t{}\tfields\t{framing}",
+                    pgp_text(name),
+                    body.len() - framing
+                ))
+            }
+            2 if body.len() >= 4 => Some(format!(
+                "sig\tv{}\tfull\tsigclass\t0x{:02x}\tpubkey\t{}\thash\t{}",
+                body[0], body[1], body[2], body[3]
+            )),
+            4 if body.is_empty() => Some("sig\t-\tonepass".to_string()),
+            4 => Some(format!("sig\tv{}\tonepass", body[0])),
+            3 if body.len() >= 4 => Some(format!(
+                "skesf\tv{}\tcipher\t{}\ts2k\t{}\thash\t{}",
+                body[0], body[1], body[2], body[3]
+            )),
+            1 if body.len() >= 10 => Some(format!(
+                "pkesf\tv{}\talgo\t{}\tkeyid\t{}",
+                body[0],
+                body[9],
+                pgp_hex(&body[1..9])
+            )),
+            6 | 14 if body.len() >= 6 => {
+                let created = u32::from_be_bytes(body[1..5].try_into().ok()?);
+                Some(format!(
+                    "key\tv{}\talgo\t{}\tcreated\t{}",
+                    body[0], body[5], created
+                ))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// A keyring export starts at a key packet; a signed, encrypted or literal message starts elsewhere.
+fn pgp_is_key(tag: u8) -> bool {
+    matches!(tag, 6 | 14)
+}
+
+/// An OpenPGP transfer: the packet framing, plus the body fields whose spelling the witness confirms.
+/// Nothing is decrypted or decompressed, and the report names the packets it stopped in front of instead
+/// of skipping them silently.
+fn read_pgp(bytes: &[u8]) -> Option<Vec<String>> {
+    let (packets, broken, ends) = pgp_walk(bytes);
+    if packets.is_empty() || broken != 0 || !ends {
+        return None;
+    }
+    let mut rows = vec![
+        format!(
+            "openpgp\tpackets\t{}\tbytes\t{}\tends\tyes\tbroken\t{broken}",
+            packets.len(),
+            bytes.len()
+        ),
+        format!(
+            "kind\t{}",
+            if pgp_is_key(packets[0].tag) { "key" } else { "message" }
+        ),
+    ];
+    for each in packets.iter().take(PGP_MAX_PACKETS) {
+        rows.push(each.row());
+    }
+    if packets.len() > PGP_MAX_PACKETS {
+        rows.push(format!("stopped\tpackets\t{PGP_MAX_PACKETS}"));
+    }
+    for each in packets.iter().take(PGP_MAX_PACKETS) {
+        if let Some(row) = each.detail(bytes) {
+            rows.push(row);
+        }
+    }
+    Some(rows)
+}
+
 pub fn parse(bytes: &[u8]) -> i32 {
     // Eight bytes is the shortest header any reader below can use (a Netpbm bitmap is seven), and
     // each reader bounds-checks itself, so there is nothing to gain by rejecting earlier.
@@ -7847,8 +8149,15 @@ pub fn parse(bytes: &[u8]) -> i32 {
     if let Some(lines) = read_stl(bytes) {
         return accept(FORMAT_STL, lines);
     }
+    // Last of the signature-less checks, and second to last overall: OpenPGP's claim is that the packet
+    // lengths tile the file, so it must give way to every family that can be named by its first octets.
+    // Being here also matters the other way - a NumPy file starts `\x93`, whose old-format header is
+    // indeterminate and so tiles trivially - so the format whose magic that is has already answered.
+    if let Some(lines) = read_pgp(bytes) {
+        return accept(FORMAT_PGP, lines);
+    }
     reject(
-        "not a vCard, torrent, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
+        "not a vCard, torrent, OpenPGP packet stream, tar, ar, deb, RIFF, TIFF, EBML, PDF, Netpbm, ASF, FLV, CAB, MPEG-TS, WebAssembly, font, icon, property-list, QOI, WOFF2, JPEG 2000, NumPy array, HDF5, Avro container, Arrow stream, Parquet file, ONNX model, HEIF image, compound file, ICC profile, enhanced metafile, PostScript, 7z archive, Photoshop document, COFF object, X.509 certificate or binary STL",
         -2,
     )
 }

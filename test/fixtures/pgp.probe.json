@@ -1,0 +1,581 @@
+{
+ "lab-encr.pgp": {
+  "bytes": 185,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "84",
+    "detail": [
+     "version 3, algo 18, keyid FFC5990A3B25AFC3",
+     "data: [263 bits]",
+     "data: [392 bits]"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "pubkey enc",
+    "off": 0,
+    "plen": 94,
+    "tag": 1
+   },
+   {
+    "ctb": "d2",
+    "detail": [
+     "length: 87",
+     "mdc_method: 2"
+    ],
+    "flags": [
+     "new-ctb"
+    ],
+    "hlen": 2,
+    "label": "encrypted data",
+    "off": 96,
+    "plen": 87,
+    "tag": 18
+   },
+   {
+    "ctb": "ac",
+    "detail": [
+     "mode b (62), created 1789968001, name=\"note.txt\",",
+     "raw data: 30 bytes"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "literal data",
+    "off": 117,
+    "plen": 44,
+    "tag": 11
+   }
+  ],
+  "opaque": true,
+  "packets": 2,
+  "rows": [
+   "openpgp\tpackets\t2\tbytes\t185\tends\tyes\tbroken\t0",
+   "kind\tmessage",
+   "packet\t0\told\ttag\t1\tpubkey enc\thlen\t2\tplen\t94",
+   "packet\t96\tnew\ttag\t18\tencrypted data\thlen\t2\tplen\t87",
+   "pkesf\tv3\talgo\t18\tkeyid\tffc5990a3b25afc3",
+   "descend\tno\tencrypted"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "84",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 0,
+    "plen": 94,
+    "tag": 1
+   },
+   {
+    "ctb": "d2",
+    "format": "new",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 96,
+    "plen": 87,
+    "tag": 18
+   }
+  ]
+ },
+ "lab-key.pgp": {
+  "bytes": 421,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "98",
+    "detail": [
+     "version 4, algo 22, created 1789967999, expires 0",
+     "pkey[0]: [80 bits] ed25519 (1.3.6.1.4.1.11591.15.1)",
+     "pkey[1]: [263 bits]",
+     "keyid: 829E8BB58926A196"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "public key",
+    "off": 0,
+    "plen": 51,
+    "tag": 6
+   },
+   {
+    "ctb": "b4",
+    "detail": [
+     "\"APK Lens ed Fixture <ed@example.invalid>\""
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "user ID",
+    "off": 53,
+    "plen": 40,
+    "tag": 13
+   },
+   {
+    "ctb": "88",
+    "detail": [
+     "algo 22, keyid 829E8BB58926A196",
+     "version 4, created 1789967999, md5len 0, sigclass 0x13",
+     "digest algo 10, begin of digest b1 4e",
+     "hashed subpkt 33 len 21 (issuer fpr v4 6238A5C6581FE0FF69AE54FE829E8BB58926A196)",
+     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
+     "hashed subpkt 27 len 1 (key flags: 03)",
+     "hashed subpkt 11 len 4 (pref-sym-algos: 9 8 7 2)",
+     "hashed subpkt 21 len 5 (pref-hash-algos: 10 9 8 11 2)",
+     "hashed subpkt 22 len 3 (pref-zip-algos: 2 3 1)",
+     "hashed subpkt 30 len 1 (features: 01)",
+     "hashed subpkt 23 len 1 (keyserver preferences: 80)",
+     "subpkt 16 len 8 (issuer key ID 829E8BB58926A196)",
+     "data: [256 bits]",
+     "data: [255 bits]"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "signature",
+    "off": 95,
+    "plen": 144,
+    "tag": 2
+   },
+   {
+    "ctb": "b8",
+    "detail": [
+     "version 4, algo 18, created 1789967999, expires 0",
+     "pkey[0]: [88 bits] cv25519 (1.3.6.1.4.1.3029.1.5.1)",
+     "pkey[1]: [263 bits]",
+     "pkey[2]: [32 bits]",
+     "keyid: FFC5990A3B25AFC3"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "public sub key",
+    "off": 241,
+    "plen": 56,
+    "tag": 14
+   },
+   {
+    "ctb": "88",
+    "detail": [
+     "algo 22, keyid 829E8BB58926A196",
+     "version 4, created 1789967999, md5len 0, sigclass 0x18",
+     "digest algo 10, begin of digest 9d a5",
+     "hashed subpkt 33 len 21 (issuer fpr v4 6238A5C6581FE0FF69AE54FE829E8BB58926A196)",
+     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
+     "hashed subpkt 27 len 1 (key flags: 0C)",
+     "subpkt 16 len 8 (issuer key ID 829E8BB58926A196)",
+     "data: [256 bits]",
+     "data: [254 bits]"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "signature",
+    "off": 299,
+    "plen": 120,
+    "tag": 2
+   }
+  ],
+  "opaque": false,
+  "packets": 5,
+  "rows": [
+   "openpgp\tpackets\t5\tbytes\t421\tends\tyes\tbroken\t0",
+   "kind\tkey",
+   "packet\t0\told\ttag\t6\tpublic key\thlen\t2\tplen\t51",
+   "packet\t53\told\ttag\t13\tuser ID\thlen\t2\tplen\t40",
+   "packet\t95\told\ttag\t2\tsignature\thlen\t2\tplen\t144",
+   "packet\t241\told\ttag\t14\tpublic sub key\thlen\t2\tplen\t56",
+   "packet\t299\told\ttag\t2\tsignature\thlen\t2\tplen\t120",
+   "key\tv4\talgo\t22\tcreated\t1789967999",
+   "userid\tAPK Lens ed Fixture <ed@example.invalid>",
+   "sig\tv4\tfull\tsigclass\t0x13\tpubkey\t22\thash\t10",
+   "key\tv4\talgo\t18\tcreated\t1789967999",
+   "sig\tv4\tfull\tsigclass\t0x18\tpubkey\t22\thash\t10"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "98",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 0,
+    "plen": 51,
+    "tag": 6
+   },
+   {
+    "ctb": "b4",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 53,
+    "plen": 40,
+    "tag": 13
+   },
+   {
+    "ctb": "88",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 95,
+    "plen": 144,
+    "tag": 2
+   },
+   {
+    "ctb": "b8",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 241,
+    "plen": 56,
+    "tag": 14
+   },
+   {
+    "ctb": "88",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 299,
+    "plen": 120,
+    "tag": 2
+   }
+  ]
+ },
+ "lab-rsa.pgp": {
+  "bytes": 653,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "99",
+    "detail": [
+     "version 4, algo 1, created 1789968000, expires 0",
+     "pkey[0]: [2048 bits]",
+     "pkey[1]: [17 bits]",
+     "keyid: E25A0595724D6CA9"
+    ],
+    "flags": [],
+    "hlen": 3,
+    "label": "public key",
+    "off": 0,
+    "plen": 269,
+    "tag": 6
+   },
+   {
+    "ctb": "b4",
+    "detail": [
+     "\"APK Lens rsa Fixture <rsa@example.invalid>\""
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "user ID",
+    "off": 272,
+    "plen": 42,
+    "tag": 13
+   },
+   {
+    "ctb": "89",
+    "detail": [
+     "algo 1, keyid E25A0595724D6CA9",
+     "version 4, created 1789968000, md5len 0, sigclass 0x13",
+     "digest algo 10, begin of digest c4 3e",
+     "hashed subpkt 33 len 21 (issuer fpr v4 59699B3337EFD913F8230414E25A0595724D6CA9)",
+     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
+     "hashed subpkt 27 len 1 (key flags: 03)",
+     "hashed subpkt 11 len 4 (pref-sym-algos: 9 8 7 2)",
+     "hashed subpkt 21 len 5 (pref-hash-algos: 10 9 8 11 2)",
+     "hashed subpkt 22 len 3 (pref-zip-algos: 2 3 1)",
+     "hashed subpkt 30 len 1 (features: 01)",
+     "hashed subpkt 23 len 1 (keyserver preferences: 80)",
+     "subpkt 16 len 8 (issuer key ID E25A0595724D6CA9)",
+     "data: [2048 bits]"
+    ],
+    "flags": [],
+    "hlen": 3,
+    "label": "signature",
+    "off": 316,
+    "plen": 334,
+    "tag": 2
+   }
+  ],
+  "opaque": false,
+  "packets": 3,
+  "rows": [
+   "openpgp\tpackets\t3\tbytes\t653\tends\tyes\tbroken\t0",
+   "kind\tkey",
+   "packet\t0\told\ttag\t6\tpublic key\thlen\t3\tplen\t269",
+   "packet\t272\told\ttag\t13\tuser ID\thlen\t2\tplen\t42",
+   "packet\t316\told\ttag\t2\tsignature\thlen\t3\tplen\t334",
+   "key\tv4\talgo\t1\tcreated\t1789968000",
+   "userid\tAPK Lens rsa Fixture <rsa@example.invalid>",
+   "sig\tv4\tfull\tsigclass\t0x13\tpubkey\t1\thash\t10"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "99",
+    "format": "old",
+    "hlen": 3,
+    "indeterminate": false,
+    "off": 0,
+    "plen": 269,
+    "tag": 6
+   },
+   {
+    "ctb": "b4",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 272,
+    "plen": 42,
+    "tag": 13
+   },
+   {
+    "ctb": "89",
+    "format": "old",
+    "hlen": 3,
+    "indeterminate": false,
+    "off": 316,
+    "plen": 334,
+    "tag": 2
+   }
+  ]
+ },
+ "lab-signed.pgp": {
+  "bytes": 180,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "90",
+    "detail": [
+     "keyid 829E8BB58926A196",
+     "version 3, sigclass 0x00, digest 10, pubkey 22, last=1"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "onepass_sig",
+    "off": 0,
+    "plen": 13,
+    "tag": 4
+   },
+   {
+    "ctb": "ac",
+    "detail": [
+     "mode b (62), created 1789968001, name=\"note.txt\",",
+     "raw data: 30 bytes"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "literal data",
+    "off": 15,
+    "plen": 44,
+    "tag": 11
+   },
+   {
+    "ctb": "88",
+    "detail": [
+     "algo 22, keyid 829E8BB58926A196",
+     "version 4, created 1789968001, md5len 0, sigclass 0x00",
+     "digest algo 10, begin of digest 77 e6",
+     "hashed subpkt 33 len 21 (issuer fpr v4 6238A5C6581FE0FF69AE54FE829E8BB58926A196)",
+     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
+     "subpkt 16 len 8 (issuer key ID 829E8BB58926A196)",
+     "data: [256 bits]",
+     "data: [256 bits]"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "signature",
+    "off": 61,
+    "plen": 117,
+    "tag": 2
+   }
+  ],
+  "opaque": false,
+  "packets": 3,
+  "rows": [
+   "openpgp\tpackets\t3\tbytes\t180\tends\tyes\tbroken\t0",
+   "kind\tmessage",
+   "packet\t0\told\ttag\t4\tonepass_sig\thlen\t2\tplen\t13",
+   "packet\t15\told\ttag\t11\tliteral data\thlen\t2\tplen\t44",
+   "packet\t61\told\ttag\t2\tsignature\thlen\t2\tplen\t117",
+   "sig\tv3\tonepass",
+   "literal\tnote.txt\tbody\t30\tfields\t14",
+   "sig\tv4\tfull\tsigclass\t0x00\tpubkey\t22\thash\t10"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "90",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 0,
+    "plen": 13,
+    "tag": 4
+   },
+   {
+    "ctb": "ac",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 15,
+    "plen": 44,
+    "tag": 11
+   },
+   {
+    "ctb": "88",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 61,
+    "plen": 117,
+    "tag": 2
+   }
+  ]
+ },
+ "lab-signedz.pgp": {
+  "bytes": 176,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "a3",
+    "detail": [
+     "algo=1"
+    ],
+    "flags": [
+     "indeterminate"
+    ],
+    "hlen": 1,
+    "label": "compressed",
+    "off": 0,
+    "plen": 0,
+    "tag": 8
+   },
+   {
+    "ctb": "90",
+    "detail": [
+     "keyid 829E8BB58926A196",
+     "version 3, sigclass 0x00, digest 10, pubkey 22, last=1"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "onepass_sig",
+    "off": 2,
+    "plen": 13,
+    "tag": 4
+   },
+   {
+    "ctb": "ac",
+    "detail": [
+     "mode b (62), created 1789968001, name=\"note.txt\",",
+     "raw data: 30 bytes"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "literal data",
+    "off": 17,
+    "plen": 44,
+    "tag": 11
+   },
+   {
+    "ctb": "88",
+    "detail": [
+     "algo 22, keyid 829E8BB58926A196",
+     "version 4, created 1789968001, md5len 0, sigclass 0x00",
+     "digest algo 10, begin of digest 77 e6",
+     "hashed subpkt 33 len 21 (issuer fpr v4 6238A5C6581FE0FF69AE54FE829E8BB58926A196)",
+     "hashed subpkt 2 len 4 (sig created 2026-09-21)",
+     "subpkt 16 len 8 (issuer key ID 829E8BB58926A196)",
+     "data: [256 bits]",
+     "data: [256 bits]"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "signature",
+    "off": 63,
+    "plen": 117,
+    "tag": 2
+   }
+  ],
+  "opaque": true,
+  "packets": 1,
+  "rows": [
+   "openpgp\tpackets\t1\tbytes\t176\tends\tyes\tbroken\t0",
+   "kind\tmessage",
+   "packet\t0\told\ttag\t8\tcompressed\thlen\t1\tplen\t-\tindeterminate",
+   "descend\tno\tdeflate"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "a3",
+    "format": "old",
+    "hlen": 1,
+    "indeterminate": true,
+    "off": 0,
+    "plen": null,
+    "tag": 8
+   }
+  ]
+ },
+ "lab-sym.pgp": {
+  "bytes": 104,
+  "ends": true,
+  "gpg": [
+   {
+    "ctb": "8c",
+    "detail": [
+     "version 4, cipher 9, aead 0, s2k 3, hash 10",
+     "salt 1A99CC914B717C4D, count 48234496 (247)"
+    ],
+    "flags": [],
+    "hlen": 2,
+    "label": "symkey enc",
+    "off": 0,
+    "plen": 13,
+    "tag": 3
+   },
+   {
+    "ctb": "d2",
+    "detail": [
+     "length: 87",
+     "mdc_method: 2"
+    ],
+    "flags": [
+     "new-ctb"
+    ],
+    "hlen": 2,
+    "label": "encrypted data",
+    "off": 15,
+    "plen": 87,
+    "tag": 18
+   }
+  ],
+  "opaque": true,
+  "packets": 2,
+  "rows": [
+   "openpgp\tpackets\t2\tbytes\t104\tends\tyes\tbroken\t0",
+   "kind\tmessage",
+   "packet\t0\told\ttag\t3\tsymkey enc\thlen\t2\tplen\t13",
+   "packet\t15\tnew\ttag\t18\tencrypted data\thlen\t2\tplen\t87",
+   "skesf\tv4\tcipher\t9\ts2k\t3\thash\t10",
+   "descend\tno\tencrypted"
+  ],
+  "tiles": true,
+  "walk": [
+   {
+    "ctb": "8c",
+    "format": "old",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 0,
+    "plen": 13,
+    "tag": 3
+   },
+   {
+    "ctb": "d2",
+    "format": "new",
+    "hlen": 2,
+    "indeterminate": false,
+    "off": 15,
+    "plen": 87,
+    "tag": 18
+   }
+  ]
+ }
+}

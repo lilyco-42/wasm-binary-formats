@@ -309,7 +309,9 @@ test('every container the demo offers answers with the code the page prints', ()
     ['tiny.webp', 3], ['tiny.tif', 4], ['media.mp4', 10], ['tiny.avif', 10], ['media.3gp', 10], ['wide.mov', 10],
     ['media.mkv', 11], ['media.webm', 11], ['tiny.pdf', 16], ['chromium.pdf', 16],
     ['pillow-3p.pdf', 16], ['tiny.pbm', 19], ['media.asf', 20], ['media.wma', 20], ['media.wmv', 20], ['media.flv', 21], ['tiny.cab', 22],
-    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['lab.vcard', 52], ['lab.torrent', 53], ['tiny.icns', 30],
+    ['lab-fixture.deb', 23], ['media.ts', 25], ['tiny.ttf', 27], ['tiny.woff', 28], ['lab.otf', 51], ['lab.vcard', 52], ['lab.torrent', 53],
+    ['lab-key.pgp', 54], ['lab-rsa.pgp', 54], ['lab-signed.pgp', 54], ['lab-signedz.pgp', 54], ['lab-encr.pgp', 54], ['lab-sym.pgp', 54],
+    ['tiny.icns', 30],
     ['tiny.bplist', 31], ['keyed.bplist', 31],
     ['tiny.qoi', 32], ['srgb.qoi', 32], ['all6.qoi', 32],
     ['tiny.jp2', 33], ['rgba.jp2', 33], ['grey.jp2', 33],
@@ -839,6 +841,56 @@ test('a torrent is accepted only when its stated lengths tile the file', () => {
   }
 });
 
+test('OpenPGP is accepted by the packet lengths tiling the file and stops at a stream it cannot open', () => {
+  // gpg wrote all six fixtures and `gpg --list-packets` printed `off`, `tag`, `hlen` and `plen` for every
+  // packet in them (`test/fixtures/pgp.probe.json` holds that listing), so the framing numbers below are
+  // another implementation's reading of the same bytes rather than this repo's own walk agreeing with
+  // itself. The packet *names* come from the same listing.
+  const key = assertReadable('container', 'lab-key.pgp', 54);
+  assert.equal(key.name, 'pgp');
+  assert.ok(key.rows.includes('kind\tkey'), key.rows.join(' | '));
+  assert.ok(key.rows.includes('userid\tAPK Lens ed Fixture <ed@example.invalid>'), key.rows.join(' | '));
+  // A user-ID certification and a subkey binding signature are different classes over the same algorithm,
+  // and the two rows can only both be right if the reader read each packet's own body.
+  assert.ok(key.rows.includes('sig\tv4\tfull\tsigclass\t0x13\tpubkey\t22\thash\t10'), key.rows.join(' | '));
+  assert.ok(key.rows.includes('sig\tv4\tfull\tsigclass\t0x18\tpubkey\t22\thash\t10'), key.rows.join(' | '));
+
+  // The branch the ed25519 export never reaches: packets whose old-format length needs two octets, so the
+  // header is three bytes for them and two for the user ID in between.
+  const rsa = assertReadable('container', 'lab-rsa.pgp', 54);
+  assert.ok(rsa.rows.includes('packet\t0\told\ttag\t6\tpublic key\thlen\t3\tplen\t269'), rsa.rows.join(' | '));
+  assert.ok(rsa.rows.includes('packet\t272\told\ttag\t13\tuser ID\thlen\t2\tplen\t42'), rsa.rows.join(' | '));
+
+  // A compressed packet states no length at all - its body is the rest of the file - and what follows the
+  // header is a deflate stream, not more packets, so the report says it stopped rather than listing what
+  // gpg can only show after decompressing.
+  const wrapped = assertReadable('container', 'lab-signedz.pgp', 54);
+  assert.ok(wrapped.rows.some((row) => row.endsWith('\tindeterminate')), wrapped.rows.join(' | '));
+  assert.ok(wrapped.rows.includes('descend\tno\tdeflate'), wrapped.rows.join(' | '));
+  assert.equal(wrapped.rows.filter((row) => row.startsWith('packet\t')).length, 1, wrapped.rows.join(' | '));
+
+  // An encrypted body is named as far as its header goes. The key ID sits between the version and the
+  // algorithm in the packet, which is not the order gpg lists them in, so reading them positionally would
+  // print 0xff - the key ID's first octet - as an algorithm.
+  const sealed = assertReadable('container', 'lab-encr.pgp', 54);
+  assert.ok(sealed.rows.some((row) => /^pkesf\tv3\talgo\t18\tkeyid\t[0-9a-f]{16}$/.test(row)), sealed.rows.join(' | '));
+  assert.ok(sealed.rows.includes('packet\t96\tnew\ttag\t18\tencrypted data\thlen\t2\tplen\t87'), sealed.rows.join(' | '));
+  assert.ok(sealed.rows.includes('descend\tno\tencrypted'), sealed.rows.join(' | '));
+
+  const phrase = assertReadable('container', 'lab-sym.pgp', 54);
+  assert.ok(phrase.rows.includes('skesf\tv4\tcipher\t9\ts2k\t3\thash\t10'), phrase.rows.join(' | '));
+
+  // Bencode, a card and a plain string are all refused as packet streams: the first octet of each either
+  // has no high bit or its stated length does not reach the end of the file.
+  for (const [label, text] of [
+    ['bencode', 'd8:announce7:trackeree'],
+    ['plain text', 'just bytes that happen to be long enough to walk over'],
+  ]) {
+    const seen = driveBytes('container', new TextEncoder().encode(text));
+    assert.ok(seen.code !== 54, `${label} was read as OpenPGP: ${seen.code}`);
+  }
+});
+
 test('the page tree of both PDF producers survives the trip through the wasm ABI', () => {
   for (const file of ['chromium.pdf', 'pillow-3p.pdf', 'tiny.pdf']) {
     const rows = assertReadable('container', file, 16).rows;
@@ -883,7 +935,7 @@ test('the reader names the family, not the first row it happened to walk', () =>
     ['container', 'gnu.tar', 'tar'], ['container', 'plain.ar', 'ar'], ['container', 'lab-fixture.deb', 'deb'],
     ['container', 'media.wav', 'riff'], ['container', 'tiny.tif', 'tiff'], ['container', 'media.mp4', 'iso-base-media'], ['container', 'wide.mov', 'iso-base-media'],
     ['container', 'media.mkv', 'ebml'], ['container', 'tiny.pdf', 'pdf'], ['container', 'tiny.pbm', 'netpbm'],
-    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'lab.vcard', 'vcard'], ['container', 'lab.torrent', 'torrent'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
+    ['container', 'media.asf', 'asf'], ['container', 'media.flv', 'flv'], ['container', 'tiny.cab', 'cab'], ['container', 'media.ts', 'mpegts'], ['container', 'tiny.ttf', 'ttf'], ['container', 'lab.otf', 'otf'], ['container', 'lab.vcard', 'vcard'], ['container', 'lab.torrent', 'torrent'], ['container', 'lab-key.pgp', 'pgp'], ['container', 'lab-sym.pgp', 'pgp'], ['container', 'tiny.woff', 'woff'], ['container', 'tiny.icns', 'icns'], ['container', 'tiny.bplist', 'bplist'], ['container', 'keyed.bplist', 'bplist'], ['container', 'all6.qoi', 'qoi'], ['container', 'tiny.jp2', 'jp2'], ['container', 'tiny.woff2', 'woff2'], ['container', 'f64.npy', 'npy'], ['container', 'tree-v0.h5', 'h5'], ['container', 'links-v3.h5', 'h5'], ['container', 'rows.avro', 'avro'], ['container', 'many.avro', 'avro'], ['container', 'rows.arrow', 'arrow'], ['container', 'file.arrow', 'arrow'], ['container', 'dict.arrow', 'arrow'], ['container', 'rows.parquet', 'parquet'], ['container', 'typed.parquet', 'parquet'], ['container', 'add.onnx', 'onnx'], ['container', 'types.onnx', 'onnx'], ['container', 'photo.heic', 'heif'], ['container', 'seq.heic', 'heif'], ['container', 'word97.doc', 'cfb'], ['container', 'excel97.xls', 'cfb'], ['container', 'tet.stl', 'stl'], ['container', 'srgb.icc', 'icc'], ['container', 'xyz.icc', 'icc'], ['container', 'page.emf', 'emf'], ['container', 'gdi.emf', 'emf'],
     ['container', 'preview.eps', 'postscript'], ['container', 'plain.ps', 'postscript'],
     ['container', 'answer.obj', 'coff'], ['container', 'i686.obj', 'coff'],
     ['container', 'rsa.crt', 'der'], ['container', 'ec.crt', 'der'],
