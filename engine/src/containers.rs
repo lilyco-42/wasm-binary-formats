@@ -6638,7 +6638,10 @@ fn crc32(raw: &[u8]) -> u32 {
     }
     let mut crc = 0xFFFF_FFFFu32;
     for byte in raw {
-        crc = table[usize::from((crc ^ u32::from(*byte)) & 0xFF)] ^ (crc >> 8);
+        // Masked to a byte before it indexes, so the narrowing is the format's own and not a cast that
+        // could silently drop an index on a 16-bit target.
+        let index = usize::from(((crc ^ u32::from(*byte)) & 0xFF) as u8);
+        crc = table[index] ^ (crc >> 8);
     }
     crc ^ 0xFFFF_FFFF
 }
