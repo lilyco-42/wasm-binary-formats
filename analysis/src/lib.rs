@@ -7,7 +7,9 @@
 //! clicked, and which reports its own exports and byte size once it is there.
 //!
 //! What it says is the layout, not the meaning: the container's own section table, its symbol table,
-//! the counts the two add up to, and an index from address to name over those tables. Nothing is loaded
+//! the counts the two add up to, an index from address to name over those tables, and a map of the file's
+//! byte regions - header, tables, code, data, structure, signature, and the gaps none of them reaches -
+//! which is what the page colours by. Nothing is loaded
 //! into memory, nothing is relocated, and no byte of a section is executed or interpreted as an
 //! instruction - instruction decoding is a separate module with its own download.
 //!
@@ -117,8 +119,11 @@ pub fn names_len() -> usize {
 
 pub fn analyse(bytes: &[u8]) -> Option<Vec<String>> {
     // A file that is not an object file leaves no names standing either, for the same reason it leaves
-    // no rows: the panel would otherwise show the previous file's answers under this file's rows.
+    // no rows: the panel would otherwise show the previous file's answers under this file's rows. The map
+    // is cleared here too, because this function can give up before it reaches the point where it would
+    // have been replaced - and a stale colour strip is exactly as wrong as a stale name.
     NAMES.with(|slot| slot.borrow_mut().clear());
+    REGIONS.with(|slot| slot.borrow_mut().clear());
     let file = object::File::parse(bytes).ok()?;
     let mut rows = Vec::new();
     let mut named: Vec<(u64, String)> = Vec::new();
@@ -532,10 +537,10 @@ fn pe_kind(name: &str, chars: u64) -> &'static str {
 fn region_rows(raw: &[u8]) -> Vec<String> {
     let (mut spans, loaded) = match elf_spans(raw) {
         Some(found) => (found.0, found.1),
-        None => (match pe_spans(raw) {
+        None => match pe_spans(raw) {
             Some(found) => (found, Vec::new()),
             None => return Vec::new(),
-        }),
+        },
     };
     spans.sort_by(|left, right| {
         left.start
@@ -600,14 +605,15 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
             Some(stop) => stop,
             None => break,
         };
-        // A table that states a span reaching past the end of the file is clipped and says so, rather
-        // than leaving the map with a range whose colour would have to be invented.
-        let (length, note) = if stop > total {
-            (total - start, annotate(&each.note, "beyond end of file"))
-        } else if start != each.start {
-            (length, annotate(&each.note, "overlaps"))
+        if stop > total {
+            // A table whose stated span does not fit the file is not clipped into a partial claim: what is
+            // left of the file is the overlay row below, which says the same thing more honestly.
+            break;
+        }
+        let note = if start != each.start {
+            annotate(&each.note, "overlaps")
         } else {
-            (length, each.note)
+            each.note
         };
         if length == 0 {
             continue;
@@ -619,9 +625,8 @@ fn region_rows(raw: &[u8]) -> Vec<String> {
             name: each.name,
             note,
         });
-        // `length` is either the file's own span, which was just checked to end inside the file, or the
-        // clipped remainder - so this addition cannot overflow in either branch.
-        cursor = cursor.max(start + length);
+        // `stop` was computed and bounds-checked above, so this cannot overflow.
+        cursor = cursor.max(stop);
     }
     if cursor < raw.len() as u64 {
         let tail = raw.len() as u64 - cursor;

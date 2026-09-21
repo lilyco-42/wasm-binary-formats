@@ -280,30 +280,33 @@ fn a_pe_section_claims_only_the_bytes_it_says_it_uses_and_the_rest_is_padding() 
     );
 }
 
+/// Two things the map has to get right about files it cannot map: an object file has no loaded segments,
+/// and a file the analyser refuses must not keep the previous file's strip on screen.
 #[test]
-fn a_object_file_and_a_lie_about_a_table_both_leave_a_map_the_page_can_still_paint() {
+fn an_object_file_gets_no_map_and_a_refused_file_takes_the_last_ones_with_it() {
     // A COFF object is neither of the two image formats whose header tables this map walks, so it gets no
     // map - which the page shows as "no map" rather than as one big unclaimed range.
     let bytes = fixture("answer.obj");
     assert!(analyse(&bytes).is_some());
     assert_eq!(regions().len(), 0, "an object file has no segment map to draw");
 
-    // A section-header count that cannot be true is clipped to the file and says so, rather than leaving
-    // the map with a range running off the end - and the entries themselves stop being read at the first
-    // one that is not there, so a truncated table still shows the header, the segments and the real
-    // sections. That is what makes the tiling hold for a file that lies about its own size.
-    let mut lies = fixture("lab.elf");
+    // A map is per-file state, and the only way to see that is to look at what the previous file left
+    // behind. The object reader refuses a 65 535-entry section table outright, which is the right answer
+    // for the file - and the wrong one for the panel, unless the refusal also takes the colour strip with
+    // it instead of letting the last file's map stand under this file's name.
+    let honest = fixture("lab.elf");
+    assert!(analyse(&honest).is_some());
+    let lines = regions();
+    assert!(tiles(1064, &lines), "the honest file must still tile: {lines:#?}");
+    assert!(region_count() > 1, "and the map has to show through the ABI");
+    let mut lies = honest.clone();
     lies[60] = 0xff;
     lies[61] = 0xff;
-    assert!(analyse(&lies).is_some());
-    let lines = regions();
-    assert!(tiles(1064, &lines), "a lying count must not break the tiling: {lines:#?}");
     assert!(
-        lines
-            .iter()
-            .any(|row| row.starts_with("region\t616\t448\ttables\tsection headers\tbeyond end of file")),
-        "the table claim should have been clipped to the file: {lines:#?}"
+        analyse(&lies).is_none(),
+        "a section-header count that cannot be true is not a file"
     );
+    assert_eq!(region_count(), 0, "a refused file kept the last file's map");
 }
 
 /// The map's rows, read through the same C ABI the page uses.
