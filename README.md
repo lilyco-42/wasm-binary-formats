@@ -376,21 +376,26 @@ are not looked at, so a file whose only imports are delay imports reads as impor
 
 **The demangled names** (`demangle_count` / `demangle_at`) are that analyser's other automatic service,
 and the only honest way to ship one here is to be told the answers twice:
-`scripts/make-demangle-fixtures.py` compiles a C++ source for `x86_64-unknown-linux-gnu` with `clang++` -
-so every name is the compiler's spelling rather than one typed into a test - reads the symbol table back
-with `llvm-readobj --symbols`, then asks binutils' `c++filt` and LLVM's `llvm-cxxfilt` what each name
-means. A name enters the probe only if the two write the same string, and the script stops if a shape it
-means to cover (a nested substitution, an array under a reference, a template argument) has disappeared
-from clang's list, so the claim cannot narrow when a compiler changes. The one name here where the two do
-not agree is `_Z4varsPcPKwDn`: `decltype(nullptr)` to binutils, `std::nullptr_t` to LLVM, so its row
-answers `-` with the reason instead of picking a side - and the refusal is whole, which is why no part of
-that signature is printed either. Twenty names, nineteen spellings, one refusal. Three facts the rows
-carry because a witness said them first: `C1` and `C2` (and `D1`/`D2`) are different symbols that demangle
-to the same string, so the raw name stays in the row; a non-template function's return type is not in its
-mangled name at all, which is why `retfn` - a function returning a function pointer - reads as `retfn(int)`;
-and `T_` in a template resolves through its own argument list, which is why `int pick<int>(int, int)`
-starts with a type and `retfn(int)` does not. Operator names, `Dn`, and every other spelling without a
-second witness are refused, and the `refused` column counts them.
+`scripts/make-demangle-fixtures.py` compiles two C++ sources for `x86_64-unknown-linux-gnu` with
+`clang++` - so every name is the compiler's spelling rather than one typed into a test - reads the symbol
+tables back with `llvm-readobj --symbols`, then asks binutils' `c++filt` and LLVM's `llvm-cxxfilt` what
+each name means. A name enters the probe only if the two write the same string *and* that string is not
+merely the name echoed back, because two demanglers can "agree" by both giving up; the probe keeps the
+unequal and the unread lists beside the rows so a silent narrowing is visible. The script also stops if a
+shape the reader claims (a nested substitution, an array under a reference, a `pL` compound assignment)
+has vanished from clang's list. Sixty-nine names, sixty-eight spellings, one refusal. The one name here
+where the two do not agree is `_Z4varsPcPKwDn`: `decltype(nullptr)` to binutils, `std::nullptr_t` to LLVM,
+so its row answers `-` with the reason instead of picking a side - and the refusal is whole, which is why
+no part of that signature is printed either. Four things the rows carry because a witness said them first:
+`C1` and `C2` (and `D1`/`D2`) are different symbols that demangle to the same string, so the raw name
+stays in the row; a non-template function's return type is not in its mangled name at all, which is why
+`retfn` - a function returning a function pointer - reads as `retfn(int)`; `dl` and `da` are the scalar
+and array forms of `operator delete` in that order, which is not what the letters suggest and is why the
+operator table is read off a probe; and a substitution names the type that *completed*, so
+`_Z7one_refRiS_` is `one_ref(int&, int&)` - the reference, not the `int` inside it. `operator<`,
+`operator<=` and `operator<<` are the reason the walk tracks whether a name carried `I <args> E` instead
+of looking for a `<` in the answer: those three are ordinary functions whose spelling is full of angle
+brackets, and a reader that sniffed would invent a return type in front of each.
 
 `scripts/make-image-fixtures.py` links the two fixtures with `clang` driving `ld.lld`
 (`-nostdlib -ffreestanding`, one for `x86_64-unknown-linux-gnu`, one for `x86_64-w64-windows-gnu`), which
@@ -565,7 +570,7 @@ temp/venv/Scripts/python.exe scripts/make-import-fixtures.py     # csc.exe write
 temp/venv/Scripts/python.exe scripts/make-pgp-fixtures.py           # gpg writes six OpenPGP files and --list-packets reads every packet back
 npm install jsonc-parser && temp/venv/Scripts/python.exe scripts/make-jsonc-fixtures.py   # jsonc-parser (MIT) supplies the tree, json.loads the refusal; both are needed for one probe
 temp/venv/Scripts/python.exe scripts/make-gpx-fixtures.py    # gpxpy writes test/fixtures/lab.gpx and xml.etree.ElementTree walks the same bytes; the probe is not written unless the two agree on every element, attribute spelling and decoded text, and gpxpy's own re-reading gives the counts
-temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py   # clang++ writes test/fixtures/cxx.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically, and the script stops if a shape the reader claims is missing from clang's list
+temp/venv/Scripts/python.exe scripts/make-demangle-fixtures.py --refresh   # clang++ writes test/fixtures/cxx.o and ops.o; a name reaches the probe only when c++filt and llvm-cxxfilt spell its demangling identically and neither just echoes the name back, and the script stops if a shape the reader claims is missing from clang's list
 python tools/vcard-sim.py                          # a second reading of the fold rules, diffed against the rows
 python tools/torrent-sim.py                        # the same walk in Python, for the bencode rows
 python scripts/make-font-fixtures.py   # fontTools compiles tiny.ttf / tiny.woff from nothing

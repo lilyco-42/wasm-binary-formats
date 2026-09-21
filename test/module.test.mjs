@@ -367,27 +367,52 @@ test('the imports a loader will fill in come through as the readers spell them',
 });
 
 test('the C++ names in an object answer as two demanglers read them', async () => {
-  // `cxx.o` is clang's own output for a linux target, and its `_Z` names are the compiler's spelling -
-  // nothing here was typed by hand. `scripts/make-demangle-fixtures.py` read those names out of the
-  // object with `llvm-readobj --symbols`, then asked binutils' `c++filt` and LLVM's `llvm-cxxfilt` what
-  // each means, and kept as the claim only the names where the two wrote the same string. So every row
-  // below is an answer two independent demanglers give.
+  // `cxx.o` and `ops.o` are clang's own output for a linux target, and their `_Z` names are the
+  // compiler's spelling - nothing here was typed by hand. `scripts/make-demangle-fixtures.py` read those
+  // names out of each object with `llvm-readobj --symbols`, then asked binutils' `c++filt` and LLVM's
+  // `llvm-cxxfilt` what each means, and kept as the claim only the names where the two wrote the same
+  // string. So every row below is an answer two independent demanglers give.
   const probe = JSON.parse(await readFile('test/fixtures/demangle.probe.json', 'utf8'));
-  const want = probe.rows;
-  assert.equal(want.length, 21, 'the probe itself has to hold the whole list');
-  const seen = report(new Uint8Array(await readFile('test/fixtures/cxx.o')));
-  assert.equal(seen.rc, 0, 'the object has to be accepted');
-  assert.equal(ex.demangle_count(), want.length, 'a different number of name rows');
-  for (let index = 0; index < want.length; index += 1) {
-    assert.equal(text('demangle_at', index), want[index], `row ${index} moved`);
+  for (const file of ['cxx.o', 'ops.o']) {
+    const bytes = new Uint8Array(await readFile(`test/fixtures/${file}`));
+    assert.equal(bytes.length, probe[file].bytes, `${file} is not the object the probe read`);
+    const want = probe[file].rows;
+    const seen = report(bytes);
+    assert.equal(seen.rc, 0, `${file} has to be accepted`);
+    assert.equal(ex.demangle_count(), want.length, `${file}: a different number of name rows`);
+    for (let index = 0; index < want.length; index += 1) {
+      assert.equal(text('demangle_at', index), want[index], `${file} row ${index} moved`);
+    }
   }
+  // The operators are the bulk of a real symbol table, and every code here is the witnesses' own
+  // spelling: `dl` and `da` are the scalar and array forms of delete in that order, `co` is `~`,
+  // `cv i` converts to int, and a free operator prints with no class in front of it.
+  const ops = probe['ops.o'].agreed;
+  assert.equal(Object.keys(ops).length, 48, 'the operator fixture lost names');
+  assert.equal(ops._ZN3VecdlEPv, 'Vec::operator delete(void*)');
+  assert.equal(ops._ZN3VecdaEPv, 'Vec::operator delete[](void*)');
+  assert.equal(ops._ZNK3VeccoEv, 'Vec::operator~() const');
+  assert.equal(ops._ZNK3VeccviEv, 'Vec::operator int() const');
+  assert.equal(ops._ZmiRK3VecS1_, 'operator-(Vec const&, Vec const&)');
+  // `operator<`, `operator<=` and `operator<<` all carry a `<` in the answer without being templates,
+  // which is the difference between reading a name and guessing at one: a return type would otherwise
+  // be invented in front of each of them.
+  assert.equal(ops._ZNK3VecltERKS_, 'Vec::operator<(Vec const&) const');
+  assert.equal(ops._ZNK3VecleERKS_, 'Vec::operator<=(Vec const&) const');
+  assert.equal(ops._ZNK3VeclsERKS_, 'Vec::operator<<(Vec const&) const');
+  // A substitution names the type that *completed*, not the one inside it: the second parameter of
+  // `one_ref` is the whole reference, and the free operator's is two declarators deep.
+  assert.equal(probe['cxx.o'].agreed._Z7one_refRiS_, 'one_ref(int&, int&)');
   // The one name the two witnesses spell differently is answered with a refusal, and neither of their
-  // spellings reaches the report: `Dn` is `decltype(nullptr)` to one and `std::nullptr_t` to the other,
-  // so no string is a fact about those two bytes.
-  const refused = want.find((row) => row.includes('\tout\t-\t'));
-  assert.match(refused, /^sym\t14\tin\t_Z4varsPcPKwDn\tout\t-\twhy\t/);
-  assert.ok(!want.some((row) => row.includes('nullptr')), 'a spelling was picked anyway');
-  assert.equal(Object.keys(probe.diverged).join(), '_Z4varsPcPKwDn', 'the divergence moved');
+  // spellings reaches the report: `Dn` is `decltype(nullptr)` to binutils and `std::nullptr_t` to LLVM.
+  const cxx = probe['cxx.o'].rows;
+  const refused = cxx.find((row) => row.includes('\tout\t-\t'));
+  assert.match(refused, /^sym\t\d+\tin\t_Z4varsPcPKwDn\tout\t-\twhy\tnot in the two-witness subset$/);
+  assert.ok(!cxx.some((row) => row.includes('nullptr')), 'a spelling was picked anyway');
+  assert.ok(!refused.includes('wchar_t'), 'that name was half demangled');
+  assert.deepEqual(Object.keys(probe['cxx.o'].unequal), ['_Z4varsPcPKwDn'], 'the divergence moved');
+  assert.deepEqual(probe['ops.o'].unequal, {}, 'two demanglers stopped agreeing on an operator');
+  assert.deepEqual(probe['ops.o'].untouched, [], 'a name neither witness read');
   // A C object has no mangled name in it, and the list says so rather than keeping the previous file's.
   report(new Uint8Array(await readFile('test/fixtures/answer.obj')));
   assert.equal(ex.demangle_count(), 1, 'the totals row and nothing else');
